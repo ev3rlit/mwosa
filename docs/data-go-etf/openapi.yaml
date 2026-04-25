@@ -1,0 +1,690 @@
+openapi: "3.0.3"
+info:
+  title: 금융위원회_증권상품시세정보
+  version: "1.0.0"
+  description: |
+    증권상품시세정보는 한국거래소에서 제공하는 상장 증권상품의 실시간 시세 정보를 제공하는 데이터입니다.
+    상장지수펀드(ETF), 상장지수채권(ETN), 주식워런트증권(ELW) 등 주요 증권상품의 시가, 종가, 고가, 저가, 거래량, 변동률 등 시세 항목을 포함하고 있습니다.
+
+    이 데이터는 3개 오퍼레이션으로 구성되어 있습니다.
+    각 오퍼레이션은 다음과 같습니다.
+
+    ① ETF 시세 : 상장지수펀드(ETF)의 종목별 시세 정보를 조회합니다.
+    ② ETN 시세 : 상장지수채권(ETN)의 종목별 시세 정보를 조회합니다.
+    ③ ELW 시세 : 주식워런트증권(ELW)의 종목별 시세 정보를 조회합니다.
+  contact:
+    name: 금융공공데이터팀 (금융위원회)
+    phone: "02-2100-2674"
+
+servers:
+  - url: https://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService
+    description: 공공데이터포털 운영 서버 (HTTPS)
+  - url: http://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService
+    description: 공공데이터포털 운영 서버 (HTTP)
+
+tags:
+  - name: ETF시세
+    description: 상장지수펀드(ETF) 종목별 시세 조회
+  - name: ETN시세
+    description: 상장지수채권(ETN) 종목별 시세 조회
+  - name: ELW시세
+    description: 주식워런트증권(ELW) 종목별 시세 조회
+
+paths:
+  /getETFPriceInfo:
+    get:
+      tags:
+        - ETF시세
+      summary: ETF 시세 조회
+      operationId: getETFPriceInfo
+      description: |
+        한국거래소에서 제공하는 상장지수펀드(ETF) 종목별 시세 정보를 조회합니다.
+        ETF 종목별 시세, ETN 종목별 시세, ELW 종목별 시세 대한 오퍼레이션을 제공한다.
+      parameters:
+        - $ref: "#/components/parameters/serviceKey"
+        - $ref: "#/components/parameters/numOfRows"
+        - $ref: "#/components/parameters/pageNo"
+        - $ref: "#/components/parameters/resultType"
+        - $ref: "#/components/parameters/basDt"
+        - $ref: "#/components/parameters/beginBasDt"
+        - $ref: "#/components/parameters/endBasDt"
+        - $ref: "#/components/parameters/likeBasDt"
+        - $ref: "#/components/parameters/likeSrtnCd"
+        - $ref: "#/components/parameters/isinCd"
+        - $ref: "#/components/parameters/likeIsinCd"
+        - $ref: "#/components/parameters/itmsNm"
+        - $ref: "#/components/parameters/likeItmsNm"
+        - $ref: "#/components/parameters/beginVs"
+        - $ref: "#/components/parameters/endVs"
+        - name: beginFltRt
+          in: query
+          required: false
+          description: 등락률이 검색값보다 크거나 같은 데이터를 검색
+          schema:
+            type: string
+        - name: endFltRt
+          in: query
+          required: false
+          description: 등락률이 검색값보다 작은 데이터를 검색
+          schema:
+            type: string
+        - name: beginNav
+          in: query
+          required: false
+          description: NAV가 검색값보다 크거나 같은 데이터를 검색
+          schema:
+            type: string
+        - name: endNav
+          in: query
+          required: false
+          description: NAV가 검색값보다 작은 데이터를 검색
+          schema:
+            type: string
+        - $ref: "#/components/parameters/beginTrqu"
+        - $ref: "#/components/parameters/endTrqu"
+        - $ref: "#/components/parameters/beginTrPrc"
+        - $ref: "#/components/parameters/endTrPrc"
+        - $ref: "#/components/parameters/beginMrktTotAmt"
+        - $ref: "#/components/parameters/endMrktTotAmt"
+        - name: bssIdxIdxNm
+          in: query
+          required: false
+          description: 검색값과 기초지수_지수명이 일치하는 데이터를 검색
+          schema:
+            type: string
+        - name: likeBssIdxIdxNm
+          in: query
+          required: false
+          description: 기초지수_지수명이 검색값을 포함하는 데이터를 검색
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ETFPriceInfoResponse"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ETFPriceInfoResponse"
+
+  /getETNPriceInfo:
+    get:
+      tags:
+        - ETN시세
+      summary: ETN 시세 조회
+      operationId: getETNPriceInfo
+      description: |
+        한국거래소에서 제공하는 상장지수채권(ETN) 종목별 시세 정보를 조회합니다.
+      parameters:
+        - $ref: "#/components/parameters/serviceKey"
+        - $ref: "#/components/parameters/numOfRows"
+        - $ref: "#/components/parameters/pageNo"
+        - $ref: "#/components/parameters/resultType"
+        - $ref: "#/components/parameters/basDt"
+        - $ref: "#/components/parameters/beginBasDt"
+        - $ref: "#/components/parameters/endBasDt"
+        - $ref: "#/components/parameters/likeBasDt"
+        - $ref: "#/components/parameters/likeSrtnCd"
+        - $ref: "#/components/parameters/isinCd"
+        - $ref: "#/components/parameters/likeIsinCd"
+        - $ref: "#/components/parameters/itmsNm"
+        - $ref: "#/components/parameters/likeItmsNm"
+        - $ref: "#/components/parameters/beginVs"
+        - $ref: "#/components/parameters/endVs"
+        - name: beginFltRt
+          in: query
+          required: false
+          description: 등락률이 검색값보다 크거나 같은 데이터를 검색
+          schema:
+            type: string
+        - name: endFltRt
+          in: query
+          required: false
+          description: 등락률이 검색값보다 작은 데이터를 검색
+          schema:
+            type: string
+        - name: beginIndcVal
+          in: query
+          required: false
+          description: IV(지표가치)가 검색값보다 크거나 같은 데이터를 검색
+          schema:
+            type: string
+        - name: endIndcVal
+          in: query
+          required: false
+          description: IV(지표가치)가 검색값보다 작은 데이터를 검색
+          schema:
+            type: string
+        - $ref: "#/components/parameters/beginTrqu"
+        - $ref: "#/components/parameters/endTrqu"
+        - $ref: "#/components/parameters/beginTrPrc"
+        - $ref: "#/components/parameters/endTrPrc"
+        - $ref: "#/components/parameters/beginMrktTotAmt"
+        - $ref: "#/components/parameters/endMrktTotAmt"
+        - name: bssIdxIdxNm
+          in: query
+          required: false
+          description: 검색값과 기초지수_지수명이 일치하는 데이터를 검색
+          schema:
+            type: string
+        - name: likeBssIdxIdxNm
+          in: query
+          required: false
+          description: 기초지수_지수명이 검색값을 포함하는 데이터를 검색
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ETNPriceInfoResponse"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ETNPriceInfoResponse"
+
+  /getELWPriceInfo:
+    get:
+      tags:
+        - ELW시세
+      summary: ELW 시세 조회
+      operationId: getELWPriceInfo
+      description: |
+        한국거래소에서 제공하는 주식워런트증권(ELW) 종목별 시세 정보를 조회합니다.
+      parameters:
+        - $ref: "#/components/parameters/serviceKey"
+        - $ref: "#/components/parameters/numOfRows"
+        - $ref: "#/components/parameters/pageNo"
+        - $ref: "#/components/parameters/resultType"
+        - $ref: "#/components/parameters/basDt"
+        - $ref: "#/components/parameters/beginBasDt"
+        - $ref: "#/components/parameters/endBasDt"
+        - $ref: "#/components/parameters/likeBasDt"
+        - $ref: "#/components/parameters/likeSrtnCd"
+        - $ref: "#/components/parameters/isinCd"
+        - $ref: "#/components/parameters/likeIsinCd"
+        - $ref: "#/components/parameters/itmsNm"
+        - $ref: "#/components/parameters/likeItmsNm"
+        - $ref: "#/components/parameters/beginVs"
+        - $ref: "#/components/parameters/endVs"
+        - $ref: "#/components/parameters/beginTrqu"
+        - $ref: "#/components/parameters/endTrqu"
+        - $ref: "#/components/parameters/beginTrPrc"
+        - $ref: "#/components/parameters/endTrPrc"
+        - $ref: "#/components/parameters/beginMrktTotAmt"
+        - $ref: "#/components/parameters/endMrktTotAmt"
+        - name: udasAstNm
+          in: query
+          required: false
+          description: 검색값과 기초지수_자산명이 일치하는 데이터를 검색
+          schema:
+            type: string
+        - name: likeUdasAstNm
+          in: query
+          required: false
+          description: 기초지수_자산명이 검색값을 포함하는 데이터를 검색
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ELWPriceInfoResponse"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ELWPriceInfoResponse"
+
+components:
+  parameters:
+    serviceKey:
+      name: serviceKey
+      in: query
+      required: true
+      description: 공공데이터포털에서 받은 인증키
+      schema:
+        type: string
+
+    numOfRows:
+      name: numOfRows
+      in: query
+      required: false
+      description: 한 페이지 결과 수
+      schema:
+        type: integer
+
+    pageNo:
+      name: pageNo
+      in: query
+      required: false
+      description: 페이지 번호
+      schema:
+        type: integer
+
+    resultType:
+      name: resultType
+      in: query
+      required: false
+      description: "응답 데이터 형식 구분 (xml 또는 json). Default: xml"
+      schema:
+        type: string
+        enum: [ xml, json ]
+        default: xml
+
+    basDt:
+      name: basDt
+      in: query
+      required: false
+      description: 검색값과 기준일자가 일치하는 데이터를 검색 (YYYYMMDD 형식)
+      schema:
+        type: string
+        example: "20240101"
+
+    beginBasDt:
+      name: beginBasDt
+      in: query
+      required: false
+      description: 기준일자가 검색값보다 크거나 같은 데이터를 검색 (YYYYMMDD 형식)
+      schema:
+        type: string
+        example: "20240101"
+
+    endBasDt:
+      name: endBasDt
+      in: query
+      required: false
+      description: 기준일자가 검색값보다 작은 데이터를 검색 (YYYYMMDD 형식)
+      schema:
+        type: string
+        example: "20241231"
+
+    likeBasDt:
+      name: likeBasDt
+      in: query
+      required: false
+      description: 기준일자값이 검색값을 포함하는 데이터를 검색
+      schema:
+        type: string
+
+    likeSrtnCd:
+      name: likeSrtnCd
+      in: query
+      required: false
+      description: 단축코드가 검색값을 포함하는 데이터를 검색
+      schema:
+        type: string
+
+    isinCd:
+      name: isinCd
+      in: query
+      required: false
+      description: 검색값과 ISIN코드가 일치하는 데이터를 검색
+      schema:
+        type: string
+
+    likeIsinCd:
+      name: likeIsinCd
+      in: query
+      required: false
+      description: ISIN코드가 검색값을 포함하는 데이터를 검색
+      schema:
+        type: string
+
+    itmsNm:
+      name: itmsNm
+      in: query
+      required: false
+      description: 검색값과 종목명이 일치하는 데이터를 검색
+      schema:
+        type: string
+
+    likeItmsNm:
+      name: likeItmsNm
+      in: query
+      required: false
+      description: 종목명이 검색값을 포함하는 데이터를 검색
+      schema:
+        type: string
+
+    beginVs:
+      name: beginVs
+      in: query
+      required: false
+      description: 대비가 검색값보다 크거나 같은 데이터를 검색
+      schema:
+        type: string
+
+    endVs:
+      name: endVs
+      in: query
+      required: false
+      description: 대비가 검색값보다 작은 데이터를 검색
+      schema:
+        type: string
+
+    beginTrqu:
+      name: beginTrqu
+      in: query
+      required: false
+      description: 거래량이 검색값보다 크거나 같은 데이터를 검색
+      schema:
+        type: string
+
+    endTrqu:
+      name: endTrqu
+      in: query
+      required: false
+      description: 거래량이 검색값보다 작은 데이터를 검색
+      schema:
+        type: string
+
+    beginTrPrc:
+      name: beginTrPrc
+      in: query
+      required: false
+      description: 거래대금이 검색값보다 크거나 같은 데이터를 검색
+      schema:
+        type: string
+
+    endTrPrc:
+      name: endTrPrc
+      in: query
+      required: false
+      description: 거래대금이 검색값보다 작은 데이터를 검색
+      schema:
+        type: string
+
+    beginMrktTotAmt:
+      name: beginMrktTotAmt
+      in: query
+      required: false
+      description: 시가총액이 검색값보다 크거나 같은 데이터를 검색
+      schema:
+        type: string
+
+    endMrktTotAmt:
+      name: endMrktTotAmt
+      in: query
+      required: false
+      description: 시가총액이 검색값보다 작은 데이터를 검색
+      schema:
+        type: string
+
+  schemas:
+    Header:
+      type: object
+      properties:
+        resultCode:
+          type: string
+          description: API 호출 결과의 상태 코드
+        resultMsg:
+          type: string
+          description: API 호출 결과의 상태 메시지
+
+    # ─── ETF ───────────────────────────────────────────────
+    ETFPriceInfoResponse:
+      type: object
+      xml:
+        name: response
+      properties:
+        header:
+          $ref: "#/components/schemas/Header"
+        body:
+          $ref: "#/components/schemas/Body_ETFPriceInfo"
+
+    Body_ETFPriceInfo:
+      type: object
+      properties:
+        numOfRows:
+          type: integer
+          description: 한 페이지의 결과 수
+        pageNo:
+          type: integer
+          description: 현재 조회된 데이터의 페이지 번호
+        totalCount:
+          type: integer
+          description: 전체 데이터의 총 수
+        items:
+          type: object
+          properties:
+            item:
+              oneOf:
+                - $ref: "#/components/schemas/Item_ETFPriceInfo"
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/Item_ETFPriceInfo"
+
+    Item_ETFPriceInfo:
+      type: object
+      properties:
+        basDt:
+          type: string
+          description: "YYYYMMDD 기준일자"
+        srtnCd:
+          type: string
+          description: "종목 코드보다 짧으면서 유일성이 보장되는 코드 (6자리)"
+        isinCd:
+          type: string
+          description: "국제 채권 식별 번호. 유가증권(채권)의 국제인증 고유번호"
+        itmsNm:
+          type: string
+          description: "유가증권 국제인증 고유번호 코드 이름 (종목명)"
+        clpr:
+          type: number
+          description: "정규시장의 매매시간 종료 시까지 형성되는 최종가격 (종가)"
+        vs:
+          type: number
+          description: "전일 대비 등락"
+        fltRt:
+          type: number
+          description: "전일 대비 등락에 따른 비율 (등락률)"
+        mkp:
+          type: number
+          description: "정규시장의 매매시간 개시 후 형성되는 최초가격 (시가)"
+        hipr:
+          type: number
+          description: "하루 중 가격의 최고치 (고가)"
+        lopr:
+          type: number
+          description: "하루 중 가격의 최저치 (저가)"
+        trqu:
+          type: number
+          description: "체결수량의 누적 합계 (거래량)"
+        trPrc:
+          type: number
+          description: "거래건 별 체결가격 × 체결수량의 누적 합계 (거래대금)"
+        mrktTotAmt:
+          type: number
+          description: "종가 × 상장좌수 (시가총액)"
+        nPptTotAmt:
+          type: number
+          description: "ETF의 순자산총액"
+        stLstgCnt:
+          type: number
+          description: "ETF의 상장좌수"
+        nav:
+          type: number
+          description: "순자산총액 / 상장좌수 (NAV)"
+        bssIdxIdxNm:
+          type: string
+          description: "ETF의 기초지수 명칭"
+        bssIdxClpr:
+          type: number
+          description: "ETF의 기초지수 종가"
+
+    # ─── ETN ───────────────────────────────────────────────
+    ETNPriceInfoResponse:
+      type: object
+      xml:
+        name: response
+      properties:
+        header:
+          $ref: "#/components/schemas/Header"
+        body:
+          $ref: "#/components/schemas/Body_ETNPriceInfo"
+
+    Body_ETNPriceInfo:
+      type: object
+      properties:
+        numOfRows:
+          type: integer
+          description: 한 페이지의 결과 수
+        pageNo:
+          type: integer
+          description: 현재 조회된 데이터의 페이지 번호
+        totalCount:
+          type: integer
+          description: 전체 데이터의 총 수
+        items:
+          type: object
+          properties:
+            item:
+              oneOf:
+                - $ref: "#/components/schemas/Item_ETNPriceInfo"
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/Item_ETNPriceInfo"
+
+    Item_ETNPriceInfo:
+      type: object
+      properties:
+        basDt:
+          type: string
+          description: "YYYYMMDD 기준일자"
+        srtnCd:
+          type: string
+          description: "종목 코드보다 짧으면서 유일성이 보장되는 코드 (6자리)"
+        isinCd:
+          type: string
+          description: "국제 채권 식별 번호. 유가증권(채권)의 국제인증 고유번호"
+        itmsNm:
+          type: string
+          description: "유가증권 국제인증 고유번호 코드 이름 (종목명)"
+        clpr:
+          type: number
+          description: "정규시장의 매매시간 종료 시까지 형성되는 최종가격 (종가)"
+        vs:
+          type: number
+          description: "전일 대비 등락"
+        fltRt:
+          type: number
+          description: "전일 대비 등락에 따른 비율 (등락률)"
+        mkp:
+          type: number
+          description: "정규시장의 매매시간 개시 후 형성되는 최초가격 (시가)"
+        hipr:
+          type: number
+          description: "하루 중 가격의 최고치 (고가)"
+        lopr:
+          type: number
+          description: "하루 중 가격의 최저치 (저가)"
+        trqu:
+          type: number
+          description: "체결수량의 누적 합계 (거래량)"
+        trPrc:
+          type: number
+          description: "거래건 별 체결가격 × 체결수량의 누적 합계 (거래대금)"
+        mrktTotAmt:
+          type: number
+          description: "종가 × 상장증권수 (시가총액)"
+        indcVal:
+          type: number
+          description: "지표가치총액 / 상장증권수 (지표가치, IV)"
+        indcValTotAmt:
+          type: number
+          description: "ETN의 지표가치총액"
+        lstgScrtCnt:
+          type: number
+          description: "ETN의 상장증권수"
+        bssIdxIdxNm:
+          type: string
+          description: "ETN의 기초지수 명칭"
+        bssIdxClpr:
+          type: number
+          description: "ETN의 기초지수 종가"
+
+    # ─── ELW ───────────────────────────────────────────────
+    ELWPriceInfoResponse:
+      type: object
+      xml:
+        name: response
+      properties:
+        header:
+          $ref: "#/components/schemas/Header"
+        body:
+          $ref: "#/components/schemas/Body_ELWPriceInfo"
+
+    Body_ELWPriceInfo:
+      type: object
+      properties:
+        numOfRows:
+          type: integer
+          description: 한 페이지의 결과 수
+        pageNo:
+          type: integer
+          description: 현재 조회된 데이터의 페이지 번호
+        totalCount:
+          type: integer
+          description: 전체 데이터의 총 수
+        items:
+          type: object
+          properties:
+            item:
+              oneOf:
+                - $ref: "#/components/schemas/Item_ELWPriceInfo"
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/Item_ELWPriceInfo"
+
+    Item_ELWPriceInfo:
+      type: object
+      properties:
+        basDt:
+          type: string
+          description: "YYYYMMDD 기준일자"
+        srtnCd:
+          type: string
+          description: "종목 코드보다 짧으면서 유일성이 보장되는 코드 (6자리)"
+        isinCd:
+          type: string
+          description: "국제 채권 식별 번호. 유가증권(채권)의 국제인증 고유번호"
+        itmsNm:
+          type: string
+          description: "유가증권 국제인증 고유번호 코드 이름 (종목명)"
+        clpr:
+          type: number
+          description: "정규시장의 매매시간 종료 시까지 형성되는 최종가격 (종가)"
+        vs:
+          type: number
+          description: "전일 대비 등락"
+        mkp:
+          type: number
+          description: "정규시장의 매매시간 개시 후 형성되는 최초가격 (시가)"
+        hipr:
+          type: number
+          description: "하루 중 가격의 최고치 (고가)"
+        lopr:
+          type: number
+          description: "하루 중 가격의 최저치 (저가)"
+        trqu:
+          type: number
+          description: "체결수량의 누적 합계 (거래량)"
+        trPrc:
+          type: number
+          description: "거래건 별 체결가격 × 체결수량의 누적 합계 (거래대금)"
+        mrktTotAmt:
+          type: number
+          description: "종가 × 상장증권수 (시가총액)"
+        lstgScrtCnt:
+          type: number
+          description: "ELW의 상장증권수"
+        udasAstNm:
+          type: string
+          description: "기초자산명"
+        udasAstClpr:
+          type: number
+          description: "기초자산 종가"
