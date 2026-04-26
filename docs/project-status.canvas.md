@@ -12,7 +12,7 @@ viewport:
 
 # mwosa 프로젝트 관리판
 
-기준: 2026-04-25
+기준: 2026-04-26
 
 이 캔버스는 문서 의사결정 목록이 아니라 **프로젝트를 어떻게 진행할지 보는 관리판**이다. 현재 상태, 일정 흐름, 다음 작업, 주요 과제, 아직 정하지 않은 항목, 범위 밖 항목을 한눈에 보도록 구성한다.
 
@@ -38,6 +38,7 @@ viewport:
 | 제품 정체성 | 결정됨 |
 | 장기 CLI 표면 | 결정됨 |
 | 스윙 MVP 흐름 | 결정됨 |
+| 지표/추세 아키텍처 | 초안 작성됨 |
 | canonical schema v1 | 결정됨 |
 | provider / layer 구조 | 설계 기준 정리됨 |
 | Go 구현 | 초기 모듈 상태 |
@@ -59,6 +60,7 @@ viewport:
 - `docs/architectures/tech-stack/README.md`: Go, Cobra, 로컬 파일, SurrealDB 결정
 - `docs/architectures/layers/README.md`: 레이어 책임, 금지 방향, 디렉터리 예시
 - `docs/architectures/provider/README.md`: provider role/router/adapter 구조
+- `docs/architectures/indicator/README.md`: 지표와 추세 계산 레이어
 - `docs/development/README.md`: 개발 협업 기준, HTTP client 선택 기준
 - `docs/providers/datago/README.md`: `datago` provider 와 첫 provider group 구현 계획
 

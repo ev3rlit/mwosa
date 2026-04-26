@@ -264,7 +264,8 @@ fallback 규칙:
 - canonical key
 - price series
 - return calculation
-- RSI/MACD/SMA 같은 indicator 계산
+- RSI, MACD, SMA 같은 indicator 계산
+- 스윙 흐름에 필요한 추세, 거래량, 변동성, 모멘텀 계산
 - position sizing
 - reward/risk calculation
 - portfolio weight calculation
@@ -293,6 +294,8 @@ indicator/
 ```
 
 초기에는 `canonical`, `indicator` 로 시작하고, domain 개념이 커질 때 `domain` 으로 확장한다.
+
+지표와 추세 계산의 세부 기준은 [Indicator Architecture](../indicator/README.md) 에 둔다. provider 에서 가져온 원천 데이터는 canonical data 로 정규화하고, indicator 계산은 그 위에서 수행한다.
 
 ## Persistence Layer
 
