@@ -1,4 +1,4 @@
-package datago
+package datagoclient
 
 import (
 	"bytes"
@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-
-	provider "github.com/ev3rlit/mwosa/providers/core"
 )
 
 type Client struct {
@@ -21,13 +19,13 @@ type Client struct {
 	numOfRows  int
 }
 
-func NewClient(config Config) (*Client, error) {
+func New(config Config) (*Client, error) {
 	config = config.withDefaults()
 	if strings.TrimSpace(config.ServiceKey) == "" {
-		return nil, fmt.Errorf("datago client config: serviceKey is required provider=%s group=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice)
+		return nil, fmt.Errorf("datago client config: serviceKey is required provider=%s group=%s", ProviderDataGo, GroupSecuritiesProductPrice)
 	}
 	if _, err := url.ParseRequestURI(config.BaseURL); err != nil {
-		return nil, fmt.Errorf("datago client config: invalid baseURL provider=%s group=%s baseURL=%q: %w", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, config.BaseURL, err)
+		return nil, fmt.Errorf("datago client config: invalid baseURL provider=%s group=%s baseURL=%q: %w", ProviderDataGo, GroupSecuritiesProductPrice, config.BaseURL, err)
 	}
 	return &Client{
 		serviceKey: config.ServiceKey,
@@ -37,30 +35,30 @@ func NewClient(config Config) (*Client, error) {
 	}, nil
 }
 
-type priceQuery struct {
-	Operation provider.OperationID
+type PriceQuery struct {
+	Operation string
 	Params    url.Values
 	Limit     int
 }
 
-type priceResult struct {
-	Items      []priceItem
+type PriceResult struct {
+	Items      []PriceItem
 	TotalCount int
 }
 
-func (c *Client) fetchPrices(ctx context.Context, query priceQuery) (priceResult, error) {
+func (c *Client) FetchPrices(ctx context.Context, query PriceQuery) (PriceResult, error) {
 	if query.Operation == "" {
-		return priceResult{}, fmt.Errorf("datago fetch prices: operation is required provider=%s group=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice)
+		return PriceResult{}, fmt.Errorf("datago fetch prices: operation is required provider=%s group=%s", ProviderDataGo, GroupSecuritiesProductPrice)
 	}
 
-	allItems := make([]priceItem, 0)
+	allItems := make([]PriceItem, 0)
 	totalCount := 0
 	pageNo := 1
 
 	for {
 		response, err := c.fetchPage(ctx, query.Operation, query.Params, pageNo)
 		if err != nil {
-			return priceResult{}, err
+			return PriceResult{}, err
 		}
 		totalCount = response.Body.TotalCount
 		allItems = append(allItems, response.Body.Items...)
@@ -75,14 +73,14 @@ func (c *Client) fetchPrices(ctx context.Context, query priceQuery) (priceResult
 		pageNo++
 	}
 
-	return priceResult{Items: allItems, TotalCount: totalCount}, nil
+	return PriceResult{Items: allItems, TotalCount: totalCount}, nil
 }
 
-func (c *Client) fetchPage(ctx context.Context, operation provider.OperationID, params url.Values, pageNo int) (apiResponse, error) {
+func (c *Client) fetchPage(ctx context.Context, operation string, params url.Values, pageNo int) (apiResponse, error) {
 	endpoint := fmt.Sprintf("%s/%s", c.baseURL, operation)
 	reqURL, err := url.Parse(endpoint)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("datago request build failed provider=%s group=%s operation=%s: %w", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, err)
+		return apiResponse{}, fmt.Errorf("datago request build failed provider=%s group=%s operation=%s: %w", ProviderDataGo, GroupSecuritiesProductPrice, operation, err)
 	}
 
 	values := cloneValues(params)
@@ -94,29 +92,29 @@ func (c *Client) fetchPage(ctx context.Context, operation provider.OperationID, 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("datago request build failed provider=%s group=%s operation=%s: %w", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, err)
+		return apiResponse{}, fmt.Errorf("datago request build failed provider=%s group=%s operation=%s: %w", ProviderDataGo, GroupSecuritiesProductPrice, operation, err)
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("datago remote request failed provider=%s group=%s operation=%s page=%d: %w", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, pageNo, err)
+		return apiResponse{}, fmt.Errorf("datago remote request failed provider=%s group=%s operation=%s page=%d: %w", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("datago remote response read failed provider=%s group=%s operation=%s page=%d status=%d: %w", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, err)
+		return apiResponse{}, fmt.Errorf("datago remote response read failed provider=%s group=%s operation=%s page=%d status=%d: %w", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return apiResponse{}, fmt.Errorf("datago remote error provider=%s group=%s operation=%s page=%d status=%d body=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, strings.TrimSpace(string(body)))
+		return apiResponse{}, fmt.Errorf("datago remote error provider=%s group=%s operation=%s page=%d status=%d body=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	decoded, err := decodeAPIResponse(body)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("datago response decode failed provider=%s group=%s operation=%s page=%d: %w", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, pageNo, err)
+		return apiResponse{}, fmt.Errorf("datago response decode failed provider=%s group=%s operation=%s page=%d: %w", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, err)
 	}
 	if decoded.Header.ResultCode != "" && decoded.Header.ResultCode != "00" {
-		return apiResponse{}, fmt.Errorf("datago remote error provider=%s group=%s operation=%s page=%d result_code=%s result_msg=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice, operation, pageNo, decoded.Header.ResultCode, decoded.Header.ResultMsg)
+		return apiResponse{}, fmt.Errorf("datago remote error provider=%s group=%s operation=%s page=%d result_code=%s result_msg=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, decoded.Header.ResultCode, decoded.Header.ResultMsg)
 	}
 	return decoded, nil
 }
@@ -143,7 +141,7 @@ type apiBody struct {
 	NumOfRows  int
 	PageNo     int
 	TotalCount int
-	Items      []priceItem
+	Items      []PriceItem
 }
 
 func decodeAPIResponse(body []byte) (apiResponse, error) {
@@ -180,9 +178,9 @@ func decodeAPIResponse(body []byte) (apiResponse, error) {
 	}, nil
 }
 
-type priceItem map[string]string
+type PriceItem map[string]string
 
-func (p *priceItem) UnmarshalJSON(data []byte) error {
+func (p *PriceItem) UnmarshalJSON(data []byte) error {
 	var raw map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
@@ -190,7 +188,7 @@ func (p *priceItem) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	item := make(priceItem, len(raw))
+	item := make(PriceItem, len(raw))
 	for key, value := range raw {
 		switch typed := value.(type) {
 		case nil:
@@ -209,7 +207,7 @@ func (p *priceItem) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func decodeItems(raw json.RawMessage) ([]priceItem, error) {
+func decodeItems(raw json.RawMessage) ([]PriceItem, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return nil, nil
@@ -217,17 +215,17 @@ func decodeItems(raw json.RawMessage) ([]priceItem, error) {
 
 	switch trimmed[0] {
 	case '[':
-		var items []priceItem
+		var items []PriceItem
 		if err := json.Unmarshal(trimmed, &items); err != nil {
 			return nil, err
 		}
 		return items, nil
 	case '{':
-		var item priceItem
+		var item PriceItem
 		if err := json.Unmarshal(trimmed, &item); err != nil {
 			return nil, err
 		}
-		return []priceItem{item}, nil
+		return []PriceItem{item}, nil
 	default:
 		return nil, fmt.Errorf("unsupported item shape: %s", string(trimmed))
 	}

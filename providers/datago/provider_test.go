@@ -198,7 +198,7 @@ func TestRemoteErrorIncludesProviderContext(t *testing.T) {
 }
 
 func TestUnsupportedSecurityTypeIsNotHiddenAsEmptySuccess(t *testing.T) {
-	p := NewWithClient(&Client{})
+	p := NewWithClient(nil)
 	_, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeStock,
@@ -219,7 +219,7 @@ func TestUnsupportedSecurityTypeIsNotHiddenAsEmptySuccess(t *testing.T) {
 }
 
 func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
-	p := NewWithClient(&Client{})
+	p := NewWithClient(nil)
 	registry := provider.NewRegistry()
 	if err := Register(registry, p); err != nil {
 		t.Fatalf("register datago provider: %v", err)

@@ -6,10 +6,17 @@ import (
 	"net/url"
 	"regexp"
 
+	datagoclient "github.com/ev3rlit/mwosa/providers/clients/marketdata-provider-datago"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
 )
+
+type Config = datagoclient.Config
+
+type priceClient interface {
+	FetchPrices(context.Context, datagoclient.PriceQuery) (datagoclient.PriceResult, error)
+}
 
 type Provider struct {
 	provider.Identity
@@ -17,18 +24,18 @@ type Provider struct {
 	dailybar.Fetch
 	instrument.Search
 
-	client *Client
+	client priceClient
 }
 
 func New(config Config) (*Provider, error) {
-	client, err := NewClient(config)
+	client, err := datagoclient.New(config)
 	if err != nil {
 		return nil, err
 	}
 	return NewWithClient(client), nil
 }
 
-func NewWithClient(client *Client) *Provider {
+func NewWithClient(client priceClient) *Provider {
 	p := &Provider{
 		Identity: provider.Identity{
 			ID:          provider.ProviderDataGo,
@@ -118,6 +125,9 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 	if err != nil {
 		return dailybar.FetchResult{}, err
 	}
+	if p.client == nil {
+		return dailybar.FetchResult{}, fmt.Errorf("datago adapter client is nil provider=%s group=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice)
+	}
 
 	params := url.Values{}
 	if input.Symbol != "" {
@@ -134,8 +144,8 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 		}
 	}
 
-	result, err := p.client.fetchPrices(ctx, priceQuery{
-		Operation: operation,
+	result, err := p.client.FetchPrices(ctx, datagoclient.PriceQuery{
+		Operation: string(operation),
 		Params:    params,
 		Limit:     input.Limit,
 	})
@@ -165,6 +175,9 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 	if err != nil {
 		return instrument.SearchResult{}, err
 	}
+	if p.client == nil {
+		return instrument.SearchResult{}, fmt.Errorf("datago adapter client is nil provider=%s group=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice)
+	}
 
 	instruments := make([]instrument.Instrument, 0)
 	totalCount := 0
@@ -176,8 +189,8 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 			params.Set("likeItmsNm", input.Query)
 		}
 
-		result, err := p.client.fetchPrices(ctx, priceQuery{
-			Operation: spec.Operation,
+		result, err := p.client.FetchPrices(ctx, datagoclient.PriceQuery{
+			Operation: string(spec.Operation),
 			Params:    params,
 			Limit:     input.Limit,
 		})
@@ -287,7 +300,7 @@ func operationIDs(specs []operationSpec) []provider.OperationID {
 	return operations
 }
 
-func normalizeDailyBar(item priceItem, securityType provider.SecurityType, operation provider.OperationID) dailybar.Bar {
+func normalizeDailyBar(item datagoclient.PriceItem, securityType provider.SecurityType, operation provider.OperationID) dailybar.Bar {
 	return dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
@@ -312,7 +325,7 @@ func normalizeDailyBar(item priceItem, securityType provider.SecurityType, opera
 	}
 }
 
-func normalizeInstrument(item priceItem, securityType provider.SecurityType, operation provider.OperationID) instrument.Instrument {
+func normalizeInstrument(item datagoclient.PriceItem, securityType provider.SecurityType, operation provider.OperationID) instrument.Instrument {
 	securityCode := item["srtnCd"]
 	return instrument.Instrument{
 		Provider:     provider.ProviderDataGo,
@@ -341,7 +354,7 @@ func normalizeDate(value string) string {
 	return fmt.Sprintf("%s-%s-%s", value[:4], value[4:6], value[6:8])
 }
 
-func extensionFields(item priceItem) map[string]string {
+func extensionFields(item datagoclient.PriceItem) map[string]string {
 	extensions := make(map[string]string)
 	for key, value := range item {
 		if isCommonDailyBarField(key) {
