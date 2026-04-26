@@ -184,7 +184,7 @@ mwosa inspect tool <name>
 | `mwosa backfill daily`            | 과거 일별 데이터를 지정한 기간만큼 시장/자산군 단위로 채운다.   |
 | `mwosa backfill candles <symbol>` | 과거 시계열 데이터를 지정한 범위만큼 채운다.                    |
 | `mwosa verify data <symbol>`      | 저장된 데이터의 중복, 누락, 날짜 정합성을 검사한다.             |
-| `mwosa reindex data`              | 로컬 파일을 다시 스캔해 검색/coverage 인덱스를 재구축한다.      |
+| `mwosa reindex data`              | SQLite 정본 데이터를 기준으로 검색/coverage 보조 구조를 재구축한다. |
 | `mwosa prune cache`               | 오래된 캐시나 임시 데이터를 정리한다.                           |
 | `mwosa delete data <selector>`    | 특정 종목, 기간, record type 의 로컬 데이터를 삭제한다.         |
 | `mwosa export data <selector>`    | 데이터를 `json`, `ndjson`, `csv` 등으로 내보낸다.               |

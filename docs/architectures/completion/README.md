@@ -128,7 +128,7 @@ Tab 입력은 매우 자주 발생하므로 completion 함수가 외부 API 를 
 | --- | --- | --- |
 | provider name | provider registry metadata | 안 함 |
 | market/exchange | static catalog 또는 local index | 안 함 |
-| symbol/instrument | SurrealDB index 또는 local canonical files | 안 함 |
+| symbol/instrument | SQLite canonical database 또는 read-only lookup index | 안 함 |
 | portfolio/universe/strategy | local user data | 안 함 |
 | config path | shell file completion directive | shell 에 위임 |
 

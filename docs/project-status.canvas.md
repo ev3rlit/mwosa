@@ -57,7 +57,7 @@ viewport:
 - `README.md`: 제품 정체성, 장기 CLI 도움말 표면
 - `docs/swing-cli-minimum-requirements.md`: 스윙 MVP 흐름
 - `docs/canonical-schema.md`: canonical record, key, 저장/삭제 규칙
-- `docs/architectures/tech-stack/README.md`: Go, Cobra, 로컬 파일, SurrealDB 결정
+- `docs/architectures/tech-stack/README.md`: Go, Cobra, SQLite 결정
 - `docs/architectures/layers/README.md`: 레이어 책임, 금지 방향, 디렉터리 예시
 - `docs/architectures/provider/README.md`: provider role/router/adapter 구조
 - `docs/architectures/indicator/README.md`: 지표와 추세 계산 레이어
@@ -130,18 +130,17 @@ viewport:
 
 # 3단계: 저장소
 
-목표: 로컬 파일을 정본으로 쓰는 최소 저장 흐름 만들기
+목표: 로컬 SQLite database 를 정본으로 쓰는 최소 저장 흐름 만들기
 
-- NDJSON writer/reader
-- record type 별 path layout
-- append/read/delete 초안
-- file manifest 초안
-- coverage index 연결 준비
+- SQLite schema 초안
+- daily_bar upsert/query
+- database path flag
+- coverage/index 확장 준비
 
 완료 기준:
 
-- `daily_bar` 를 파일에 쓰고 다시 읽을 수 있다.
-- SurrealDB index 없이도 정본 파일만으로 기본 조회가 가능하다.
+- `daily_bar` 를 SQLite 에 쓰고 다시 읽을 수 있다.
+- 단일 database 파일만으로 기본 조회가 가능하다.
 
 :::
 
@@ -210,7 +209,7 @@ CLI 골격 다음에 이어질 작업:
 
 - `canonical` type 작성
 - canonical key 생성 helper 작성
-- `daily_bar` NDJSON writer/reader 작성
+- `daily_bar` SQLite upsert/query 작성
 - provider error code 초안 작성
 - table/json formatter 분리
 - `get daily` service request/result type 작성
@@ -225,7 +224,7 @@ CLI 골격 다음에 이어질 작업:
 
 첫 데이터 흐름이 잡힌 뒤:
 
-- SurrealDB coverage/index 연결
+- SQLite coverage/index 연결
 - `ensure daily`
 - `delete data`
 - `reindex data`
@@ -284,12 +283,12 @@ CLI 골격 다음에 이어질 작업:
 
 ::: note {"id":"challenge-storage","at":{"x":-560,"y":992,"w":520},"style":{"bg":{"color":"#FFF1E6"},"stroke":{"color":"#EA580C"}}}
 
-# 주요 과제: 파일 정본과 인덱스
+# 주요 과제: SQLite 정본과 인덱스
 
 왜 중요한가:
 
-- canonical body 는 로컬 파일이 정본이다.
-- SurrealDB는 index 이며 정본을 대체하지 않는다.
+- canonical body 는 로컬 SQLite database 가 정본이다.
+- 보조 index 는 정본 데이터를 대체하지 않는다.
 - delete, reindex, ensure 는 이 경계를 전제로 한다.
 
 위험:

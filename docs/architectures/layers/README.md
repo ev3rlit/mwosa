@@ -70,7 +70,7 @@ presentation/
 | cli handler layer       | argv, flags, stdin, env 값을 use case request 로 정규화하는 레이어다.                                                                                                                                                                 |
 | service layer           | use case 를 실행하고 provider registry, persistence, domain service 를 조합하는 application layer 다.                                                                                                                                 |
 | domain layer            | 투자 리서치 도메인의 순수 규칙, 계산, value object 를 담는 레이어다. CLI, provider, storage 에 의존하지 않는다.                                                                                                                       |
-| persistence layer       | 로컬 파일 정본과 SurrealDB index 접근을 담당하는 저장소 레이어다.                                                                                                                                                                     |
+| persistence layer       | 로컬 SQLite 정본 database 접근을 담당하는 저장소 레이어다.                                                                                                                                                                           |
 | presentation layer      | service result 를 `table`, `json`, `ndjson`, `csv` 출력으로 변환하는 레이어다.                                                                                                                                                        |
 | provider implementation | 실제 외부 API 호출, 인증, pagination, provider-native response parsing 을 담당하는 구현체다. provider architecture 문서에서는 provider client module 에 둔다.                                                                          |
 | provider adapter        | provider implementation 을 service layer 가 사용하는 provider role interface 로 연결하는 adapter 다.                                                                                                                                  |
@@ -281,7 +281,7 @@ fallback 규칙:
 하지 않는 일:
 
 - 외부 API 호출
-- file/SurrealDB 접근
+- SQLite storage 접근
 - stdout 렌더링
 - Cobra command 접근
 
@@ -301,22 +301,21 @@ indicator/
 
 역할:
 
-- 로컬 파일 정본과 SurrealDB index 접근을 담당한다.
+- 로컬 SQLite 정본 database 접근을 담당한다.
 - service 가 필요한 저장소 interface 를 구현한다.
 
 구성:
 
-- file source of truth
-- coverage index
-- file manifest index
-- provenance index
-- latest quote index
+- SQLite canonical database
+- explicit SQL migration files
+- query/index helpers
+- provenance columns
+- latest quote view or table
 
 책임:
 
 - canonical record append/read/delete
-- file bucket layout 관리
-- SurrealDB metadata 갱신
+- SQLite schema 와 index 관리
 - reindex 지원
 - storage error 표준화
 
@@ -330,8 +329,7 @@ indicator/
 예시 위치:
 
 ```text
-storage/files/
-storage/index/
+storage/sqlite/
 ```
 
 ## Presentation Layer
@@ -387,8 +385,7 @@ service
   -> provider interface
 
 persistence implementation
-  -> filesystem
-  -> SurrealDB
+  -> SQLite database
 
 presentation
   <- service result
@@ -415,7 +412,7 @@ presentation
 | use case / application service | service                          |
 | entity / value object          | domain                           |
 | repository / gateway           | persistence / provider interface |
-| database adapter               | storage files / storage index    |
+| database adapter               | storage/sqlite                   |
 | response presenter             | presentation                     |
 | JSON HTTP response             | table / json / ndjson / csv      |
 

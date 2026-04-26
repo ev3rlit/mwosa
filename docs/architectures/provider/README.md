@@ -371,8 +371,7 @@ HTTP client 선택 기준은 `docs/development/README.md` 에 둔다.
 adapter 가 하지 않는 일:
 
 - Cobra flag parsing
-- local file storage 직접 쓰기
-- SurrealDB index 직접 갱신
+- SQLite storage 직접 쓰기
 - terminal output rendering
 - indicator 계산
 
