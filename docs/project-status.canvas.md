@@ -43,7 +43,7 @@ viewport:
 | Go 구현 | 초기 모듈 상태 |
 | provider 실제 패키지 | 구현 전 |
 
-현재 `go.mod` 와 Cobra 의존성은 있지만, `cmd/mwosa` 와 `internal/*` 구현 골격은 아직 만들어지지 않았다.
+현재 `go.mod` 와 Cobra 의존성은 있지만, `cmd/mwosa` 와 root package 구현 골격은 아직 만들어지지 않았다.
 
 :::
 
@@ -57,8 +57,7 @@ viewport:
 - `docs/swing-cli-minimum-requirements.md`: 스윙 MVP 흐름
 - `docs/canonical-schema.md`: canonical record, key, 저장/삭제 규칙
 - `docs/architectures/tech-stack/README.md`: Go, Cobra, 로컬 파일, SurrealDB 결정
-- `docs/architectures/directory/README.md`: 구현 디렉터리 구조
-- `docs/architectures/layers/README.md`: 레이어 책임과 금지 방향
+- `docs/architectures/layers/README.md`: 레이어 책임, 금지 방향, 디렉터리 예시
 - `docs/architectures/provider/README.md`: provider role/router/bridge 구조
 - `docs/providers/data-go-etf/README.md`: 첫 provider 후보의 구현 계획
 
@@ -91,8 +90,8 @@ viewport:
 목표: 실행 가능한 최소 CLI 만들기
 
 - `cmd/mwosa/main.go`
-- `internal/app`
-- `internal/cli`
+- `app`
+- `cli`
 - `mwosa version`
 - `mwosa help`
 - 공통 output flag 골격
@@ -110,7 +109,7 @@ viewport:
 
 목표: provider 와 무관한 데이터 계약을 코드로 옮기기
 
-- `internal/canonical`
+- `canonical`
 - `instrument`
 - `daily_bar`
 - `quote_snapshot`
@@ -149,7 +148,7 @@ viewport:
 
 목표: provider role/router/bridge 구조를 첫 데이터 흐름에 연결하기
 
-- `internal/provider`
+- `provider`
 - `dailybar.Fetcher`
 - `instrument.Searcher`
 - provider registry
@@ -192,7 +191,7 @@ viewport:
 - Cobra root command 만들기
 - `version`, `help`, `completion` 최소 연결
 - `--output table|json|ndjson|csv` flag 형태 잡기
-- `internal/app` 에 조립 지점 만들기
+- `app` 에 조립 지점 만들기
 - README 의 명령어 표면과 실제 도움말 구조를 먼저 맞추기
 
 이 그룹은 구현 시작을 위한 “손에 잡히는 첫 작업”이다.
@@ -205,7 +204,7 @@ viewport:
 
 CLI 골격 다음에 이어질 작업:
 
-- `internal/canonical` type 작성
+- `canonical` type 작성
 - canonical key 생성 helper 작성
 - `daily_bar` NDJSON writer/reader 작성
 - provider error code 초안 작성
@@ -377,8 +376,8 @@ CLI 골격 다음에 이어질 작업:
 - test assertion library
 - table rendering library
 - migration/versioning tool
-- `internal/handler/cli` 즉시 분리 여부
-- `internal/presentation` 과 `internal/format` 분리 여부
+- `handler/cli` 즉시 분리 여부
+- `presentation` 과 `format` 분리 여부
 - progress renderer 정책
 - interactive confirmation 정책
 
@@ -414,15 +413,15 @@ CLI 골격 다음에 이어질 작업:
 가장 작은 실행 단위:
 
 1. `cmd/mwosa/main.go`
-2. `internal/app/run.go`
-3. `internal/cli/root.go`
+2. `app/run.go`
+3. `cli/root.go`
 4. `mwosa version`
 5. `mwosa completion <shell>`
 6. `--output` flag 후보
 
 그 다음 단위:
 
-1. `internal/canonical`
+1. `canonical`
 2. `daily_bar` type
 3. canonical key helper
 4. table/json formatter

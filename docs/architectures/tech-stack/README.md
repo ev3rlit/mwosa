@@ -31,8 +31,31 @@
 적용 범위:
 
 - `cmd/mwosa`
-- `internal/cli`
-- `internal/command/*`
+- `cli`
+- `command/*`
+
+### Error handling
+
+- `github.com/samber/oops`
+
+선정 이유:
+
+- operation, domain, key/value context, cause 를 함께 보존하기 좋다.
+- provider, storage, service, CLI 경계에서 실패 맥락을 명시적으로 붙이기 좋다.
+- fallback 판단, 사용자 메시지, 로그 진단에 필요한 정보를 error chain 에 남기기 좋다.
+
+결정:
+
+- 하위 레이어 error 는 호출 경계에서 `oops.In(...).With(...).Wrap(err)` 형태로 명시적으로 감싼다.
+- error code, fallback 판단, 사용자 메시지 분리는 각 아키텍처 결정 문서에서 해당 경계에 맞게 관리한다.
+- invalid input, partial data, provider failure 를 성공처럼 숨기지 않는다.
+
+적용 범위:
+
+- `cli`
+- `service`
+- `providers/*`
+- `storage`
 
 ### Canonical source of truth
 
@@ -66,8 +89,8 @@
 
 - external package: `github.com/<org>/marketdata-provider-kis`
 - external package: `github.com/<org>/marketdata-provider-data-go-etf`
-- in-repo bridge: `internal/providers/kisbridge`
-- in-repo bridge: `internal/providers/datagobridge`
+- in-repo bridge: `providers/kisbridge`
+- in-repo bridge: `providers/datagobridge`
 
 ### Configuration
 
@@ -76,7 +99,7 @@
 결정:
 
 - 초기에는 별도 설정 framework 를 도입하지 않는다.
-- 환경변수, 설정 파일, 기본 경로 처리는 `internal/config` 에서 직접 다룬다.
+- 환경변수, 설정 파일, 기본 경로 처리는 `config` 에서 직접 다룬다.
 
 ## 아직 정하지 않음
 
@@ -93,9 +116,7 @@
 
 ## 관련 문서
 
-- `docs/architectures/directory/README.md`
 - `docs/architectures/layers/README.md`
-- `docs/architectures/interfaces/README.md`
 - `docs/architectures/provider/README.md`
 - `docs/architectures/completion/README.md`
 - `docs/canonical-schema.md`

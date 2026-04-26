@@ -2,7 +2,7 @@
 
 ## 목적
 
-이 문서는 `mwosa` CLI 의 레이어 아키텍처 뼈대를 정의한다.
+이 문서는 `mwosa` CLI 의 레이어 아키텍처 뼈대를 정의한다. 디렉터리 구조는 별도 기준으로 고정하지 않고, 이 문서 안에서 레이어를 구현하는 예시로만 다룬다.
 
 기본 관점은 웹서버의 클린 아키텍처를 CLI에 적용한 것이다. HTTP router, controller, web response 가 있던 자리에 command parser, CLI handler, terminal presentation 이 들어온다.
 
@@ -25,6 +25,38 @@ mwosa CLI:
 - `domain layer`
 - `persistence layer`
 - `presentation layer`
+
+## 디렉터리 구조 예시
+
+레이어 책임과 의존 방향이 기준이다. 아래 구조는 구현을 시작할 때 참고하는 예시이며, 실제 package 이름과 파일 배치는 구현하면서 바꿀 수 있다.
+
+```text
+cmd/mwosa/
+
+app/
+cli/
+command/<domain>/
+service/<domain>/
+provider/
+providers/<provider>bridge/
+canonical/
+storage/
+format/
+config/
+```
+
+초기에는 Go의 `internal/` 디렉터리를 쓰지 않는다. 아직 package 경계가 자주 바뀔 수 있으므로 접근 제한보다 단순한 이동과 의존 관계 실험을 우선한다.
+
+외부에서 import 하면 안 되는 구현 세부사항이 분명해지면 그때 해당 package 를 `internal/` 아래로 옮긴다. 반대로 provider role interface 처럼 외부 provider package 와 공유해야 하는 계약이 생기면 `internal/` 이 아니라 공개 package 또는 별도 module 로 분리한다.
+
+필요가 분명해질 때만 아래 package 를 분리한다.
+
+```text
+handler/cli/
+middleware/
+domain/
+presentation/
+```
 
 ## 용어
 
@@ -85,10 +117,10 @@ argv/stdin/env
 - domain 계산
 - table/json 렌더링
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/command/<domain>/
+command/<domain>/
 ```
 
 ## CLI Handler Layer
@@ -114,13 +146,13 @@ internal/command/<domain>/
 - canonical record 직접 생성
 - stdout 직접 렌더링
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/handler/cli/
+handler/cli/
 ```
 
-초기 구현에서는 `internal/command/<domain>` 안에 handler 함수를 함께 둘 수 있다. 다만 handler 가 커지면 `internal/handler/cli/<domain>` 으로 분리한다.
+초기 구현에서는 `command/<domain>` 안에 handler 함수를 함께 둘 수 있다. 다만 handler 가 커지면 `handler/cli/<domain>` 으로 분리한다.
 
 ## Middleware Layer
 
@@ -150,10 +182,10 @@ TTY 관련 책임:
 - machine-readable 출력에서는 progress 나 진단 정보를 stdout 에 섞지 않게 한다.
 - interactive prompt 사용 가능 여부를 판단한다.
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/middleware/
+middleware/
 ```
 
 ## Service Layer
@@ -180,10 +212,10 @@ internal/middleware/
 - provider-native response parsing
 - 파일 경로 세부 계산
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/service/<domain>/
+service/<domain>/
 ```
 
 ### Provider Routing
@@ -250,15 +282,15 @@ fallback 규칙:
 - stdout 렌더링
 - Cobra command 접근
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/domain/
-internal/canonical/
-internal/indicator/
+domain/
+canonical/
+indicator/
 ```
 
-초기에는 기존 문서의 `internal/canonical`, `internal/indicator` 를 유지하고, domain 개념이 커질 때 `internal/domain` 으로 확장한다.
+초기에는 `canonical`, `indicator` 로 시작하고, domain 개념이 커질 때 `domain` 으로 확장한다.
 
 ## Persistence Layer
 
@@ -290,11 +322,11 @@ internal/indicator/
 - table/json 출력
 - indicator 계산
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/storage/files/
-internal/storage/index/
+storage/files/
+storage/index/
 ```
 
 ## Presentation Layer
@@ -327,14 +359,14 @@ internal/storage/index/
 - TTY 가 아니면 color/progress 출력은 기본 비활성화한다.
 - presentation 은 service 를 호출하지 않는다.
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/presentation/
-internal/format/
+presentation/
+format/
 ```
 
-초기에는 `internal/format` 으로 시작하고, terminal 상호작용이 커지면 `internal/presentation` 으로 확장한다.
+초기에는 `format` 으로 시작하고, terminal 상호작용이 커지면 `presentation` 으로 확장한다.
 
 ## 레이어 의존 방향
 
@@ -386,8 +418,8 @@ presentation
 
 이 문서는 아직 뼈대만 둔다. 아래 항목은 이후 구현 대화에서 채운다.
 
-- `internal/handler/cli` 를 처음부터 분리할지 여부
-- `internal/presentation` 을 `internal/format` 과 별도로 둘지 여부
+- `handler/cli` 를 처음부터 분리할지 여부
+- `presentation` 을 `format` 과 별도로 둘지 여부
 - middleware chain 의 구체적인 함수 signature
 - TTY abstraction interface
 - error rendering 정책
@@ -396,8 +428,6 @@ presentation
 
 ## 관련 문서
 
-- `docs/architectures/directory/README.md`
-- `docs/architectures/interfaces/README.md`
 - `docs/architectures/provider/README.md`
 - `docs/architectures/tech-stack/README.md`
 - `docs/go-cli-package-layout.md`

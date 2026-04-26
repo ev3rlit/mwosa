@@ -76,23 +76,23 @@ embedded field 만 봐도 provider 가 어떤 역할 interface 를 만족하는�
 provider 역할은 endpoint 성격에 맞춰 package 로 나눈다.
 
 ```text
-internal/provider/
+provider/
   identity.go
   registry.go
   selection.go
   errors.go
 
-internal/provider/dailybar/
+provider/dailybar/
   fetch.go
   profile.go
   selection.go
 
-internal/provider/quote/
+provider/quote/
   snapshot.go
   profile.go
   selection.go
 
-internal/provider/instrument/
+provider/instrument/
   search.go
   profile.go
   selection.go
@@ -459,7 +459,5 @@ instrument.Profile
 
 ## 관련 문서
 
-- `docs/architectures/interfaces/README.md`
 - `docs/architectures/layers/README.md`
-- `docs/architectures/directory/README.md`
 - `docs/providers/provider-package-contract.md`

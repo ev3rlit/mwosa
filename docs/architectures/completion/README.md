@@ -143,34 +143,33 @@ mwosa sync instruments --market krx
 
 ### 4. 도메인 package 가 자기 argument completion 을 소유한다
 
-`internal/cli` 는 root command, 공통 flag, completion command 를 관리한다.
+`cli` 는 root command, 공통 flag, completion command 를 관리한다.
 
 도메인별 argument completion 은 해당 command package 가 관리한다.
 
-예상 위치:
+예시 위치:
 
 ```text
-internal/
-  cli/
-    root.go
-    flags.go
+cli/
+  root.go
+  flags.go
+  completion.go
+
+command/
+  instrument/
+    routes.go
     completion.go
 
-  command/
-    instrument/
-      routes.go
-      completion.go
+  provider/
+    routes.go
+    completion.go
 
-    provider/
-      routes.go
-      completion.go
-
-    portfolio/
-      routes.go
-      completion.go
+  portfolio/
+    routes.go
+    completion.go
 ```
 
-이렇게 나누면 `instrument` package 는 symbol 검색 규칙을, `portfolio` package 는 portfolio name 검색 규칙을 스스로 소유한다. `internal/cli` 는 각 도메인의 후보 계산 세부사항을 모른다.
+이렇게 나누면 `instrument` package 는 symbol 검색 규칙을, `portfolio` package 는 portfolio name 검색 규칙을 스스로 소유한다. `cli` 는 각 도메인의 후보 계산 세부사항을 모른다.
 
 ## Completion source contract
 
@@ -399,7 +398,7 @@ $(brew --prefix)/share/zsh/site-functions/_mwosa
 ## 구현 순서
 
 1. root command 에 Cobra completion command 를 노출한다.
-2. 공통 flag completion 을 `internal/cli` 에 등록한다.
+2. 공통 flag completion 을 `cli` 에 등록한다.
 3. provider, market, output format 같은 static/local 후보를 연결한다.
 4. `instrument`, `portfolio`, `strategy` 순서로 도메인별 argument completion 을 추가한다.
 5. completion source 가 network 를 사용하지 않는지 테스트한다.
@@ -430,6 +429,5 @@ mwosa __complete get quote --output ""
 ## 관련 문서
 
 - `docs/architectures/tech-stack/README.md`
-- `docs/architectures/directory/README.md`
 - `docs/architectures/layers/README.md`
 - `README.md`
