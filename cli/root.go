@@ -5,6 +5,7 @@ import (
 	"io"
 	"runtime"
 
+	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/spf13/cobra"
 )
 
@@ -20,11 +21,19 @@ type BuildInfo struct {
 }
 
 type Options struct {
-	Output string
+	Output         string
+	Provider       string
+	PreferProvider string
+	Market         string
+	DataDir        string
 }
 
 func NewRootCommand(build BuildInfo) *cobra.Command {
-	opts := Options{Output: "table"}
+	opts := Options{
+		Output:  "table",
+		Market:  string(provider.MarketKRX),
+		DataDir: ".mwosa-data",
+	}
 
 	cmd := &cobra.Command{
 		Use:           "mwosa",
@@ -40,8 +49,36 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		opts.Output,
 		"output format: table, json, ndjson, csv",
 	)
+	cmd.PersistentFlags().StringVar(
+		&opts.Provider,
+		"provider",
+		opts.Provider,
+		"force a provider by id",
+	)
+	cmd.PersistentFlags().StringVar(
+		&opts.PreferProvider,
+		"prefer-provider",
+		opts.PreferProvider,
+		"prefer a provider when multiple candidates match",
+	)
+	cmd.PersistentFlags().StringVar(
+		&opts.Market,
+		"market",
+		opts.Market,
+		"market id",
+	)
+	cmd.PersistentFlags().StringVar(
+		&opts.DataDir,
+		"data-dir",
+		opts.DataDir,
+		"local data directory",
+	)
 
 	cmd.AddCommand(newVersionCommand(build))
+	cmd.AddCommand(newGetCommand(&opts))
+	cmd.AddCommand(newEnsureCommand(&opts))
+	cmd.AddCommand(newSyncCommand(&opts))
+	cmd.AddCommand(newBackfillCommand(&opts))
 
 	return cmd
 }

@@ -52,29 +52,29 @@ type FetchInput struct {
 }
 
 type Bar struct {
-	Provider     provider.ProviderID
-	Group        provider.GroupID
-	Operation    provider.OperationID
-	Market       provider.Market
-	SecurityType provider.SecurityType
+	Provider     provider.ProviderID   `json:"provider"`
+	Group        provider.GroupID      `json:"provider_group"`
+	Operation    provider.OperationID  `json:"operation"`
+	Market       provider.Market       `json:"market"`
+	SecurityType provider.SecurityType `json:"security_type"`
 
-	Symbol      string
-	ISIN        string
-	Name        string
-	TradingDate string
-	Currency    string
+	Symbol      string `json:"symbol"`
+	ISIN        string `json:"isin,omitempty"`
+	Name        string `json:"name,omitempty"`
+	TradingDate string `json:"trading_date"`
+	Currency    string `json:"currency"`
 
-	Open        string
-	High        string
-	Low         string
-	Close       string
-	Change      string
-	ChangeRate  string
-	Volume      string
-	TradedValue string
-	MarketCap   string
+	Open        string `json:"opening_price,omitempty"`
+	High        string `json:"highest_price,omitempty"`
+	Low         string `json:"lowest_price,omitempty"`
+	Close       string `json:"closing_price,omitempty"`
+	Change      string `json:"price_change_from_previous_close,omitempty"`
+	ChangeRate  string `json:"price_change_rate_from_previous_close,omitempty"`
+	Volume      string `json:"traded_volume,omitempty"`
+	TradedValue string `json:"traded_amount,omitempty"`
+	MarketCap   string `json:"market_capitalization,omitempty"`
 
-	Extensions map[string]string
+	Extensions map[string]string `json:"extensions,omitempty"`
 }
 
 type FetchResult struct {
