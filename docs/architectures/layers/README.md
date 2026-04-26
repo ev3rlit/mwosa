@@ -49,7 +49,7 @@ config/
 
 초기에는 Go의 `internal/` 디렉터리를 쓰지 않는다. 아직 package 경계가 자주 바뀔 수 있으므로 접근 제한보다 단순한 이동과 의존 관계 실험을 우선한다.
 
-외부에서 import 하면 안 되는 구현 세부사항이 분명해지면 그때 해당 package 를 `internal/` 아래로 옮긴다. 반대로 provider role interface 처럼 외부 provider package 와 공유해야 하는 계약이 생기면 `internal/` 이 아니라 공개 package 또는 별도 module 로 분리한다.
+외부에서 import 하면 안 되는 구현 세부사항이 분명해지면 그때 해당 package 를 `internal/` 아래로 옮긴다. 반대로 provider role interface 처럼 provider client module 과 공유해야 하는 계약이 생기면 `internal/` 이 아니라 공개 package 또는 별도 module 로 분리한다.
 
 필요가 분명해질 때만 아래 package 를 분리한다.
 
@@ -72,9 +72,9 @@ presentation/
 | domain layer            | 투자 리서치 도메인의 순수 규칙, 계산, value object 를 담는 레이어다. CLI, provider, storage 에 의존하지 않는다.                                                                                                                       |
 | persistence layer       | 로컬 파일 정본과 SurrealDB index 접근을 담당하는 저장소 레이어다.                                                                                                                                                                     |
 | presentation layer      | service result 를 `table`, `json`, `ndjson`, `csv` 출력으로 변환하는 레이어다.                                                                                                                                                        |
-| provider implementation | 실제 외부 API 호출, 인증, pagination, provider-native response parsing 을 담당하는 구현체다. provider architecture 문서에서는 external provider package 라고도 부른다.                                                                |
+| provider implementation | 실제 외부 API 호출, 인증, pagination, provider-native response parsing 을 담당하는 구현체다. provider architecture 문서에서는 provider client module 에 둔다.                                                                          |
 | provider adapter        | provider implementation 을 service layer 가 사용하는 provider role interface 로 연결하는 adapter 다.                                                                                                                                  |
-| provider router         | service layer 의 요청을 capability-compatible provider role 로 라우팅하고 fallback 후보 순서를 결정하는 application component 다. 구체적인 interface 는 [Provider Architecture](../provider/README.md#provider-router) 에서 정의한다. |
+| provider router         | service layer 의 요청을 실제로 실행할 수 있는 provider role 로 라우팅하고 fallback 후보 순서를 결정하는 application component 다. 구체적인 interface 는 [Provider Architecture](../provider/README.md#provider-router) 에서 정의한다. |
 | provider role interface | service layer 가 의존하는 provider 계약이다. 예: `dailybar.Fetcher`, `quote.Snapshotter`, `instrument.Searcher`                                                                                                                       |
 
 이 용어 기준에서는 provider adapter 가 CLI 안 연결 지점이고, provider implementation 이 실제 외부 API client 다. service/domain layer 는 provider 세부사항을 알지 않고 앱의 use case 와 도메인 규칙을 수행한다.
