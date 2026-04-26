@@ -10,7 +10,7 @@
 
 - CLI core 는 provider 의 구현 방식을 모른다.
 - service 는 provider role interface 에만 의존한다.
-- provider adapter 는 external provider package 와 `mwosa` role interface 사이를 연결한다.
+- provider adapter 는 provider client module 과 `mwosa` role interface 사이를 연결한다.
 - provider 가 REST API, SDK, 파일, scraping 중 무엇을 쓰는지는 provider 구현 단계에서 정한다.
 - 구현 라이브러리 선택은 필요가 보일 때 작게 결정하고, core contract 로 새지 않게 한다.
 
@@ -39,10 +39,13 @@ provider 가 REST API 를 사용할 수도 있지만, 모든 provider 가 REST A
 1. 필요한 role interface 를 먼저 확인한다.
 2. provider 가 지원하는 capability 와 제한사항을 profile 로 적는다.
 3. provider 구현체가 REST 인지 SDK 인지 파일 기반인지 확인한다.
-4. 구현체에 맞는 transport/library 를 provider package 또는 provider 별 adapter 안에서만 선택한다.
-5. external response 를 canonical data 로 변환한다.
-6. 실패는 성공처럼 숨기지 않고 provider 이름, operation, symbol, market 같은 맥락을 붙여 반환한다.
-7. service 에는 provider 별 adapter type 이 아니라 role interface 와 router 결과만 전달한다.
+4. `mwosa` repository root 의 `go.work` 에 포함되는 독립 Go module 로 provider client 를 만든다.
+5. 구현체에 맞는 transport/library 를 provider client module 안에서 선택한다.
+6. request builder, fake transport, 응답 파서, provider-native error 를 client module 단위 테스트로 검증한다.
+7. 단위 테스트를 통과한 client 만 CLI adapter 에 연결한다.
+8. provider response 를 canonical data 로 변환한다.
+9. 실패는 성공처럼 숨기지 않고 provider 이름, operation, symbol, market 같은 맥락을 붙여 반환한다.
+10. service 에는 provider 별 adapter type 이 아니라 role interface 와 router 결과만 전달한다.
 
 ## 문서 갱신 기준
 

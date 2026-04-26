@@ -10,7 +10,7 @@
 
 원본 OpenAPI 스펙은 `docs/providers/datago/securitiesProductPrice.openapi.yaml` 에 보관한다.
 
-이 provider의 실 구현체는 CLI 저장소 안이 아니라 **별도 외부 Go 패키지**로 분리하는 것을 기본 방향으로 한다.
+이 provider 의 client 구현체는 `mwosa` workspace 안의 **독립 Go module** 로 관리한다. `mwosa` repository root 의 `go.work` 로 CLI module 과 함께 개발하고, 필요하면 나중에 별도 repository 로 분리할 수 있다.
 
 이 provider 는 canonical schema 관점에서 다음 역할을 가진다.
 
@@ -28,8 +28,8 @@
 
 권장 패키지 분리:
 
-- external package:
-  - 예: `github.com/<org>/marketdata-provider-datago`
+- provider client module:
+  - 예: `providers/clients/marketdata-provider-datago`
 - in-CLI adapter:
   - 예: `providers/datago`
 
@@ -37,7 +37,7 @@
 
 `datago` provider 는 다음처럼 나눈다.
 
-### 외부 패키지에 둘 것
+### Provider client module 에 둘 것
 
 - OpenAPI endpoint 경로
 - query parameter builder
@@ -47,16 +47,17 @@
 - `item` 단건/배열 shape 처리
 - provider-native error model
 - provider group 별 operation dispatch
+- request builder, parser, error mapping 단위 테스트
 
 ### CLI 안 provider adapter 에 둘 것
 
-- CLI config 를 external package config 로 바꾸는 코드
-- external package 결과를 canonical normalizer 로 넘기는 코드
+- CLI config 를 provider client config 로 바꾸는 코드
+- provider client 결과를 canonical normalizer 로 넘기는 코드
 - provider group 을 포함한 registry 등록 코드
 - fallback / provider priority 메타데이터
 - CLI 옵션과 provider 호출 옵션의 연결
 
-이 구조를 택하면 CLI 코어는 provider 세부사항을 직접 알 필요가 없고, `datago` 구현체도 다른 런타임에서 재사용 가능하다.
+이 구조를 택하면 CLI 코어는 provider 세부사항을 직접 알 필요가 없고, `datago` client 도 adapter 등록 전에 독립적으로 테스트할 수 있다.
 
 ## Provider group
 
@@ -170,7 +171,7 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 
 provider adapter 는 public CLI 요청을 내부적으로 OpenAPI query 로 변환한다.
 
-정확히는, CLI 안의 provider adapter 가 external package 요청 모델로 변환하고, external package 가 실제 OpenAPI query 를 만든다.
+정확히는, CLI 안의 provider adapter 가 provider client 요청 모델로 변환하고, provider client module 이 실제 OpenAPI query 를 만든다.
 
 ### `get/ensure/sync/backfill daily`
 
@@ -382,10 +383,10 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 이 provider 문서를 기준으로 다음 구현을 진행한다.
 
-1. external Go package `marketdata-provider-datago` 생성
-2. package 내부 provider group / operation registry 작성
+1. provider client module `providers/clients/marketdata-provider-datago` 생성
+2. client module 내부 provider group / operation registry 작성
 3. `securitiesProductPrice` OpenAPI query builder 작성
-4. package 내부 item normalization 구현
+4. client module 내부 item normalization 구현
 5. Go CLI adapter `providers/datago` 추가
 6. `daily_bar` 와 `instrument` upsert 구현
 7. provider group 과 operation provenance 저장 위치 결정

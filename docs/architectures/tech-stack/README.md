@@ -112,17 +112,21 @@
 
 ### Provider implementation
 
-- `External Go packages`
+- `Independent Go modules in a Go workspace`
 
 결정:
 
-- provider 실제 구현체는 CLI 저장소 밖의 Go package 로 분리한다.
-- 이 저장소에는 `providers/core` 와 provider 별 adapter 만 둔다.
+- `mwosa` repository root 는 Go workspace 로 관리한다.
+- root 의 `go.work` 로 CLI module 과 provider client module 을 함께 개발한다.
+- 각 provider client 는 workspace 안의 독립 Go module 로 생성한다.
+- provider client module 은 자체 `go.mod` 와 단위 테스트를 가진다.
+- CLI module 에는 `providers/core` 와 provider 별 adapter 를 둔다.
+- provider 를 등록하기 전에 client module 단위 테스트를 먼저 통과시킨다.
 
 예:
 
-- external package: `github.com/<org>/marketdata-provider-kis`
-- external package: `github.com/<org>/marketdata-provider-datago`
+- provider client module: `./providers/clients/marketdata-provider-kis`
+- provider client module: `./providers/clients/marketdata-provider-datago`
 - in-repo adapter: `providers/kis`
 - in-repo adapter: `providers/datago`
 
