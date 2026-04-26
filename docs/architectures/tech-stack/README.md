@@ -16,7 +16,7 @@
 
 - 단일 바이너리 CLI 배포가 쉽다.
 - 파일 I/O, HTTP client, context cancellation, 병렬 처리에 적합하다.
-- provider bridge 와 service interface 를 명확하게 나누기 좋다.
+- provider adapter 와 service interface 를 명확하게 나누기 좋다.
 
 ### CLI framework
 
@@ -83,14 +83,29 @@
 결정:
 
 - provider 실제 구현체는 CLI 저장소 밖의 Go package 로 분리한다.
-- 이 저장소에는 provider bridge adapter 와 registry 연결만 둔다.
+- 이 저장소에는 `providers/core` 와 provider 별 adapter 만 둔다.
 
 예:
 
 - external package: `github.com/<org>/marketdata-provider-kis`
-- external package: `github.com/<org>/marketdata-provider-data-go-etf`
-- in-repo bridge: `providers/kisbridge`
-- in-repo bridge: `providers/datagobridge`
+- external package: `github.com/<org>/marketdata-provider-datago`
+- in-repo adapter: `providers/kis`
+- in-repo adapter: `providers/datago`
+
+provider 이름은 큰 데이터 소스 단위로 둔다. 공공데이터포털처럼 개별 API 서비스가 따로 승인되는 경우에도 provider id 는 `datago` 로 유지하고, 세부 API 범위는 provider group 으로 표현한다.
+
+### HTTP client
+
+- `Not fixed yet`
+
+결정:
+
+- provider 가 REST API 를 사용할 때의 HTTP client 는 실제 provider 구현 단계에서 정한다.
+- 기본 후보는 Go 표준 라이브러리 `net/http` 로 둔다.
+- retry/backoff, request builder, tracing 같은 필요가 반복될 때만 wrapper 나 별도 client 를 검토한다.
+- provider role interface 와 service layer 에는 특정 HTTP client library type 을 노출하지 않는다.
+
+세부 협업 기준은 `docs/development/README.md` 에 둔다.
 
 ### Configuration
 
@@ -107,7 +122,6 @@
 
 - logging library
 - test assertion library
-- HTTP client wrapper
 - table rendering library
 - config file format
 - migration/versioning tool
@@ -119,5 +133,5 @@
 - `docs/architectures/layers/README.md`
 - `docs/architectures/provider/README.md`
 - `docs/architectures/completion/README.md`
+- `docs/development/README.md`
 - `docs/canonical-schema.md`
-- `docs/providers/provider-package-contract.md`

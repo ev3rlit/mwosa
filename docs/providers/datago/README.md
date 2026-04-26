@@ -1,10 +1,14 @@
-# data-go ETF Provider
+# datago Provider
 
 ## 개요
 
-`data-go-etf` provider 는 공공데이터포털의 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집하는 provider 다.
+`datago` provider 는 공공데이터포털의 여러 OpenAPI 를 `mwosa` 안에서 하나의 provider 로 묶는 adapter 다.
 
-원본 OpenAPI 스펙은 `docs/data-go-etf/openapi.yaml` 에 보관한다.
+공공데이터포털은 하나의 종합 API 보다 개별 API 서비스를 따로 제공하는 경우가 많다. 그래서 `datago` 는 provider 이름을 하나로 유지하고, 실제 승인 범위와 endpoint 묶음은 provider group 으로 나눈다.
+
+현재 문서는 첫 group 인 `securitiesProductPrice` 를 기준으로 작성한다. 이 group 은 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집한다.
+
+원본 OpenAPI 스펙은 `docs/providers/datago/securitiesProductPrice.openapi.yaml` 에 보관한다.
 
 이 provider의 실 구현체는 CLI 저장소 안이 아니라 **별도 외부 Go 패키지**로 분리하는 것을 기본 방향으로 한다.
 
@@ -18,20 +22,20 @@
 
 ## 위치
 
-- provider 문서: `docs/providers/data-go-etf/README.md`
-- 원본 스펙: `docs/data-go-etf/openapi.yaml`
+- provider 문서: `docs/providers/datago/README.md`
+- 원본 스펙: `docs/providers/datago/securitiesProductPrice.openapi.yaml`
 - 공통 저장 계약: `docs/canonical-schema.md`
 
 권장 패키지 분리:
 
 - external package:
-  - 예: `github.com/<org>/marketdata-provider-data-go-etf`
-- in-CLI bridge:
-  - 예: `internal/providers/datagobridge`
+  - 예: `github.com/<org>/marketdata-provider-datago`
+- in-CLI adapter:
+  - 예: `providers/datago`
 
 ## 패키지 분리 원칙
 
-`data-go-etf` provider 는 다음처럼 나눈다.
+`datago` provider 는 다음처럼 나눈다.
 
 ### 외부 패키지에 둘 것
 
@@ -42,18 +46,60 @@
 - JSON/XML 응답 파싱 정책
 - `item` 단건/배열 shape 처리
 - provider-native error model
+- provider group 별 operation dispatch
 
-### CLI 안 bridge 에 둘 것
+### CLI 안 provider adapter 에 둘 것
 
 - CLI config 를 external package config 로 바꾸는 코드
 - external package 결과를 canonical normalizer 로 넘기는 코드
-- provider registry 등록 코드
+- provider group 을 포함한 registry 등록 코드
 - fallback / provider priority 메타데이터
 - CLI 옵션과 provider 호출 옵션의 연결
 
-이 구조를 택하면 CLI 코어는 provider 세부사항을 직접 알 필요가 없고, `data-go-etf` 구현체도 다른 런타임에서 재사용 가능하다.
+이 구조를 택하면 CLI 코어는 provider 세부사항을 직접 알 필요가 없고, `datago` 구현체도 다른 런타임에서 재사용 가능하다.
 
-## 제공 API 표면
+## Provider group
+
+`datago` 의 provider id 는 항상 `datago` 로 둔다. `datago-securities-product-price` 나 `datago/securitiesProductPrice` 같은 이름을 provider 이름으로 만들지 않는다.
+
+group 은 다음 기준으로 나눈다.
+
+- 공공데이터포털의 OpenAPI 서비스 단위
+- 별도 활용신청 또는 승인 상태를 가질 수 있는 단위
+- 인증, rate limit, 응답 envelope, pagination 정책을 따로 설명해야 하는 단위
+- provenance 에 남겼을 때 원천 API 를 식별할 수 있는 단위
+
+현재 group 계획:
+
+| group | 상태 | 공공데이터포털 API | 주요 operation | capability |
+| --- | --- | --- | --- | --- |
+| `securitiesProductPrice` | `core` | 금융위원회_증권상품시세정보 | `getETFPriceInfo`, `getETNPriceInfo`, `getELWPriceInfo` | `daily_bar`, `instrument` |
+| `stockPrice` | `planned` | 금융위원회_주식시세정보 | `getStockPriceInfo` | `daily_bar`, `instrument` |
+
+config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에서 오버라이드한다.
+
+```json
+{
+  "providers": {
+    "datago": {
+      "enabled": true,
+      "auth": {
+        "service_key": "..."
+      },
+      "groups": {
+        "securitiesProductPrice": {
+          "enabled": true
+        },
+        "stockPrice": {
+          "enabled": false
+        }
+      }
+    }
+  }
+}
+```
+
+## `securitiesProductPrice` API 표면
 
 OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 
@@ -68,11 +114,11 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 - 결과는 페이지네이션과 조건 검색을 지원
 - 본문은 `body.items.item` 배열 또는 단건 객체로 내려올 수 있음
 
-즉, 이 provider 는 단건 `quote` API 라기보다 **검색 가능한 일별 시세 목록 API** 에 가깝다.
+즉, 이 group 은 단건 `quote` API 라기보다 **검색 가능한 일별 시세 목록 API** 에 가깝다.
 
 ## v1 지원 범위
 
-`data-go-etf` provider 의 초기 지원 범위는 다음과 같다.
+`datago` provider 의 초기 지원 범위는 `securitiesProductPrice` group 기준으로 다음과 같다.
 
 - `daily_bar`
 - `instrument`
@@ -86,6 +132,8 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 이유는 OpenAPI 스펙상 `basDt` 기준의 일별 시세 필드가 명확하고, 현재 canonical schema v1 도 `instrument`, `daily_bar`, `quote_snapshot` 3개만 정의하고 있기 때문이다.
 
 ## Canonical endpoint 매핑
+
+아래 매핑은 `securitiesProductPrice` group 기준이다.
 
 ### ETF
 
@@ -115,14 +163,14 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 주의:
 
 - 현재 `docs/canonical-schema.md` 의 `security_type` 예시는 `stock`, `etf`, `etn` 중심이다.
-- `data-go` 를 ELW 까지 공식 지원하려면 canonical `security_type` enum 에 `elw` 를 추가하는 후속 결정이 필요하다.
+- `datago` 를 ELW 까지 공식 지원하려면 canonical `security_type` enum 에 `elw` 를 추가하는 후속 결정이 필요하다.
 - 그 결정 전까지는 구현 범위를 ETF, ETN 우선으로 제한하는 편이 안전하다.
 
 ## 요청 모델
 
 provider adapter 는 public CLI 요청을 내부적으로 OpenAPI query 로 변환한다.
 
-정확히는, CLI 안의 Go bridge adapter 가 external package 요청 모델로 변환하고, external package 가 실제 OpenAPI query 를 만든다.
+정확히는, CLI 안의 provider adapter 가 external package 요청 모델로 변환하고, external package 가 실제 OpenAPI query 를 만든다.
 
 ### `ensure/get daily`
 
@@ -132,7 +180,7 @@ canonical request:
 get daily <security_code> --from <YYYYMMDD> --to <YYYYMMDD>
 ```
 
-`data-go` 변환 규칙:
+`datago` 변환 규칙:
 
 - `security_code` -> `likeSrtnCd` 또는 정확 match 후 `srtnCd` 필터
 - `from` -> `beginBasDt`
@@ -148,7 +196,7 @@ canonical request:
 search instrument "<keyword>"
 ```
 
-`data-go` 변환 규칙:
+`datago` 변환 규칙:
 
 - 이름 검색 -> `likeItmsNm`
 - 종목코드 검색 -> `likeSrtnCd`
@@ -216,9 +264,11 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 ### `daily_bar`
 
-`data-go` provider 가 생성하는 `daily_bar` 는 다음 규칙을 따른다.
+`datago` provider 가 생성하는 `daily_bar` 는 다음 규칙을 따른다.
 
 - `market = "krx"`
+- `provider = "datago"`
+- `provider_group = "securitiesProductPrice"`
 - `currency_code = "KRW"`
 - `market_session = "regular"`
 - `price_adjustment_type = "raw"`
@@ -260,9 +310,11 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 ## Provider 신뢰도와 우선순위
 
-`data-go-etf` provider 는 다음 특성을 가진다.
+`datago` provider 는 다음 특성을 가진다.
 
 - 장점:
+  - provider 이름을 `datago` 하나로 유지하면서 API 서비스별 group 을 확장할 수 있다.
+  - 공공데이터포털의 개별 API 승인 범위를 group 단위로 점검할 수 있다.
   - 검색 기반의 넓은 범위 조회가 가능
   - ETF / ETN / ELW 를 하나의 계열 API 에서 제공
   - KIS credentials 없이도 동작 가능한 공공 OpenAPI 경로
@@ -274,7 +326,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 초기 우선순위 정책 제안:
 
 - `daily_bar`
-  - `data-go-etf` 를 1순위 또는 KIS 와 동급 후보로 고려 가능
+  - `datago` 를 1순위 또는 KIS 와 동급 후보로 고려 가능
 - `quote_snapshot`
   - 비활성
 - `instrument search`
@@ -292,9 +344,10 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 내부에서만 다음 정책이 적용된다.
 
-- `daily_bar` 는 `data-go-etf` 또는 `kis` 중 가능한 provider 선택
-- `quote_snapshot` 는 `data-go-etf` 를 후보에서 제외
-- instrument search 는 `data-go-etf` 를 포함한 provider fan-out 가능
+- `daily_bar` 는 `datago` 또는 `kis` 중 가능한 provider 선택
+- `quote_snapshot` 는 `datago` 를 후보에서 제외
+- instrument search 는 `datago` 를 포함한 provider fan-out 가능
+- provenance 에는 `provider=datago`, `provider_group=securitiesProductPrice`, 실제 operation 을 함께 남김
 
 ## 오류 및 edge case
 
@@ -310,10 +363,12 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 이 provider 문서를 기준으로 다음 구현을 진행한다.
 
-1. external Go package `marketdata-provider-data-go-etf` 생성
-2. package 내부 OpenAPI query builder 작성
-3. package 내부 item normalization 구현
-4. Go CLI bridge `datagobridge` 추가
-5. `daily_bar` 와 `instrument` upsert 구현
-6. provider extension metadata 저장 위치 결정
-7. KIS provider 와 함께 registry 우선순위 정책 연결
+1. external Go package `marketdata-provider-datago` 생성
+2. package 내부 provider group / operation registry 작성
+3. `securitiesProductPrice` OpenAPI query builder 작성
+4. package 내부 item normalization 구현
+5. Go CLI adapter `providers/datago` 추가
+6. `daily_bar` 와 `instrument` upsert 구현
+7. provider group 과 operation provenance 저장 위치 결정
+8. provider extension metadata 저장 위치 결정
+9. KIS provider 와 함께 registry 우선순위 정책 연결

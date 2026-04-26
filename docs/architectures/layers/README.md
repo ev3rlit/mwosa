@@ -37,8 +37,10 @@ app/
 cli/
 command/<domain>/
 service/<domain>/
-provider/
-providers/<provider>bridge/
+providers/
+  core/
+  kis/
+  datago/
 canonical/
 storage/
 format/
@@ -62,20 +64,20 @@ presentation/
 
 이 문서에서는 아래 용어를 기준으로 통일한다.
 
-| 용어 | 의미 |
-| --- | --- |
-| command layer | Cobra command tree, verb-first 명령 표면, flag 선언을 담당하는 레이어다. |
-| cli handler layer | argv, flags, stdin, env 값을 use case request 로 정규화하는 레이어다. |
-| service layer | use case 를 실행하고 provider registry, persistence, domain service 를 조합하는 application layer 다. |
-| domain layer | 투자 리서치 도메인의 순수 규칙, 계산, value object 를 담는 레이어다. CLI, provider, storage 에 의존하지 않는다. |
-| persistence layer | 로컬 파일 정본과 SurrealDB index 접근을 담당하는 저장소 레이어다. |
-| presentation layer | service result 를 `table`, `json`, `ndjson`, `csv` 출력으로 변환하는 레이어다. |
-| provider implementation | 실제 외부 API 호출, 인증, pagination, provider-native response parsing 을 담당하는 구현체다. provider architecture 문서에서는 external provider package 라고도 부른다. |
-| provider bridge | provider implementation 을 service layer 가 사용하는 provider role interface 로 연결하는 adapter 다. |
-| provider router | service layer 의 요청을 capability-compatible provider role 로 라우팅하고 fallback 후보 순서를 결정하는 application component 다. 구체적인 interface 는 [Provider Architecture](../provider/README.md#provider-router) 에서 정의한다. |
-| provider role interface | service layer 가 의존하는 provider 계약이다. 예: `dailybar.Fetcher`, `quote.Snapshotter`, `instrument.Searcher` |
+| 용어                    | 의미                                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| command layer           | Cobra command tree, verb-first 명령 표면, flag 선언을 담당하는 레이어다.                                                                                                                                                              |
+| cli handler layer       | argv, flags, stdin, env 값을 use case request 로 정규화하는 레이어다.                                                                                                                                                                 |
+| service layer           | use case 를 실행하고 provider registry, persistence, domain service 를 조합하는 application layer 다.                                                                                                                                 |
+| domain layer            | 투자 리서치 도메인의 순수 규칙, 계산, value object 를 담는 레이어다. CLI, provider, storage 에 의존하지 않는다.                                                                                                                       |
+| persistence layer       | 로컬 파일 정본과 SurrealDB index 접근을 담당하는 저장소 레이어다.                                                                                                                                                                     |
+| presentation layer      | service result 를 `table`, `json`, `ndjson`, `csv` 출력으로 변환하는 레이어다.                                                                                                                                                        |
+| provider implementation | 실제 외부 API 호출, 인증, pagination, provider-native response parsing 을 담당하는 구현체다. provider architecture 문서에서는 external provider package 라고도 부른다.                                                                |
+| provider adapter        | provider implementation 을 service layer 가 사용하는 provider role interface 로 연결하는 adapter 다.                                                                                                                                  |
+| provider router         | service layer 의 요청을 capability-compatible provider role 로 라우팅하고 fallback 후보 순서를 결정하는 application component 다. 구체적인 interface 는 [Provider Architecture](../provider/README.md#provider-router) 에서 정의한다. |
+| provider role interface | service layer 가 의존하는 provider 계약이다. 예: `dailybar.Fetcher`, `quote.Snapshotter`, `instrument.Searcher`                                                                                                                       |
 
-이 용어 기준에서는 provider bridge 가 adapter 이고, provider implementation 이 실제 외부 API client 다. service/domain layer 는 provider 세부사항을 알지 않고 앱의 use case 와 도메인 규칙을 수행한다.
+이 용어 기준에서는 provider adapter 가 CLI 안 연결 지점이고, provider implementation 이 실제 외부 API client 다. service/domain layer 는 provider 세부사항을 알지 않고 앱의 use case 와 도메인 규칙을 수행한다.
 
 ## 요청 흐름
 
@@ -237,9 +239,9 @@ InspectService
   needs: instrument + quote + recent daily candles
 
 provider router:
-  instrument -> krx, kis, data-go-etf
+  instrument -> krx, kis, datago
   quote      -> kis, kiwoom
-  candles    -> kis, data-go-etf, krx
+  candles    -> kis, datago, krx
 ```
 
 fallback 규칙:
@@ -397,22 +399,22 @@ presentation
 - `service -> command`
 - `persistence -> command`
 - `persistence -> presentation`
-- `provider bridge -> command`
+- `provider adapter -> command`
 
 ## 웹서버 클린 아키텍처와의 대응
 
-| Web server | mwosa CLI |
-| --- | --- |
-| route | command |
-| controller / handler | cli handler |
-| HTTP middleware | CLI middleware |
-| request context | command context |
-| use case / application service | service |
-| entity / value object | domain |
-| repository / gateway | persistence / provider interface |
-| database adapter | storage files / storage index |
-| response presenter | presentation |
-| JSON HTTP response | table / json / ndjson / csv |
+| Web server                     | mwosa CLI                        |
+| ------------------------------ | -------------------------------- |
+| route                          | command                          |
+| controller / handler           | cli handler                      |
+| HTTP middleware                | CLI middleware                   |
+| request context                | command context                  |
+| use case / application service | service                          |
+| entity / value object          | domain                           |
+| repository / gateway           | persistence / provider interface |
+| database adapter               | storage files / storage index    |
+| response presenter             | presentation                     |
+| JSON HTTP response             | table / json / ndjson / csv      |
 
 ## 열어둘 결정
 

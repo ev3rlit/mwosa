@@ -73,7 +73,7 @@ mwosa inspect tool <name>
 | 옵션                       | 설명                                                                                |
 | -------------------------- | ----------------------------------------------------------------------------------- |
 | `-o, --output <format>`    | 출력 형식을 선택한다. 지원 형식은 `table`, `json`, `ndjson`, `csv` 다. 기본값은 `table` 이다. |
-| `--provider <name>`        | 특정 provider 를 명시해서 조회한다. 호환 provider 는 [provider compatibility guide](docs/provider/README.md)를 참고한다. |
+| `--provider <name>`        | 특정 provider 를 명시해서 조회한다. 호환 provider 는 [provider compatibility guide](docs/providers/README.md)를 참고한다. |
 | `--prefer-provider <name>` | 가능한 경우 특정 provider 를 우선 사용한다.                                         |
 | `--market <market>`        | 조회 시장을 제한한다. 예: `krx`, `nasdaq`, `nyse`                                   |
 | `--currency <code>`        | 출력 통화 기준을 지정한다. 예: `KRW`, `USD`                                         |

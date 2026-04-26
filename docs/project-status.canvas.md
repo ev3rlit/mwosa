@@ -58,8 +58,9 @@ viewport:
 - `docs/canonical-schema.md`: canonical record, key, 저장/삭제 규칙
 - `docs/architectures/tech-stack/README.md`: Go, Cobra, 로컬 파일, SurrealDB 결정
 - `docs/architectures/layers/README.md`: 레이어 책임, 금지 방향, 디렉터리 예시
-- `docs/architectures/provider/README.md`: provider role/router/bridge 구조
-- `docs/providers/data-go-etf/README.md`: 첫 provider 후보의 구현 계획
+- `docs/architectures/provider/README.md`: provider role/router/adapter 구조
+- `docs/development/README.md`: 개발 협업 기준, HTTP client 선택 기준
+- `docs/providers/datago/README.md`: `datago` provider 와 첫 provider group 구현 계획
 
 :::
 
@@ -74,7 +75,7 @@ viewport:
   -> CLI 골격
   -> canonical type
   -> local storage
-  -> provider bridge
+  -> provider adapter
   -> get daily
   -> 스윙 MVP 흐름
 ```
@@ -146,18 +147,19 @@ viewport:
 
 # 4단계: Provider 연결
 
-목표: provider role/router/bridge 구조를 첫 데이터 흐름에 연결하기
+목표: provider role/router/adapter 구조를 첫 데이터 흐름에 연결하기
 
-- `provider`
+- `providers/core`
 - `dailybar.Fetcher`
 - `instrument.Searcher`
 - provider registry
 - provider router
-- `data-go-etf` bridge 또는 stub
+- `providers/datago` adapter 또는 stub
+- `datago` provider group 등록
 
 완료 기준:
 
-- `data-go-etf` 가 `daily_bar` 후보로 등록된다.
+- `datago` 의 `securitiesProductPrice` group 이 `daily_bar` 후보로 등록된다.
 - unsupported capability 가 빈 성공으로 숨겨지지 않는다.
 
 :::
@@ -259,19 +261,19 @@ CLI 골격 다음에 이어질 작업:
 왜 중요한가:
 
 - provider 구현체는 외부 Go package 로 둔다.
-- 이 저장소는 bridge 와 registry 만 가진다.
+- 이 저장소는 `providers/core` 와 provider 별 adapter 만 가진다.
 - provider-native result 와 canonical record 를 섞으면 나중에 확장이 어려워진다.
 
 위험:
 
-- bridge 가 두꺼워질 수 있다.
+- adapter 가 두꺼워질 수 있다.
 - unsupported 기능이 빈 성공처럼 보일 수 있다.
-- `data-go-etf` 의 일별 시세 성격을 quote 처럼 오해할 수 있다.
+- `datago` 의 group 별 일별 시세 성격을 quote 처럼 오해할 수 있다.
 
 관리 포인트:
 
 - role interface 를 작게 유지한다.
-- bridge 는 storage 를 직접 쓰지 않는다.
+- adapter 는 storage 를 직접 쓰지 않는다.
 - fallback 사유를 숨기지 않는다.
 
 :::
@@ -362,7 +364,8 @@ CLI 골격 다음에 이어질 작업:
 - `--output` 기본값과 에러 출력 형식
 - `get daily` 의 날짜 flag 형식
 - provider 없는 상태에서 시장 데이터 명령의 에러 문구
-- `data-go-etf` 를 외부 package 로 바로 만들지, local stub 으로 시작할지
+- `datago` 를 외부 package 로 바로 만들지, local stub 으로 시작할지
+- provider group 인증 상태를 어떤 명령에서 먼저 보여줄지
 
 :::
 
