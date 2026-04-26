@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 	}))
 	defer server.Close()
 
-	dataDir := t.TempDir()
+	databasePath := filepath.Join(t.TempDir(), "mwosa.db")
 	setDataGoEnv(t, server.URL)
 
 	var ensureOut bytes.Buffer
@@ -48,7 +49,7 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 	ensureCmd.SetOut(&ensureOut)
 	ensureCmd.SetErr(&ensureOut)
 	if err := executeForTest(context.Background(), ensureCmd,
-		"--data-dir", dataDir,
+		"--database", databasePath,
 		"--output", "json",
 		"ensure", "daily", "069500",
 		"--as-of", "20240415",
@@ -67,7 +68,7 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 	getCmd.SetOut(&getOut)
 	getCmd.SetErr(&getOut)
 	if err := executeForTest(context.Background(), getCmd,
-		"--data-dir", dataDir,
+		"--database", databasePath,
 		"--output", "json",
 		"get", "daily", "069500",
 		"--as-of", "2024-04-15",
@@ -86,7 +87,7 @@ func TestGetDailyMissingDataReturnsEnsureHint(t *testing.T) {
 	cmd.SetErr(&out)
 
 	err := executeForTest(context.Background(), cmd,
-		"--data-dir", t.TempDir(),
+		"--database", filepath.Join(t.TempDir(), "mwosa.db"),
 		"get", "daily", "069500",
 		"--from", "20240101",
 		"--to", "20240102",
@@ -121,7 +122,7 @@ func TestBackfillDailyCollectsEachDate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	dataDir := t.TempDir()
+	databasePath := filepath.Join(t.TempDir(), "mwosa.db")
 	setDataGoEnv(t, server.URL)
 
 	var out bytes.Buffer
@@ -129,7 +130,7 @@ func TestBackfillDailyCollectsEachDate(t *testing.T) {
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 	if err := executeForTest(context.Background(), cmd,
-		"--data-dir", dataDir,
+		"--database", databasePath,
 		"--output", "json",
 		"backfill", "daily",
 		"--from", "20240415",

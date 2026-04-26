@@ -50,8 +50,8 @@ func writeBars(w io.Writer, output string, bars []dailybar.Bar) error {
 func writeCollectResult(w io.Writer, output string, result daily.CollectResult) error {
 	switch output {
 	case "", "table":
-		_, _ = fmt.Fprintln(w, "market\tsecurity_type\tprovider\tgroup\tdates\tfetched\tstored\tfiles")
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n", result.Market, result.SecurityType, result.ProviderID, result.Group, len(result.Dates), result.BarsFetched, result.BarsStored, result.FilesWritten)
+		_, _ = fmt.Fprintln(w, "market\tsecurity_type\tprovider\tgroup\tdates\tfetched\tstored\trows_affected")
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n", result.Market, result.SecurityType, result.ProviderID, result.Group, len(result.Dates), result.BarsFetched, result.BarsStored, result.RowsAffected)
 		return nil
 	case "json":
 		encoder := json.NewEncoder(w)
@@ -61,7 +61,7 @@ func writeCollectResult(w io.Writer, output string, result daily.CollectResult) 
 		return json.NewEncoder(w).Encode(result)
 	case "csv":
 		writer := csv.NewWriter(w)
-		if err := writer.Write([]string{"market", "security_type", "provider", "group", "dates", "fetched", "stored", "files"}); err != nil {
+		if err := writer.Write([]string{"market", "security_type", "provider", "group", "dates", "fetched", "stored", "rows_affected"}); err != nil {
 			return err
 		}
 		if err := writer.Write([]string{
@@ -72,7 +72,7 @@ func writeCollectResult(w io.Writer, output string, result daily.CollectResult) 
 			fmt.Sprint(len(result.Dates)),
 			fmt.Sprint(result.BarsFetched),
 			fmt.Sprint(result.BarsStored),
-			fmt.Sprint(result.FilesWritten),
+			fmt.Sprint(result.RowsAffected),
 		}); err != nil {
 			return err
 		}

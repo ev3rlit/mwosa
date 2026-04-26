@@ -1,7 +1,8 @@
-package files
+package sqlite
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
-	store := NewDailyBarStore(t.TempDir())
+	store := NewDailyBarStore(filepath.Join(t.TempDir(), "mwosa.db"))
 	bar := dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
@@ -18,8 +19,12 @@ func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
 		Symbol:       "069500",
+		Name:         "KODEX 200",
 		TradingDate:  "2024-04-15",
 		Close:        "35120",
+		Extensions: map[string]string{
+			"nav": "35155.1",
+		},
 	}
 
 	if _, err := store.UpsertDailyBars(context.Background(), []dailybar.Bar{bar}); err != nil {
@@ -45,5 +50,8 @@ func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
 	}
 	if bars[0].Close != "35130" {
 		t.Fatalf("close = %q, want updated close 35130", bars[0].Close)
+	}
+	if bars[0].Extensions["nav"] != "35155.1" {
+		t.Fatalf("nav extension = %q, want 35155.1", bars[0].Extensions["nav"])
 	}
 }

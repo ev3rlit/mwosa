@@ -23,7 +23,7 @@ type Query struct {
 }
 
 type WriteResult struct {
-	FilesWritten int
+	RowsAffected int
 	BarsWritten  int
 }
 
@@ -55,7 +55,7 @@ type CollectResult struct {
 	Dates        []string              `json:"dates"`
 	BarsFetched  int                   `json:"bars_fetched"`
 	BarsStored   int                   `json:"bars_stored"`
-	FilesWritten int                   `json:"files_written"`
+	RowsAffected int                   `json:"rows_affected"`
 }
 
 func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
@@ -143,7 +143,7 @@ func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, erro
 		result.Dates = append(result.Dates, partial.Dates...)
 		result.BarsFetched += partial.BarsFetched
 		result.BarsStored += partial.BarsStored
-		result.FilesWritten += partial.FilesWritten
+		result.RowsAffected += partial.RowsAffected
 	}
 	return result, nil
 }
@@ -193,7 +193,7 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 		Dates:        []string{isoDate(date)},
 		BarsFetched:  len(result.Bars),
 		BarsStored:   writeResult.BarsWritten,
-		FilesWritten: writeResult.FilesWritten,
+		RowsAffected: writeResult.RowsAffected,
 	}, nil
 }
 

@@ -25,14 +25,14 @@ type Options struct {
 	Provider       string
 	PreferProvider string
 	Market         string
-	DataDir        string
+	Database       string
 }
 
 func NewRootCommand(build BuildInfo) *cobra.Command {
 	opts := Options{
-		Output:  "table",
-		Market:  string(provider.MarketKRX),
-		DataDir: ".mwosa-data",
+		Output:   "table",
+		Market:   string(provider.MarketKRX),
+		Database: ".mwosa-data/mwosa.db",
 	}
 
 	cmd := &cobra.Command{
@@ -68,10 +68,10 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		"market id",
 	)
 	cmd.PersistentFlags().StringVar(
-		&opts.DataDir,
-		"data-dir",
-		opts.DataDir,
-		"local data directory",
+		&opts.Database,
+		"database",
+		opts.Database,
+		"local SQLite database path",
 	)
 
 	cmd.AddCommand(newVersionCommand(build))
