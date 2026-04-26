@@ -157,7 +157,7 @@ mwosa inspect tool <name>
 | --------------------------------- | --------------------------------------------------------- |
 | `mwosa get quote <symbol>`        | 현재가 또는 최신 quote snapshot 을 조회한다.              |
 | `mwosa get candles <symbol>`      | 일봉, 주봉, 월봉, 분봉 같은 OHLCV 시계열을 조회한다.      |
-| `mwosa get daily <symbol>`        | 일별 OHLCV 데이터를 간단히 조회한다.                      |
+| `mwosa get daily <symbol>`        | 저장된 일별 OHLCV 데이터를 조회한다. 데이터가 없으면 `ensure`, `sync`, `backfill` 안내를 출력한다. |
 | `mwosa get orderbook <symbol>`    | 호가 잔량과 매수/매도 호가를 조회한다.                    |
 | `mwosa get trades <symbol>`       | 최근 체결 내역을 조회한다.                                |
 | `mwosa get fundamentals <symbol>` | 시가총액, PER, PBR, EPS 등 기본 지표를 조회한다.          |
@@ -176,9 +176,12 @@ mwosa inspect tool <name>
 | 명령어                            | 설명                                                            |
 | --------------------------------- | --------------------------------------------------------------- |
 | `mwosa ensure quote <symbol>`     | 최신 quote 가 없으면 provider 에서 받아 저장한다.               |
+| `mwosa ensure daily <symbol>`     | 요청 범위의 일별 데이터가 없으면 부족한 날짜를 provider 에서 받아 저장한다. |
 | `mwosa ensure candles <symbol>`   | 요청 범위의 candle 데이터가 없으면 부족한 구간만 받아 저장한다. |
+| `mwosa sync daily`                | 특정 날짜의 시장/자산군 일별 데이터를 provider 기준으로 일괄 갱신한다. |
 | `mwosa sync instrument <symbol>`  | 종목 메타데이터를 provider 기준으로 갱신한다.                   |
 | `mwosa sync universe <name>`      | universe 에 포함된 종목의 주요 데이터를 일괄 갱신한다.          |
+| `mwosa backfill daily`            | 과거 일별 데이터를 지정한 기간만큼 시장/자산군 단위로 채운다.   |
 | `mwosa backfill candles <symbol>` | 과거 시계열 데이터를 지정한 범위만큼 채운다.                    |
 | `mwosa verify data <symbol>`      | 저장된 데이터의 중복, 누락, 날짜 정합성을 검사한다.             |
 | `mwosa reindex data`              | 로컬 파일을 다시 스캔해 검색/coverage 인덱스를 재구축한다.      |
