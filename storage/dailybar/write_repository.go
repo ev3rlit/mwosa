@@ -18,12 +18,15 @@ type writeRepository struct {
 
 var _ daily.WriteRepository = (*writeRepository)(nil)
 
-func NewWriteRepository(database *storage.Database) daily.WriteRepository {
-	return &writeRepository{database: database}
+func NewWriteRepository(database *storage.Database) (daily.WriteRepository, error) {
+	if err := requireDatabase(database); err != nil {
+		return nil, err
+	}
+	return &writeRepository{database: database}, nil
 }
 
 func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailybar.Bar) (daily.WriteResult, error) {
-	client, err := r.client(ctx)
+	client, err := r.database.Client(ctx)
 	if err != nil {
 		return daily.WriteResult{}, err
 	}
@@ -109,11 +112,4 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 		BarsWritten:  len(bars),
 		RowsAffected: len(bars),
 	}, nil
-}
-
-func (r *writeRepository) client(ctx context.Context) (*entdb.Client, error) {
-	if r == nil || r.database == nil {
-		return nil, fmt.Errorf("daily bar write repository database is nil")
-	}
-	return r.database.Client(ctx)
 }

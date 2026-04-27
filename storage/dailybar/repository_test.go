@@ -18,7 +18,10 @@ func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	reader, writer := NewRepositories(database)
+	reader, writer, err := NewRepositories(database)
+	if err != nil {
+		t.Fatalf("new repositories: %v", err)
+	}
 	bar := dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
@@ -60,5 +63,17 @@ func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
 	}
 	if bars[0].Extensions["nav"] != "35155.1" {
 		t.Fatalf("nav extension = %q, want 35155.1", bars[0].Extensions["nav"])
+	}
+}
+
+func TestNewRepositoriesRequiresDatabase(t *testing.T) {
+	if _, _, err := NewRepositories(nil); err == nil {
+		t.Fatal("NewRepositories nil database error is nil")
+	}
+	if _, err := NewReadRepository(nil); err == nil {
+		t.Fatal("NewReadRepository nil database error is nil")
+	}
+	if _, err := NewWriteRepository(nil); err == nil {
+		t.Fatal("NewWriteRepository nil database error is nil")
 	}
 }

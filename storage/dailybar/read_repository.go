@@ -18,16 +18,29 @@ type readRepository struct {
 
 var _ daily.ReadRepository = (*readRepository)(nil)
 
-func NewReadRepository(database *storage.Database) daily.ReadRepository {
-	return &readRepository{database: database}
+func NewReadRepository(database *storage.Database) (daily.ReadRepository, error) {
+	if err := requireDatabase(database); err != nil {
+		return nil, err
+	}
+	return &readRepository{database: database}, nil
 }
 
-func NewRepositories(database *storage.Database) (daily.ReadRepository, daily.WriteRepository) {
-	return &readRepository{database: database}, &writeRepository{database: database}
+func NewRepositories(database *storage.Database) (daily.ReadRepository, daily.WriteRepository, error) {
+	if err := requireDatabase(database); err != nil {
+		return nil, nil, err
+	}
+	return &readRepository{database: database}, &writeRepository{database: database}, nil
+}
+
+func requireDatabase(database *storage.Database) error {
+	if database == nil {
+		return fmt.Errorf("daily bar repository database is nil")
+	}
+	return nil
 }
 
 func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
-	client, err := r.client(ctx)
+	client, err := r.database.Client(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +86,4 @@ func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) 
 		bars = append(bars, bar)
 	}
 	return bars, nil
-}
-
-func (r *readRepository) client(ctx context.Context) (*entdb.Client, error) {
-	if r == nil || r.database == nil {
-		return nil, fmt.Errorf("daily bar read repository database is nil")
-	}
-	return r.database.Client(ctx)
 }

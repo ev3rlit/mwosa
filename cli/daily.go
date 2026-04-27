@@ -211,7 +211,10 @@ func closeDailyService(service dailyService, err *error) {
 
 func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
 	database := storage.NewDatabase(opts.Database)
-	reader, writer := dailybarstorage.NewRepositories(database)
+	reader, writer, err := dailybarstorage.NewRepositories(database)
+	if err != nil {
+		return dailyService{}, err
+	}
 	service := daily.Service{
 		Reader: reader,
 		Writer: writer,
