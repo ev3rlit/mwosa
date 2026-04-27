@@ -62,27 +62,7 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 			return daily.WriteResult{}, barErrb.Wrap(err)
 		}
 		now := time.Now()
-		err = tx.DailyBar.Create().
-			SetProvider(string(bar.Provider)).
-			SetProviderGroup(string(bar.Group)).
-			SetOperation(string(bar.Operation)).
-			SetMarket(string(bar.Market)).
-			SetSecurityType(string(bar.SecurityType)).
-			SetSymbol(bar.Symbol).
-			SetIsin(bar.ISIN).
-			SetName(bar.Name).
-			SetTradingDate(bar.TradingDate).
-			SetCurrency(bar.Currency).
-			SetOpeningPrice(bar.Open).
-			SetHighestPrice(bar.High).
-			SetLowestPrice(bar.Low).
-			SetClosingPrice(bar.Close).
-			SetPriceChangeFromPreviousClose(bar.Change).
-			SetPriceChangeRateFromPreviousClose(bar.ChangeRate).
-			SetTradedVolume(bar.Volume).
-			SetTradedAmount(bar.TradedValue).
-			SetMarketCapitalization(bar.MarketCap).
-			SetExtensionsJSON(extensionsJSON).
+		err = setDailyBarCreateFields(tx.DailyBar.Create(), bar, extensionsJSON, now).
 			OnConflictColumns(
 				dailybarent.FieldMarket,
 				dailybarent.FieldSecurityType,
@@ -91,23 +71,7 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 				dailybarent.FieldProvider,
 				dailybarent.FieldProviderGroup,
 			).
-			Update(func(upsert *entdb.DailyBarUpsert) {
-				upsert.UpdateOperation()
-				upsert.UpdateIsin()
-				upsert.UpdateName()
-				upsert.UpdateCurrency()
-				upsert.UpdateOpeningPrice()
-				upsert.UpdateHighestPrice()
-				upsert.UpdateLowestPrice()
-				upsert.UpdateClosingPrice()
-				upsert.UpdatePriceChangeFromPreviousClose()
-				upsert.UpdatePriceChangeRateFromPreviousClose()
-				upsert.UpdateTradedVolume()
-				upsert.UpdateTradedAmount()
-				upsert.UpdateMarketCapitalization()
-				upsert.UpdateExtensionsJSON()
-				upsert.SetUpdatedAt(now)
-			}).
+			UpdateNewValues().
 			Exec(ctx)
 		if err != nil {
 			return daily.WriteResult{}, barErrb.Wrapf(err, "upsert daily bar sqlite row")
@@ -123,4 +87,29 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 		BarsWritten:  len(bars),
 		RowsAffected: len(bars),
 	}, nil
+}
+
+func setDailyBarCreateFields(create *entdb.DailyBarCreate, bar coredailybar.Bar, extensionsJSON string, now time.Time) *entdb.DailyBarCreate {
+	return create.
+		SetProvider(string(bar.Provider)).
+		SetProviderGroup(string(bar.Group)).
+		SetOperation(string(bar.Operation)).
+		SetMarket(string(bar.Market)).
+		SetSecurityType(string(bar.SecurityType)).
+		SetSymbol(bar.Symbol).
+		SetIsin(bar.ISIN).
+		SetName(bar.Name).
+		SetTradingDate(bar.TradingDate).
+		SetCurrency(bar.Currency).
+		SetOpeningPrice(bar.Open).
+		SetHighestPrice(bar.High).
+		SetLowestPrice(bar.Low).
+		SetClosingPrice(bar.Close).
+		SetPriceChangeFromPreviousClose(bar.Change).
+		SetPriceChangeRateFromPreviousClose(bar.ChangeRate).
+		SetTradedVolume(bar.Volume).
+		SetTradedAmount(bar.TradedValue).
+		SetMarketCapitalization(bar.MarketCap).
+		SetExtensionsJSON(extensionsJSON).
+		SetUpdatedAt(now)
 }
