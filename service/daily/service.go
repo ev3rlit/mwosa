@@ -9,9 +9,12 @@ import (
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 )
 
-type Store interface {
-	UpsertDailyBars(ctx context.Context, bars []dailybar.Bar) (WriteResult, error)
+type ReadRepository interface {
 	QueryDailyBars(ctx context.Context, query Query) ([]dailybar.Bar, error)
+}
+
+type WriteRepository interface {
+	UpsertDailyBars(ctx context.Context, bars []dailybar.Bar) (WriteResult, error)
 }
 
 type Query struct {
@@ -29,7 +32,8 @@ type WriteResult struct {
 
 type Service struct {
 	Router dailybar.Router
-	Store  Store
+	Reader ReadRepository
+	Writer WriteRepository
 }
 
 type Request struct {
@@ -59,15 +63,15 @@ type CollectResult struct {
 }
 
 func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
-	if s.Store == nil {
-		return BarsResult{}, fmt.Errorf("daily service store is nil")
+	if s.Reader == nil {
+		return BarsResult{}, fmt.Errorf("daily service read repository is nil")
 	}
 	dates, err := resolveDateRange(req.From, req.To, req.AsOf)
 	if err != nil {
 		return BarsResult{}, err
 	}
 	query := queryFromRequest(req, dates)
-	bars, err := s.Store.QueryDailyBars(ctx, query)
+	bars, err := s.Reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, err
 	}
@@ -90,7 +94,10 @@ func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 	}
 
 	query := queryFromRequest(req, dates)
-	existing, err := s.Store.QueryDailyBars(ctx, query)
+	if s.Reader == nil {
+		return BarsResult{}, fmt.Errorf("daily service read repository is nil")
+	}
+	existing, err := s.Reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, err
 	}
@@ -101,7 +108,7 @@ func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 		}
 	}
 
-	bars, err := s.Store.QueryDailyBars(ctx, query)
+	bars, err := s.Reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, err
 	}
@@ -152,8 +159,8 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 	if s.Router == nil {
 		return CollectResult{}, fmt.Errorf("daily service router is nil")
 	}
-	if s.Store == nil {
-		return CollectResult{}, fmt.Errorf("daily service store is nil")
+	if s.Writer == nil {
+		return CollectResult{}, fmt.Errorf("daily service write repository is nil")
 	}
 	if req.SecurityType == "" {
 		return CollectResult{}, fmt.Errorf("daily collection requires --security-type")
@@ -180,7 +187,7 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 	if err != nil {
 		return CollectResult{}, err
 	}
-	writeResult, err := s.Store.UpsertDailyBars(ctx, result.Bars)
+	writeResult, err := s.Writer.UpsertDailyBars(ctx, result.Bars)
 	if err != nil {
 		return CollectResult{}, err
 	}

@@ -188,8 +188,11 @@ func addSecurityTypeFlag(cmd *cobra.Command, flags *dailyFlags) {
 }
 
 func newDailyService(opts *Options, withProvider bool) (daily.Service, error) {
-	store := sqlite.NewDailyBarStore(opts.Database)
-	service := daily.Service{Store: store}
+	reader, writer := sqlite.NewDailyBarRepositories(opts.Database)
+	service := daily.Service{
+		Reader: reader,
+		Writer: writer,
+	}
 	if !withProvider {
 		return service, nil
 	}

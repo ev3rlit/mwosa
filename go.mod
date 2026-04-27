@@ -3,6 +3,7 @@ module github.com/ev3rlit/mwosa
 go 1.25.6
 
 require (
+	entgo.io/ent v0.14.6
 	github.com/samber/oops v1.21.0
 	github.com/spf13/cobra v1.10.2
 	modernc.org/sqlite v1.50.0
@@ -18,9 +19,9 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/samber/lo v1.52.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
-	golang.org/x/sys v0.42.0 // indirect
 	go.opentelemetry.io/otel v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	modernc.org/libc v1.72.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

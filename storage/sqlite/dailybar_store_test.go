@@ -11,7 +11,7 @@ import (
 )
 
 func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
-	store := NewDailyBarStore(filepath.Join(t.TempDir(), "mwosa.db"))
+	reader, writer := NewDailyBarRepositories(filepath.Join(t.TempDir(), "mwosa.db"))
 	bar := dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
@@ -27,15 +27,15 @@ func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
 		},
 	}
 
-	if _, err := store.UpsertDailyBars(context.Background(), []dailybar.Bar{bar}); err != nil {
+	if _, err := writer.UpsertDailyBars(context.Background(), []dailybar.Bar{bar}); err != nil {
 		t.Fatalf("first upsert: %v", err)
 	}
 	bar.Close = "35130"
-	if _, err := store.UpsertDailyBars(context.Background(), []dailybar.Bar{bar}); err != nil {
+	if _, err := writer.UpsertDailyBars(context.Background(), []dailybar.Bar{bar}); err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
 
-	bars, err := store.QueryDailyBars(context.Background(), daily.Query{
+	bars, err := reader.QueryDailyBars(context.Background(), daily.Query{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
 		Symbol:       "069500",
