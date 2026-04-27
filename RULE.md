@@ -1,37 +1,39 @@
 # RULE.md
 
-This file is the compact programming rulebook for mwosa. Keep it shorter than
-the architecture documents. When a rule needs long explanation, link to the
-relevant document instead of expanding this file.
+이 문서는 mwosa의 짧은 프로그래밍 규칙입니다. 아키텍처 문서보다
+짧게 유지합니다. 설명이 길어지는 내용은 이 문서에 모두 풀어쓰기보다
+관련 문서로 연결합니다.
 
-## Core Principles
+## 핵심 원칙
 
-- Preserve the layer boundary. CLI code composes dependencies, service code uses
-  role interfaces and repository interfaces, and provider implementation details
-  do not leak into service code.
-- Keep provider clients independent. A provider client under `providers/clients`
-  is its own Go module with its own `go.mod` and tests.
-- Prefer narrow changes. Do not introduce broad refactors when the request can
-  be handled at the current boundary.
-- Do not hide failures as empty success. Unsupported capability, missing route,
-  remote error, storage error, and invalid input must return explicit errors
-  with provider, group, operation, market, security type, symbol, or date
-  context when those values exist.
+- 레이어 경계를 지킵니다. CLI는 의존성을 조립하고, service는 role
+  interface와 repository interface만 사용하며, provider 구현 세부사항은
+  service로 새지 않게 합니다.
+- provider client는 독립적으로 관리합니다. `providers/clients` 아래의
+  provider client는 자체 `go.mod`와 테스트를 가진 별도 Go 모듈입니다.
+- 변경 범위는 좁게 유지합니다. 현재 경계 안에서 해결할 수 있는 요청에
+  불필요한 대형 리팩터링을 붙이지 않습니다.
+- 실패를 빈 성공처럼 숨기지 않습니다. unsupported capability, route
+  없음, remote error, storage error, invalid input은 명시적인 error로
+  반환하고, 가능한 경우 provider, group, operation, market,
+  security type, symbol, date 맥락을 포함합니다.
 
-## Error Handling
+## 에러 처리
 
-- Hand-written Go code must use `github.com/samber/oops` for error creation,
-  wrapping, and joining.
-- Do not use `fmt.Errorf`, `errors.New`, or `errors.Join` for new hand-written
-  errors. Standard `errors.Is` and `errors.As` are allowed for error matching.
-- Generated code, including `storage/ent`, is excluded from this rule because it
-  is recreated by code generation.
-- Use `oops.New` or `oops.Errorf` for a new error. Use `Wrap` or `Wrapf` when a
-  lower-layer error is the cause. Use `oops.Join` when multiple cleanup errors
-  must be preserved.
-- Prefer reusable builders when a function repeats the same domain and context.
-  The builder must be completed with `.New`, `.Errorf`, `.Wrap`, `.Wrapf`,
-  `.Join`, `.Recover`, or `.Recoverf`.
+- 직접 작성하는 Go 코드는 error 생성, wrapping, joining에
+  `github.com/samber/oops`를 사용합니다.
+- 새 error를 만들 때 `fmt.Errorf`, `errors.New`, `errors.Join`을
+  사용하지 않습니다. error 판별을 위한 `errors.Is`, `errors.As`는
+  사용할 수 있습니다.
+- `storage/ent` 같은 생성 코드는 이 규칙에서 제외합니다. 생성 코드는
+  다시 생성될 수 있으므로 직접 수정하지 않습니다.
+- 새 error는 `oops.New` 또는 `oops.Errorf`를 사용합니다. 하위 레이어
+  error를 원인으로 보존해야 할 때는 `Wrap` 또는 `Wrapf`를 사용합니다.
+  cleanup 과정에서 여러 error를 보존해야 할 때는 `oops.Join`을
+  사용합니다.
+- 같은 함수 안에서 domain과 context가 반복되면 재사용 가능한 builder를
+  먼저 만듭니다. builder는 `.New`, `.Errorf`, `.Wrap`, `.Wrapf`,
+  `.Join`, `.Recover`, `.Recoverf` 같은 종료 메서드로 끝냅니다.
 
 ```go
 errb := oops.
@@ -50,47 +52,51 @@ if err != nil {
 }
 ```
 
-- Add context at each boundary instead of waiting until the CLI edge. The caller
-  should add the request context it owns; the callee should add the domain
-  context it owns.
-- `With(...)` is structured context, not always a replacement for a human-facing
-  message. If tests or CLI users must see fields such as `provider=datago`,
-  `group=securitiesProductPrice`, `operation=getETFPriceInfo`, or `status=502`,
-  keep those fields in the error message as well.
+- context는 CLI 경계에서 한 번에 몰아서 붙이지 않습니다. 호출자는 자신이
+  알고 있는 요청 맥락을 붙이고, 호출받는 쪽은 자신이 알고 있는 domain
+  맥락을 붙입니다.
+- `With(...)`는 구조화된 context이며, 항상 사람이 읽는 메시지를 대체하지는
+  않습니다. 테스트나 CLI 사용자가 `provider=datago`,
+  `group=securitiesProductPrice`, `operation=getETFPriceInfo`,
+  `status=502` 같은 필드를 error 문자열에서 직접 확인해야 한다면 해당
+  필드를 메시지에도 남깁니다.
 
 ## Storage
 
-- SQLite is the local canonical storage direction.
-- Ent schemas live under `storage/schema`. Generated Ent code lives under
-  `storage/ent` and should not be edited by hand.
-- Runtime database access should be lazy. Creating a storage handle must not open
-  SQLite; first actual use may open it, and command-level cleanup closes it.
-- Repository concrete types stay unexported. Export constructors and return
-  service-layer repository interfaces.
-- Validate repository construction invariants in constructors, not repeatedly in
-  every repository method.
+- 로컬 canonical storage 방향은 SQLite입니다.
+- Ent schema는 `storage/schema` 아래에 둡니다. 생성된 Ent 코드는
+  `storage/ent` 아래에 있으며 직접 수정하지 않습니다.
+- database runtime 접근은 lazy하게 처리합니다. storage handle 생성만으로
+  SQLite를 열지 않고, 실제 첫 사용 시점에 열 수 있습니다. cleanup은
+  command 단위에서 닫습니다.
+- repository 구현체는 export하지 않습니다. 생성자만 export하고,
+  service layer repository interface를 반환합니다.
+- repository 생성 시점에 결정되는 invariant는 생성자에서 검증합니다.
+  모든 repository 메서드에서 반복 방어하지 않습니다.
 
 ## Providers
 
-- Provider id and provider group are separate concepts. For datago, the provider
-  id is `datago` and the first group is `securitiesProductPrice`.
-- Do not encode provider group into a provider id with `-` or `/`.
-- Provider adapters convert provider-native responses toward canonical models.
-- Provider clients own endpoint paths, service keys, pagination, provider-native
-  parsing, and remote error context.
-- External API tests must use fake HTTP transports or `httptest`; unit tests must
-  not depend on live public API calls.
+- provider id와 provider group은 분리된 개념입니다. datago의 provider id는
+  `datago`이고, 첫 group은 `securitiesProductPrice`입니다.
+- provider group을 provider id에 `-` 또는 `/`로 붙이지 않습니다.
+- provider adapter는 provider-native 응답을 canonical model 방향으로
+  변환합니다.
+- provider client는 endpoint path, service key, pagination,
+  provider-native parsing, remote error context를 소유합니다.
+- 외부 API 테스트는 fake HTTP transport 또는 `httptest`를 사용합니다.
+  단위 테스트는 실제 public API 호출에 의존하지 않습니다.
 
 ## CLI
 
-- Keep the CLI verb-first and consistent with `README.md`.
-- Machine-readable output must remain predictable. JSON output should be
-  structured for `jq`; human table output can be concise.
-- stdout is for command results. stderr is for diagnostics, progress, and logs.
+- CLI는 verb-first 구조를 유지하고 `README.md`와 일관되게 둡니다.
+- machine-readable output은 예측 가능해야 합니다. JSON output은 `jq`로
+  다루기 쉬운 구조를 우선하고, human table output은 간결해도 됩니다.
+- stdout은 command 결과에 사용합니다. stderr는 diagnostics, progress,
+  log에 사용합니다.
 
 ## Documentation
 
-- Architecture contracts live under `docs/architectures`.
-- Provider lists and provider-specific plans live under `docs/providers`.
-- Do not reintroduce `docs/providers/provider-package-contract.md`; it was
-  removed.
+- 아키텍처 계약은 `docs/architectures` 아래에 둡니다.
+- provider 목록과 provider별 구현 계획은 `docs/providers` 아래에 둡니다.
+- `docs/providers/provider-package-contract.md`는 다시 만들지 않습니다. 이미
+  삭제된 문서입니다.
