@@ -19,8 +19,8 @@ type writeRepository struct {
 var _ daily.WriteRepository = (*writeRepository)(nil)
 
 func NewWriteRepository(database *storage.Database) (daily.WriteRepository, error) {
-	if err := requireDatabase(database); err != nil {
-		return nil, err
+	if database == nil {
+		return nil, oops.In("dailybar_repository").New("daily bar repository database is nil")
 	}
 	return &writeRepository{database: database}, nil
 }

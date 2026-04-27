@@ -19,24 +19,17 @@ type readRepository struct {
 var _ daily.ReadRepository = (*readRepository)(nil)
 
 func NewReadRepository(database *storage.Database) (daily.ReadRepository, error) {
-	if err := requireDatabase(database); err != nil {
-		return nil, err
+	if database == nil {
+		return nil, oops.In("dailybar_repository").New("daily bar repository database is nil")
 	}
 	return &readRepository{database: database}, nil
 }
 
 func NewRepositories(database *storage.Database) (daily.ReadRepository, daily.WriteRepository, error) {
-	if err := requireDatabase(database); err != nil {
-		return nil, nil, err
+	if database == nil {
+		return nil, nil, oops.In("dailybar_repository").New("daily bar repository database is nil")
 	}
 	return &readRepository{database: database}, &writeRepository{database: database}, nil
-}
-
-func requireDatabase(database *storage.Database) error {
-	if database == nil {
-		return oops.In("dailybar_repository").New("daily bar repository database is nil")
-	}
-	return nil
 }
 
 func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
