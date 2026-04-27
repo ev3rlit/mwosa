@@ -18,21 +18,19 @@ type readRepository struct {
 
 var _ daily.ReadRepository = (*readRepository)(nil)
 
-func NewReadRepository(databasePath string) daily.ReadRepository {
-	return &readRepository{database: storage.NewDatabase(databasePath)}
+func NewReadRepository(database *storage.Database) daily.ReadRepository {
+	return &readRepository{database: database}
 }
 
-func NewRepositories(databasePath string) (daily.ReadRepository, daily.WriteRepository) {
-	database := storage.NewDatabase(databasePath)
+func NewRepositories(database *storage.Database) (daily.ReadRepository, daily.WriteRepository) {
 	return &readRepository{database: database}, &writeRepository{database: database}
 }
 
 func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
-	client, err := r.open(ctx)
+	client, err := r.client(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer client.Close()
 
 	market := query.Market
 	if market == "" {
@@ -77,9 +75,9 @@ func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) 
 	return bars, nil
 }
 
-func (r *readRepository) open(ctx context.Context) (*entdb.Client, error) {
+func (r *readRepository) client(ctx context.Context) (*entdb.Client, error) {
 	if r == nil || r.database == nil {
 		return nil, fmt.Errorf("daily bar read repository database is nil")
 	}
-	return r.database.Open(ctx)
+	return r.database.Client(ctx)
 }

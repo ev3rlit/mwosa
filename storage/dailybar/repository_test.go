@@ -8,10 +8,17 @@ import (
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
+	"github.com/ev3rlit/mwosa/storage"
 )
 
 func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
-	reader, writer := NewRepositories(filepath.Join(t.TempDir(), "mwosa.db"))
+	database := storage.NewDatabase(filepath.Join(t.TempDir(), "mwosa.db"))
+	t.Cleanup(func() {
+		if err := database.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	reader, writer := NewRepositories(database)
 	bar := dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
