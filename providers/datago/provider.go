@@ -3,20 +3,21 @@ package datago
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"regexp"
 
-	datagoclient "github.com/ev3rlit/mwosa/providers/clients/marketdata-provider-datago"
+	datagoetp "github.com/ev3rlit/mwosa/providers/clients/datago-etp"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
 	"github.com/samber/oops"
 )
 
-type Config = datagoclient.Config
+type Config = datagoetp.Config
 
 type priceClient interface {
-	FetchPrices(context.Context, datagoclient.PriceQuery) (datagoclient.PriceResult, error)
+	GetETFPriceInfo(context.Context, datagoetp.ETFPriceInfoQuery) (datagoetp.ETFPriceInfoResult, error)
+	GetETNPriceInfo(context.Context, datagoetp.ETNPriceInfoQuery) (datagoetp.ETNPriceInfoResult, error)
+	GetELWPriceInfo(context.Context, datagoetp.ELWPriceInfoQuery) (datagoetp.ELWPriceInfoResult, error)
 }
 
 type Provider struct {
@@ -30,7 +31,7 @@ type Provider struct {
 
 func New(config Config) (*Provider, error) {
 	errb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice)
-	client, err := datagoclient.New(config)
+	client, err := datagoetp.New(config)
 	if err != nil {
 		return nil, errb.Wrap(err)
 	}
@@ -82,13 +83,23 @@ func dailyBarProfile() dailybar.Profile {
 			provider.OperationGetETNPriceInfo,
 			provider.OperationGetELWPriceInfo,
 		},
-		AuthScope:    provider.CredentialScopeDataGo,
-		RangeQuery:   dailybar.RangeQuerySupported,
-		Freshness:    provider.FreshnessDaily,
+		AuthScope:  provider.CredentialScopeDataGo,
+		RangeQuery: dailybar.RangeQuerySupported,
+		Freshness:  provider.FreshnessDaily,
+		Compatibility: provider.Compatibility{
+			DataLatency:         provider.DataLatencyPreviousBusinessDay,
+			LagBusinessDays:     1,
+			CurrentDaySupported: false,
+			Notes: []string{
+				"latest available basDt is typically the previous business day",
+				"current trading-day data is not supported",
+			},
+		},
 		RequiresAuth: true,
 		Priority:     50,
 		Limitations: []string{
-			"daily basDt data only; not a realtime quote snapshot provider",
+			"daily basDt data only; not a realtime or current trading-day provider",
+			"latest available data is typically D-1 business day EOD",
 			"ELW uses explicit security_type=elw because canonical schema policy is separate from ETF/ETN",
 		},
 	}
@@ -108,12 +119,22 @@ func instrumentSearchProfile() instrument.Profile {
 			provider.OperationGetETNPriceInfo,
 			provider.OperationGetELWPriceInfo,
 		},
-		AuthScope:    provider.CredentialScopeDataGo,
-		Freshness:    provider.FreshnessDaily,
+		AuthScope: provider.CredentialScopeDataGo,
+		Freshness: provider.FreshnessDaily,
+		Compatibility: provider.Compatibility{
+			DataLatency:         provider.DataLatencyPreviousBusinessDay,
+			LagBusinessDays:     1,
+			CurrentDaySupported: false,
+			Notes: []string{
+				"instrument snapshots are derived from D-1 business day EOD price rows",
+				"current trading-day data is not supported",
+			},
+		},
 		RequiresAuth: true,
 		Priority:     50,
 		Limitations: []string{
-			"searches public price rows and derives instrument snapshots",
+			"searches public D-1 business day EOD price rows and derives instrument snapshots",
+			"not suitable for realtime or current trading-day instrument state",
 			"ELW search requires explicit security_type=elw",
 		},
 	}
@@ -133,33 +154,31 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 		return dailybar.FetchResult{}, providerErrb.New("datago adapter client is nil")
 	}
 
-	params := url.Values{}
+	query := datagoetp.SecuritiesProductPriceQuery{
+		NumOfRows: numOfRowsForLimit(input.Limit),
+	}
 	if input.Symbol != "" {
-		params.Set("likeSrtnCd", input.Symbol)
+		query.LikeSrtnCd = input.Symbol
 	}
 	if input.From != "" && input.From == input.To {
-		params.Set("basDt", input.From)
+		query.BasDt = input.From
 	} else {
 		if input.From != "" {
-			params.Set("beginBasDt", input.From)
+			query.BeginBasDt = input.From
 		}
 		if input.To != "" {
-			params.Set("endBasDt", input.To)
+			query.EndBasDt = input.To
 		}
 	}
 
-	result, err := p.client.FetchPrices(ctx, datagoclient.PriceQuery{
-		Operation: string(operation),
-		Params:    params,
-		Limit:     input.Limit,
-	})
+	result, err := p.fetchPriceRecords(ctx, operationSpec{SecurityType: input.SecurityType, Operation: operation}, query)
 	if err != nil {
 		return dailybar.FetchResult{}, providerErrb.With("operation", operation, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrapf(err, "fetch datago daily bars")
 	}
 
-	bars := make([]dailybar.Bar, 0, len(result.Items))
-	for _, item := range result.Items {
-		bars = append(bars, normalizeDailyBar(item, input.SecurityType, operation))
+	bars := make([]dailybar.Bar, 0, len(result.Records))
+	for _, record := range result.Records {
+		bars = append(bars, normalizeDailyBar(record, input.SecurityType, operation))
 	}
 
 	return dailybar.FetchResult{
@@ -188,24 +207,22 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 	instruments := make([]instrument.Instrument, 0)
 	totalCount := 0
 	for _, spec := range operations {
-		params := url.Values{}
+		query := datagoetp.SecuritiesProductPriceQuery{
+			NumOfRows: numOfRowsForLimit(input.Limit),
+		}
 		if looksLikeSecurityCode(input.Query) {
-			params.Set("likeSrtnCd", input.Query)
+			query.LikeSrtnCd = input.Query
 		} else if input.Query != "" {
-			params.Set("likeItmsNm", input.Query)
+			query.LikeItmsNm = input.Query
 		}
 
-		result, err := p.client.FetchPrices(ctx, datagoclient.PriceQuery{
-			Operation: string(spec.Operation),
-			Params:    params,
-			Limit:     input.Limit,
-		})
+		result, err := p.fetchPriceRecords(ctx, spec, query)
 		if err != nil {
 			return instrument.SearchResult{}, providerErrb.With("operation", spec.Operation, "market", input.Market, "security_type", spec.SecurityType, "query", input.Query).Wrapf(err, "fetch datago instruments")
 		}
 		totalCount += result.TotalCount
-		for _, item := range result.Items {
-			instruments = append(instruments, normalizeInstrument(item, spec.SecurityType, spec.Operation))
+		for _, record := range result.Records {
+			instruments = append(instruments, normalizeInstrument(record, spec.SecurityType, spec.Operation))
 			if input.Limit > 0 && len(instruments) >= input.Limit {
 				return instrument.SearchResult{
 					Instruments: instruments,
@@ -230,6 +247,16 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 type operationSpec struct {
 	SecurityType provider.SecurityType
 	Operation    provider.OperationID
+}
+
+type priceRecord struct {
+	Common datagoetp.CommonPriceInfo
+	Fields map[string]string
+}
+
+type priceRecordsResult struct {
+	Records    []priceRecord
+	TotalCount int
 }
 
 func operationsForSearch(securityType provider.SecurityType, symbol string) ([]operationSpec, error) {
@@ -299,6 +326,13 @@ func looksLikeSecurityCode(query string) bool {
 	return securityCodePattern.MatchString(query)
 }
 
+func numOfRowsForLimit(limit int) int {
+	if limit > 0 && limit < datagoetp.DefaultNumOfRows {
+		return limit
+	}
+	return datagoetp.DefaultNumOfRows
+}
+
 func operationIDs(specs []operationSpec) []provider.OperationID {
 	operations := make([]provider.OperationID, 0, len(specs))
 	for _, spec := range specs {
@@ -307,33 +341,97 @@ func operationIDs(specs []operationSpec) []provider.OperationID {
 	return operations
 }
 
-func normalizeDailyBar(item datagoclient.PriceItem, securityType provider.SecurityType, operation provider.OperationID) dailybar.Bar {
+func (p *Provider) fetchPriceRecords(ctx context.Context, spec operationSpec, query datagoetp.SecuritiesProductPriceQuery) (priceRecordsResult, error) {
+	errb := oops.In("datago_adapter").With(
+		"provider", provider.ProviderDataGo,
+		"group", provider.GroupSecuritiesProductPrice,
+		"operation", spec.Operation,
+		"security_type", spec.SecurityType,
+	)
+
+	switch spec.Operation {
+	case provider.OperationGetETFPriceInfo:
+		result, err := p.client.GetETFPriceInfo(ctx, datagoetp.ETFPriceInfoQuery{
+			SecuritiesProductPriceQuery: query,
+		})
+		if err != nil {
+			return priceRecordsResult{}, errb.Wrap(err)
+		}
+		return priceRecordsResult{Records: recordsFromETF(result.Items), TotalCount: result.TotalCount}, nil
+	case provider.OperationGetETNPriceInfo:
+		result, err := p.client.GetETNPriceInfo(ctx, datagoetp.ETNPriceInfoQuery{
+			SecuritiesProductPriceQuery: query,
+		})
+		if err != nil {
+			return priceRecordsResult{}, errb.Wrap(err)
+		}
+		return priceRecordsResult{Records: recordsFromETN(result.Items), TotalCount: result.TotalCount}, nil
+	case provider.OperationGetELWPriceInfo:
+		result, err := p.client.GetELWPriceInfo(ctx, datagoetp.ELWPriceInfoQuery{
+			SecuritiesProductPriceQuery: query,
+		})
+		if err != nil {
+			return priceRecordsResult{}, errb.Wrap(err)
+		}
+		return priceRecordsResult{Records: recordsFromELW(result.Items), TotalCount: result.TotalCount}, nil
+	default:
+		return priceRecordsResult{}, errb.New("unsupported datago price info operation")
+	}
+}
+
+func recordsFromETF(items []datagoetp.ETFPriceInfo) []priceRecord {
+	records := make([]priceRecord, 0, len(items))
+	for _, item := range items {
+		records = append(records, priceRecord{Common: item.CommonPriceInfo, Fields: item.Fields()})
+	}
+	return records
+}
+
+func recordsFromETN(items []datagoetp.ETNPriceInfo) []priceRecord {
+	records := make([]priceRecord, 0, len(items))
+	for _, item := range items {
+		records = append(records, priceRecord{Common: item.CommonPriceInfo, Fields: item.Fields()})
+	}
+	return records
+}
+
+func recordsFromELW(items []datagoetp.ELWPriceInfo) []priceRecord {
+	records := make([]priceRecord, 0, len(items))
+	for _, item := range items {
+		records = append(records, priceRecord{Common: item.CommonPriceInfo, Fields: item.Fields()})
+	}
+	return records
+}
+
+func normalizeDailyBar(record priceRecord, securityType provider.SecurityType, operation provider.OperationID) dailybar.Bar {
+	item := record.Common
 	return dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
 		Operation:    operation,
 		Market:       provider.MarketKRX,
 		SecurityType: securityType,
-		Symbol:       item["srtnCd"],
-		ISIN:         item["isinCd"],
-		Name:         item["itmsNm"],
-		TradingDate:  normalizeDate(item["basDt"]),
+		Symbol:       item.SrtnCd,
+		ISIN:         item.IsinCd,
+		Name:         item.ItmsNm,
+		TradingDate:  normalizeDate(item.BasDt),
 		Currency:     "KRW",
-		Open:         item["mkp"],
-		High:         item["hipr"],
-		Low:          item["lopr"],
-		Close:        item["clpr"],
-		Change:       item["vs"],
-		ChangeRate:   item["fltRt"],
-		Volume:       item["trqu"],
-		TradedValue:  item["trPrc"],
-		MarketCap:    item["mrktTotAmt"],
-		Extensions:   extensionFields(item),
+		Open:         item.Mkp,
+		High:         item.Hipr,
+		Low:          item.Lopr,
+		Close:        item.Clpr,
+		Change:       item.Vs,
+		ChangeRate:   item.FltRt,
+		Volume:       item.Trqu,
+		TradedValue:  item.TrPrc,
+		MarketCap:    item.MrktTotAmt,
+		Extensions:   extensionFields(record.Fields),
 	}
 }
 
-func normalizeInstrument(item datagoclient.PriceItem, securityType provider.SecurityType, operation provider.OperationID) instrument.Instrument {
-	securityCode := item["srtnCd"]
+func normalizeInstrument(record priceRecord, securityType provider.SecurityType, operation provider.OperationID) instrument.Instrument {
+	item := record.Common
+	securityCode := item.SrtnCd
 	return instrument.Instrument{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,
@@ -341,8 +439,8 @@ func normalizeInstrument(item datagoclient.PriceItem, securityType provider.Secu
 		Market:       provider.MarketKRX,
 		SecurityType: securityType,
 		SecurityCode: securityCode,
-		ISIN:         item["isinCd"],
-		Name:         item["itmsNm"],
+		ISIN:         item.IsinCd,
+		Name:         item.ItmsNm,
 		ExchangeCode: "KRX",
 		CountryCode:  "KR",
 		Timezone:     "Asia/Seoul",
@@ -361,7 +459,7 @@ func normalizeDate(value string) string {
 	return fmt.Sprintf("%s-%s-%s", value[:4], value[4:6], value[6:8])
 }
 
-func extensionFields(item datagoclient.PriceItem) map[string]string {
+func extensionFields(item map[string]string) map[string]string {
 	extensions := make(map[string]string)
 	for key, value := range item {
 		if isCommonDailyBarField(key) {

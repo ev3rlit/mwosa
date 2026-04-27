@@ -8,7 +8,8 @@
 
 현재 문서는 첫 group 인 `securitiesProductPrice` 를 기준으로 작성한다. 이 group 은 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집한다.
 
-원본 OpenAPI 스펙은 `docs/providers/datago/securitiesProductPrice.openapi.yaml` 에 보관한다.
+원본 OpenAPI 스펙은 provider client module 안의
+`providers/clients/datago-etp/docs/securitiesProductPrice.openapi.yaml` 에 보관한다.
 
 이 provider 의 client 구현체는 `mwosa` workspace 안의 **독립 Go module** 로 관리한다. `mwosa` repository root 의 `go.work` 로 CLI module 과 함께 개발하고, 필요하면 나중에 별도 repository 로 분리할 수 있다.
 
@@ -19,17 +20,19 @@
 - provider-neutral 검색 소스 중 하나로 동작
 
 초기 버전에서는 실시간 호가나 분봉 provider 가 아니라, `basDt` 기준의 일별 시세 provider 로 취급한다.
+또한 공공데이터포털의 `securitiesProductPrice` 데이터는 현재 거래일 데이터를 제공하는 feed 가 아니라,
+일반적으로 **D-1 영업일 EOD 데이터**까지 제공되는 지연 데이터로 본다.
 
 ## 위치
 
 - provider 문서: `docs/providers/datago/README.md`
-- 원본 스펙: `docs/providers/datago/securitiesProductPrice.openapi.yaml`
+- 원본 스펙: `providers/clients/datago-etp/docs/securitiesProductPrice.openapi.yaml`
 - 공통 저장 계약: `docs/canonical-schema.md`
 
 권장 패키지 분리:
 
 - provider client module:
-  - 예: `providers/clients/marketdata-provider-datago`
+  - 예: `providers/clients/datago-etp`
 - in-CLI adapter:
   - 예: `providers/datago`
 
@@ -42,7 +45,7 @@
 - OpenAPI endpoint 경로
 - query parameter builder
 - `serviceKey` 인증 처리
-- pagination 반복 호출
+- `numOfRows`, `pageNo`, `totalCount` pagination metadata 처리
 - JSON/XML 응답 파싱 정책
 - `item` 단건/배열 shape 처리
 - provider-native error model
@@ -114,8 +117,23 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 - `srtnCd`, `isinCd`, `itmsNm` 기반 검색 가능
 - 결과는 페이지네이션과 조건 검색을 지원
 - 본문은 `body.items.item` 배열 또는 단건 객체로 내려올 수 있음
+- 최신 사용 가능 `basDt` 는 일반적으로 오늘이 아니라 D-1 영업일이다.
 
 즉, 이 group 은 단건 `quote` API 라기보다 **검색 가능한 일별 시세 목록 API** 에 가깝다.
+
+## 데이터 호환성
+
+`securitiesProductPrice` group 의 provider compatibility 는 다음처럼 본다.
+
+- data latency: `previous_business_day`
+- lag business days: `1`
+- current trading-day supported: `false`
+- intended use: D-1 영업일 EOD / historical daily bar / instrument snapshot
+- not intended use: realtime quote, intraday decision feed, current trading-day quote
+
+따라서 `basDt=오늘` 로 호출했을 때 `totalCount=0` 이 나오는 것은 provider 실패가 아니라
+데이터 공개 지연 특성으로 취급한다. 오늘 투자 판단에 필요한 current price provider 와는 별도로
+다뤄야 한다.
 
 ## v1 지원 범위
 
@@ -127,6 +145,7 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 초기 비지원 범위:
 
 - 진짜 실시간 `quote_snapshot`
+- 현재 거래일 daily bar 보장
 - 분봉, 틱 데이터
 - 주문/계좌 관련 데이터
 
@@ -197,12 +216,14 @@ backfill daily --market krx --security-type etf --from <YYYYMMDD> --to <YYYYMMDD
 - `backfill daily` 는 날짜 범위를 하루씩 순회하며 `basDt` batch 수집을 반복한다.
 - `ensure daily <security_code>` 는 필요한 날짜가 없으면 해당 날짜의 batch 를 먼저 수집한 뒤 저장소에서 `security_code` 를 조회한다.
 - `resultType=json`
-- `numOfRows`, `pageNo`, `totalCount` 로 pagination 을 처리한다.
+- `numOfRows`, `pageNo`, `totalCount` 를 노출하되 client 가 모든 page 를 자동 순회하지 않는다.
 - `provider=datago`, `provider_group=securitiesProductPrice`, 실제 operation 을 provenance 로 남긴다.
+- 최신 데이터 요청은 오늘이 아니라 latest available basDt, 즉 보통 D-1 영업일 기준으로 해석한다.
 
 주의:
 
 - 이 API 는 단건 ticker endpoint 보다 날짜별 batch endpoint 로 쓰는 편이 효율적이다.
+- 현재 거래일 데이터는 제공되지 않을 수 있으므로 realtime/current-day provider 로 사용하지 않는다.
 - `get daily` 는 조회 명령이므로 데이터가 없을 때 빈 성공을 반환하지 않는다.
 - ETF/ETN 은 기본 지원 대상으로 두고, ELW 는 `--security-type elw` 처럼 명시적으로 다룬다.
 
@@ -383,7 +404,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 이 provider 문서를 기준으로 다음 구현을 진행한다.
 
-1. provider client module `providers/clients/marketdata-provider-datago` 생성
+1. provider client module `providers/clients/datago-etp` 생성
 2. client module 내부 provider group / operation registry 작성
 3. `securitiesProductPrice` OpenAPI query builder 작성
 4. client module 내부 item normalization 구현

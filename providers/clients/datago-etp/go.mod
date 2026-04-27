@@ -1,4 +1,4 @@
-module github.com/ev3rlit/mwosa/providers/clients/marketdata-provider-datago
+module github.com/ev3rlit/mwosa/providers/clients/datago-etp
 
 go 1.25.6
 

@@ -150,7 +150,6 @@ func setDataGoEnv(t *testing.T, baseURL string) {
 	t.Helper()
 	t.Setenv("MWOSA_DATAGO_SERVICE_KEY", "test-key")
 	t.Setenv("MWOSA_DATAGO_BASE_URL", baseURL)
-	t.Setenv("MWOSA_DATAGO_NUM_OF_ROWS", "100")
 }
 
 func executeForTest(ctx context.Context, cmd *cobra.Command, args ...string) error {

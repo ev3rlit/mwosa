@@ -2,7 +2,6 @@ package cli
 
 import (
 	"os"
-	"strconv"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
@@ -253,13 +252,6 @@ func newDataGoProviderFromEnv() (*datago.Provider, error) {
 	config := datago.Config{
 		ServiceKey: serviceKey,
 		BaseURL:    os.Getenv("MWOSA_DATAGO_BASE_URL"),
-	}
-	if value := os.Getenv("MWOSA_DATAGO_NUM_OF_ROWS"); value != "" {
-		numOfRows, err := strconv.Atoi(value)
-		if err != nil {
-			return nil, errb.With("env", "MWOSA_DATAGO_NUM_OF_ROWS", "value", value).Wrapf(err, "MWOSA_DATAGO_NUM_OF_ROWS must be an integer")
-		}
-		config.NumOfRows = numOfRows
 	}
 	return datago.New(config)
 }

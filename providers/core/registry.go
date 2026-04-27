@@ -10,6 +10,7 @@ type RoleProfile struct {
 	Operations    []OperationID
 	AuthScope     CredentialScope
 	Freshness     Freshness
+	Compatibility Compatibility
 	RequiresAuth  bool
 	Priority      int
 	Limitations   []string
@@ -47,6 +48,9 @@ func (r *Registry) Register(provider IdentityProvider, roles ...RoleRegistration
 	for _, role := range roles {
 		if role.Profile.Role == "" {
 			return providerErrb.New("register provider role: role is empty")
+		}
+		if role.Profile.Compatibility.DataLatency == "" {
+			return providerErrb.With("role", role.Profile.Role).New("register provider role: data compatibility is required")
 		}
 		if role.Impl == nil {
 			return providerErrb.With("role", role.Profile.Role).New("register provider role: implementation is nil")

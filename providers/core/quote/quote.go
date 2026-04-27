@@ -14,6 +14,7 @@ type Profile struct {
 	Operations    []provider.OperationID
 	AuthScope     provider.CredentialScope
 	Freshness     provider.Freshness
+	Compatibility provider.Compatibility
 	RequiresAuth  bool
 	Priority      int
 	Limitations   []string
@@ -28,6 +29,7 @@ func (p Profile) RoleProfile() provider.RoleProfile {
 		Operations:    p.Operations,
 		AuthScope:     p.AuthScope,
 		Freshness:     p.Freshness,
+		Compatibility: p.Compatibility,
 		RequiresAuth:  p.RequiresAuth,
 		Priority:      p.Priority,
 		Limitations:   p.Limitations,

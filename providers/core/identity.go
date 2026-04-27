@@ -7,6 +7,7 @@ type Market string
 type SecurityType string
 type CredentialScope string
 type Freshness string
+type DataLatency string
 type Role string
 
 const (
@@ -29,10 +30,22 @@ const (
 
 	FreshnessDaily Freshness = "daily"
 
+	DataLatencyRealtime            DataLatency = "realtime"
+	DataLatencyEndOfDay            DataLatency = "end_of_day"
+	DataLatencyPreviousBusinessDay DataLatency = "previous_business_day"
+	DataLatencyHistorical          DataLatency = "historical"
+
 	RoleDailyBar   Role = "daily_bar"
 	RoleInstrument Role = "instrument"
 	RoleQuote      Role = "quote_snapshot"
 )
+
+type Compatibility struct {
+	DataLatency         DataLatency
+	LagBusinessDays     int
+	CurrentDaySupported bool
+	Notes               []string
+}
 
 type Identity struct {
 	ID          ProviderID

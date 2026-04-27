@@ -1,0 +1,5 @@
+{
+  "service_key": "YOUR_DECODED_DATAGO_SERVICE_KEY",
+  "num_of_rows": 100,
+  "timeout": "15s"
+}

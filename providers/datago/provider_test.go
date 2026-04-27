@@ -20,7 +20,7 @@ func TestFetchDailyBarsDecodesSingleObjectItem(t *testing.T) {
 		if r.URL.Path != "/getETFPriceInfo" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		assertCommonQuery(t, r, "1")
+		assertCommonQuery(t, r, "1", "100")
 		if got := r.URL.Query().Get("resultType"); got != "json" {
 			t.Fatalf("resultType = %q, want json", got)
 		}
@@ -53,7 +53,7 @@ func TestFetchDailyBarsDecodesSingleObjectItem(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := newTestProvider(t, server.URL, 100)
+	p := newTestProvider(t, server.URL)
 	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
@@ -86,7 +86,7 @@ func TestFetchDailyBarsDecodesSingleObjectItem(t *testing.T) {
 	}
 }
 
-func TestFetchDailyBarsDecodesArrayItemsAndPaginates(t *testing.T) {
+func TestFetchDailyBarsDecodesOnlyRequestedPage(t *testing.T) {
 	seenPages := make([]string, 0)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/getETNPriceInfo" {
@@ -94,57 +94,40 @@ func TestFetchDailyBarsDecodesArrayItemsAndPaginates(t *testing.T) {
 		}
 		pageNo := r.URL.Query().Get("pageNo")
 		seenPages = append(seenPages, pageNo)
-		assertCommonQuery(t, r, pageNo)
-
-		switch pageNo {
-		case "1":
-			fmt.Fprint(w, `{
-				"header": {"resultCode": "00", "resultMsg": "OK"},
-				"body": {
-					"numOfRows": 1,
-					"pageNo": 1,
-					"totalCount": 2,
-					"items": {"item": [
-						{"basDt": "20240415", "srtnCd": "580001", "itmsNm": "ETN A", "clpr": "1000"}
-					]}
-				}
-			}`)
-		case "2":
-			fmt.Fprint(w, `{
-				"header": {"resultCode": "00", "resultMsg": "OK"},
-				"body": {
-					"numOfRows": 1,
-					"pageNo": 2,
-					"totalCount": 2,
-					"items": {"item": [
-						{"basDt": "20240416", "srtnCd": "580001", "itmsNm": "ETN A", "clpr": "1005"}
-					]}
-				}
-			}`)
-		default:
-			t.Fatalf("unexpected pageNo: %s", pageNo)
-		}
+		assertCommonQuery(t, r, pageNo, "1")
+		fmt.Fprint(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 1,
+				"pageNo": 1,
+				"totalCount": 2,
+				"items": {"item": [
+					{"basDt": "20240415", "srtnCd": "580001", "itmsNm": "ETN A", "clpr": "1000"}
+				]}
+			}
+		}`)
 	}))
 	defer server.Close()
 
-	p := newTestProvider(t, server.URL, 1)
+	p := newTestProvider(t, server.URL)
 	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETN,
 		Symbol:       "580001",
+		Limit:        1,
 	})
 	if err != nil {
 		t.Fatalf("fetch daily bars: %v", err)
 	}
 
-	if strings.Join(seenPages, ",") != "1,2" {
-		t.Fatalf("seen pages = %v, want [1 2]", seenPages)
+	if strings.Join(seenPages, ",") != "1" {
+		t.Fatalf("seen pages = %v, want [1]", seenPages)
 	}
-	if len(result.Bars) != 2 {
-		t.Fatalf("bars len = %d, want 2", len(result.Bars))
+	if len(result.Bars) != 1 {
+		t.Fatalf("bars len = %d, want 1", len(result.Bars))
 	}
-	if result.Bars[1].Close != "1005" {
-		t.Fatalf("second close = %q, want 1005", result.Bars[1].Close)
+	if result.Bars[0].Close != "1000" {
+		t.Fatalf("close = %q, want 1000", result.Bars[0].Close)
 	}
 }
 
@@ -162,7 +145,7 @@ func TestSearchInstrumentsReturnsEmptyResult(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := newTestProvider(t, server.URL, 100)
+	p := newTestProvider(t, server.URL)
 	result, err := p.SearchInstruments(context.Background(), instrumentInput("missing"))
 	if err != nil {
 		t.Fatalf("search instruments: %v", err)
@@ -181,7 +164,7 @@ func TestRemoteErrorIncludesProviderContext(t *testing.T) {
 	}))
 	defer server.Close()
 
-	p := newTestProvider(t, server.URL, 100)
+	p := newTestProvider(t, server.URL)
 	_, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
@@ -243,12 +226,11 @@ func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
 	}
 }
 
-func newTestProvider(t *testing.T, baseURL string, numOfRows int) *Provider {
+func newTestProvider(t *testing.T, baseURL string) *Provider {
 	t.Helper()
 	p, err := New(Config{
 		ServiceKey: "test-key",
 		BaseURL:    baseURL,
-		NumOfRows:  numOfRows,
 	})
 	if err != nil {
 		t.Fatalf("new datago provider: %v", err)
@@ -256,13 +238,16 @@ func newTestProvider(t *testing.T, baseURL string, numOfRows int) *Provider {
 	return p
 }
 
-func assertCommonQuery(t *testing.T, r *http.Request, pageNo string) {
+func assertCommonQuery(t *testing.T, r *http.Request, pageNo string, numOfRows string) {
 	t.Helper()
 	if got := r.URL.Query().Get("serviceKey"); got != "test-key" {
 		t.Fatalf("serviceKey = %q, want test-key", got)
 	}
 	if got := r.URL.Query().Get("pageNo"); got != pageNo {
 		t.Fatalf("pageNo = %q, want %s", got, pageNo)
+	}
+	if got := r.URL.Query().Get("numOfRows"); got != numOfRows {
+		t.Fatalf("numOfRows = %q, want %s", got, numOfRows)
 	}
 }
 

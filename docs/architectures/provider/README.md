@@ -62,7 +62,7 @@ provider client 는 CLI 밖에서도 독립적으로 테스트할 수 있어야 
 
 각 provider client 는 workspace 안에 생성되는 독립 Go module 이다. 각 client module 은 자체 `go.mod` 를 가지고, provider API 호출, 인증, pagination, 원본 응답 파싱, provider-native error 처리를 자기 module 안에서 끝낸다.
 
-이 구조에서는 provider client 를 `mwosa` 에 등록하기 전에 먼저 client module 단위로 테스트한다. 예를 들어 `providers/datago` adapter 를 붙이기 전에 `marketdata-provider-datago` module 안에서 request builder, fake transport, 응답 파서, error mapping 테스트를 통과시킨다.
+이 구조에서는 provider client 를 `mwosa` 에 등록하기 전에 먼저 client module 단위로 테스트한다. 예를 들어 `providers/datago` adapter 를 붙이기 전에 `datago-etp` module 안에서 request builder, fake transport, 응답 파서, error mapping 테스트를 통과시킨다.
 
 provider client 테스트는 CLI module, storage, provider router 에 의존하지 않는다. 외부 API 를 직접 치는 테스트가 필요하면 별도 integration test 로 분리하고, 기본 단위 테스트는 `httptest` 나 fake transport 로 빠르게 실행한다.
 
@@ -250,6 +250,7 @@ type Profile struct {
 	AuthScope     provider.CredentialScope
 	RangeQuery    RangeQuerySupport
 	Freshness      provider.Freshness
+	Compatibility  provider.Compatibility
 	RequiresAuth  bool
 	Priority      int
 	Limitations   []string
@@ -267,6 +268,7 @@ datago
   security_type: etf, etn
   range query: supported
   freshness: daily
+  compatibility: previous_business_day, current_day_supported=false
 
 kis
   role: dailybar.Fetch, quote.Snapshot
@@ -274,9 +276,14 @@ kis
   security_type: stock, etf
   range query: limited
   freshness: realtime / daily
+  compatibility: realtime or end_of_day, depending on role
 ```
 
 registry 는 role interface 와 profile 을 수집한다. provider router 는 registry 의 후보 목록을 사용해 요청에 맞는 provider role 로 라우팅한다. 이때 provider 이름만 비교하지 않고 group, operation, auth scope 까지 함께 본다.
+
+`Compatibility` 는 provider 선택에서 필수 metadata 다. 같은 `daily` freshness 라도 현재 거래일 데이터를 지원하는지,
+D-1 영업일 EOD 인지, historical-only 인지에 따라 사용 가능성이 달라진다. Provider 등록 시 이 값이 없으면
+registry 가 거부한다.
 
 ## Registry
 
@@ -404,6 +411,11 @@ func New(client *datago.Client) *Provider {
 			AuthScope:    provider.CredentialScope("datago"),
 			RangeQuery:    dailybar.RangeQuerySupported,
 			Freshness:      provider.FreshnessDaily,
+			Compatibility: provider.Compatibility{
+				DataLatency:         provider.DataLatencyPreviousBusinessDay,
+				LagBusinessDays:     1,
+				CurrentDaySupported: false,
+			},
 			RequiresAuth:  true,
 			Priority:      50,
 		}, func(ctx context.Context, input dailybar.FetchInput) (dailybar.FetchResult, error) {
