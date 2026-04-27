@@ -41,6 +41,8 @@ providers/
   core/
   kis/
   datago/
+packages/
+  indicators/
 canonical/
 storage/
 format/
@@ -95,6 +97,21 @@ argv/stdin/env
 ```
 
 레이어 방향은 바깥에서 안쪽으로 흐른다. 안쪽 레이어는 바깥 레이어를 알지 않는다.
+
+## 보조지표 계산 흐름
+
+보조지표 계산은 service layer 가 use case 를 조립하고, `packages/indicators` 가 순수 계산만 맡는 구조로 둔다.
+
+| 위치 | 역할 |
+| --- | --- |
+| provider | 외부 provider 에서 원천 데이터를 가져온다. |
+| storage | 확보한 데이터를 보관하고 다시 읽는다. |
+| service/calc | 필요한 데이터 확보와 계산 호출을 조율한다. |
+| packages/indicators | 정렬된 입력 시계열을 받아 보조지표를 계산한다. |
+| command/calc | CLI 입력을 service 요청으로 바꾼다. |
+| presentation | 계산 결과를 `table`, `json`, `ndjson`, `csv` 로 보여준다. |
+
+provider 는 보조지표 공식을 알지 않는다. `packages/indicators` 는 provider, storage, Cobra, 출력 형식을 알지 않는다.
 
 ## Command Layer
 
@@ -258,13 +275,13 @@ fallback 규칙:
 - 투자 리서치 도메인의 핵심 규칙과 계산을 담는다.
 - CLI, provider, storage, terminal 에 의존하지 않는다.
 
-초기 domain 후보:
+domain 후보:
 
 - instrument identity
 - canonical key
 - price series
 - return calculation
-- RSI/MACD/SMA 같은 indicator 계산
+- indicator result vocabulary
 - position sizing
 - reward/risk calculation
 - portfolio weight calculation
@@ -289,10 +306,12 @@ fallback 규칙:
 ```text
 domain/
 canonical/
-indicator/
+packages/indicators/
 ```
 
-초기에는 `canonical`, `indicator` 로 시작하고, domain 개념이 커질 때 `domain` 으로 확장한다.
+투자 리서치에 필요한 순수 보조지표 계산은 CLI domain 폴더 안에 넣기보다 `packages/indicators` 의 독립 계산 패키지로 둔다. MACD, 일목균형표, 이동평균은 그 검토 대상 중 일부다. domain/service 는 이 패키지를 호출하고, 계산 결과를 리서치 흐름에서 어떻게 사용할지 조합한다.
+
+`canonical`, `packages/indicators`, `domain` 은 별도 책임으로 본다. 실제 package 배치는 책임 경계가 충분히 분명해졌을 때 조정한다.
 
 ## Persistence Layer
 
@@ -432,4 +451,5 @@ presentation
 
 - `docs/architectures/provider/README.md`
 - `docs/architectures/tech-stack/README.md`
+- `docs/architectures/packages/README.md`
 - `docs/go-cli-package-layout.md`

@@ -32,6 +32,18 @@ provider 가 REST API 를 사용할 수도 있지만, 모든 provider 가 REST A
 - timeout, retry, rate limit, provenance 는 provider config 와 provider result 의 의미로 표현한다.
 - REST provider 테스트는 가능하면 `httptest` 나 provider-local fake transport 로 작성한다.
 
+## 테스트 기준
+
+테스트는 Go 표준 `testing` 을 기반으로 작성하고, assertion 은 `testify` 를 사용한다.
+
+특히 `packages/indicators` 같은 계산 패키지는 함수별 단위 테스트가 필수다. 계산 함수는 기준 fixture 와 비교해 정확성을 보장해야 하며, warm-up 구간, invalid input, floating point 허용 오차를 테스트 안에 명시한다.
+
+기준:
+
+- 입력 준비나 선행 조건 검증은 `require` 로 실패 시 즉시 중단한다.
+- 계산 결과 비교는 `assert` 로 여러 값의 차이를 한 번에 확인한다.
+- 외부 라이브러리를 참고하더라도 `mwosa` 의 public result type 과 fixture 기준을 테스트의 source of truth 로 둔다.
+
 ## Provider 추가 흐름
 
 새 provider 를 붙일 때는 아래 순서로 진행한다.
