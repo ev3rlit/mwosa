@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
 )
 
 // DailyBar is the model entity for the DailyBar schema.

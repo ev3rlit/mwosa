@@ -1,30 +1,31 @@
-package sqlite
+package dailybar
 
 import (
 	"context"
 	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
-	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
-	entdb "github.com/ev3rlit/mwosa/storage/sqlite/ent"
-	dailybarent "github.com/ev3rlit/mwosa/storage/sqlite/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage"
+	entdb "github.com/ev3rlit/mwosa/storage/ent"
+	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
 )
 
 type DailyBarReadRepository struct {
-	database *Database
+	database *storage.Database
 }
 
 func NewDailyBarReadRepository(databasePath string) *DailyBarReadRepository {
-	return &DailyBarReadRepository{database: NewDatabase(databasePath)}
+	return &DailyBarReadRepository{database: storage.NewDatabase(databasePath)}
 }
 
-func NewDailyBarRepositories(databasePath string) (*DailyBarReadRepository, *DailyBarWriteRepository) {
-	database := NewDatabase(databasePath)
+func NewRepositories(databasePath string) (*DailyBarReadRepository, *DailyBarWriteRepository) {
+	database := storage.NewDatabase(databasePath)
 	return &DailyBarReadRepository{database: database}, &DailyBarWriteRepository{database: database}
 }
 
-func (r *DailyBarReadRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]dailybar.Bar, error) {
+func (r *DailyBarReadRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
 	client, err := r.open(ctx)
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func (r *DailyBarReadRepository) QueryDailyBars(ctx context.Context, query daily
 		return nil, fmt.Errorf("query daily bars sqlite market=%s security_type=%s symbol=%s from=%s to=%s: %w", query.Market, query.SecurityType, query.Symbol, query.From, query.To, err)
 	}
 
-	bars := make([]dailybar.Bar, 0, len(rows))
+	bars := make([]coredailybar.Bar, 0, len(rows))
 	for _, row := range rows {
 		bar, err := entDailyBarToCanonical(row)
 		if err != nil {
@@ -78,5 +79,5 @@ func (r *DailyBarReadRepository) open(ctx context.Context) (*entdb.Client, error
 	if r == nil || r.database == nil {
 		return nil, fmt.Errorf("daily bar read repository database is nil")
 	}
-	return r.database.open(ctx)
+	return r.database.Open(ctx)
 }

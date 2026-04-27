@@ -11,8 +11,8 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/dailybar"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/predicate"
+	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent/predicate"
 )
 
 const (

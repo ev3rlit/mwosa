@@ -5,12 +5,12 @@ package enttest
 import (
 	"context"
 
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent"
+	"github.com/ev3rlit/mwosa/storage/ent"
 	// required by schema hooks.
-	_ "github.com/ev3rlit/mwosa/storage/sqlite/ent/runtime"
+	_ "github.com/ev3rlit/mwosa/storage/ent/runtime"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/migrate"
+	"github.com/ev3rlit/mwosa/storage/ent/migrate"
 )
 
 type (

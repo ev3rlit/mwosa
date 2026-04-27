@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/predicate"
+	"github.com/ev3rlit/mwosa/storage/ent/predicate"
 )
 
 // ID filters vertices based on their ID field.

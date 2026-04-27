@@ -1,25 +1,26 @@
-package sqlite
+package dailybar
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
-	entdb "github.com/ev3rlit/mwosa/storage/sqlite/ent"
-	dailybarent "github.com/ev3rlit/mwosa/storage/sqlite/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage"
+	entdb "github.com/ev3rlit/mwosa/storage/ent"
+	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
 )
 
 type DailyBarWriteRepository struct {
-	database *Database
+	database *storage.Database
 }
 
 func NewDailyBarWriteRepository(databasePath string) *DailyBarWriteRepository {
-	return &DailyBarWriteRepository{database: NewDatabase(databasePath)}
+	return &DailyBarWriteRepository{database: storage.NewDatabase(databasePath)}
 }
 
-func (r *DailyBarWriteRepository) UpsertDailyBars(ctx context.Context, bars []dailybar.Bar) (daily.WriteResult, error) {
+func (r *DailyBarWriteRepository) UpsertDailyBars(ctx context.Context, bars []coredailybar.Bar) (daily.WriteResult, error) {
 	client, err := r.open(ctx)
 	if err != nil {
 		return daily.WriteResult{}, err
@@ -113,5 +114,5 @@ func (r *DailyBarWriteRepository) open(ctx context.Context) (*entdb.Client, erro
 	if r == nil || r.database == nil {
 		return nil, fmt.Errorf("daily bar write repository database is nil")
 	}
-	return r.database.open(ctx)
+	return r.database.Open(ctx)
 }

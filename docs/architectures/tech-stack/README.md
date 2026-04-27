@@ -82,7 +82,10 @@
 
 적용 범위:
 
-- `storage/sqlite`
+- `storage`
+- `storage/schema`
+- `storage/ent`
+- `storage/<resource>`
 - `testing/experiments/sqlite_capacity_runtime`
 
 ### Database access
@@ -93,8 +96,9 @@
 결정:
 
 - schema source of truth 는 `.sql` 파일이 아니라 Go type 으로 둔다.
-- Ent schema type 은 `storage/sqlite/ent/schema` 아래에서 관리한다.
-- Ent generated code 는 `storage/sqlite/ent` 아래에 두고, 직접 수정하지 않는다.
+- Ent schema type 은 `storage/schema` 아래에서 관리한다.
+- Ent generated code 는 `storage/ent` 아래에 두고, 직접 수정하지 않는다.
+- resource 별 repository 는 `storage/<resource>` 아래에 둔다.
 - service layer 는 Ent client 나 generated entity 를 직접 알지 않는다.
 - persistence layer 는 `ReadRepository` 와 `WriteRepository` interface 를 분리해서 구현한다.
 - embedded SQLite 는 네트워크 왕복 비용이 없으므로, 작은 CLI 조회 경로에서는 전통적인 N+1 회피를 우선 설계 목표로 두지 않는다.

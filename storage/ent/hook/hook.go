@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent"
+	"github.com/ev3rlit/mwosa/storage/ent"
 )
 
 // The DailyBarFunc type is an adapter to allow the use of ordinary

@@ -1,4 +1,4 @@
-package sqlite
+package dailybar
 
 import (
 	"encoding/json"
@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
-	"github.com/ev3rlit/mwosa/providers/core/dailybar"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent"
+	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent"
 )
 
-func validateBarKey(bar dailybar.Bar) error {
+func validateBarKey(bar coredailybar.Bar) error {
 	if bar.Market == "" || bar.SecurityType == "" || bar.TradingDate == "" || bar.Symbol == "" || bar.Provider == "" || bar.Group == "" {
 		return fmt.Errorf("daily bar missing sqlite key provider=%s group=%s market=%s security_type=%s date=%s symbol=%s", bar.Provider, bar.Group, bar.Market, bar.SecurityType, bar.TradingDate, bar.Symbol)
 	}
@@ -39,15 +39,15 @@ func decodeExtensions(raw string) (map[string]string, error) {
 	return extensions, nil
 }
 
-func entDailyBarToCanonical(row *ent.DailyBar) (dailybar.Bar, error) {
+func entDailyBarToCanonical(row *ent.DailyBar) (coredailybar.Bar, error) {
 	if row == nil {
-		return dailybar.Bar{}, fmt.Errorf("daily bar sqlite row is nil")
+		return coredailybar.Bar{}, fmt.Errorf("daily bar sqlite row is nil")
 	}
 	extensions, err := decodeExtensions(row.ExtensionsJSON)
 	if err != nil {
-		return dailybar.Bar{}, err
+		return coredailybar.Bar{}, err
 	}
-	return dailybar.Bar{
+	return coredailybar.Bar{
 		Provider:     provider.ProviderID(row.Provider),
 		Group:        provider.GroupID(row.ProviderGroup),
 		Operation:    provider.OperationID(row.Operation),

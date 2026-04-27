@@ -1,4 +1,4 @@
-package sqlite
+package dailybar
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestDailyBarStoreUpsertIsIdempotent(t *testing.T) {
-	reader, writer := NewDailyBarRepositories(filepath.Join(t.TempDir(), "mwosa.db"))
+	reader, writer := NewRepositories(filepath.Join(t.TempDir(), "mwosa.db"))
 	bar := dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
 		Group:        provider.GroupSecuritiesProductPrice,

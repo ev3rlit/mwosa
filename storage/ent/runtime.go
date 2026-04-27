@@ -5,8 +5,8 @@ package ent
 import (
 	"time"
 
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/dailybar"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/schema"
+	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/schema"
 )
 
 // The init function reads all schema descriptors with runtime code

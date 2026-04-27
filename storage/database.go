@@ -1,4 +1,4 @@
-package sqlite
+package storage
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent"
+	"github.com/ev3rlit/mwosa/storage/ent"
 	_ "modernc.org/sqlite"
 )
 
@@ -22,7 +22,7 @@ func NewDatabase(path string) *Database {
 	return &Database{path: path}
 }
 
-func (db *Database) open(ctx context.Context) (*ent.Client, error) {
+func (db *Database) Open(ctx context.Context) (*ent.Client, error) {
 	if db == nil || strings.TrimSpace(db.path) == "" {
 		return nil, fmt.Errorf("sqlite database path is empty")
 	}

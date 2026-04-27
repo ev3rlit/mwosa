@@ -9,7 +9,7 @@ import (
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/datago"
 	"github.com/ev3rlit/mwosa/service/daily"
-	"github.com/ev3rlit/mwosa/storage/sqlite"
+	dailybarstorage "github.com/ev3rlit/mwosa/storage/dailybar"
 	"github.com/spf13/cobra"
 )
 
@@ -188,7 +188,7 @@ func addSecurityTypeFlag(cmd *cobra.Command, flags *dailyFlags) {
 }
 
 func newDailyService(opts *Options, withProvider bool) (daily.Service, error) {
-	reader, writer := sqlite.NewDailyBarRepositories(opts.Database)
+	reader, writer := dailybarstorage.NewRepositories(opts.Database)
 	service := daily.Service{
 		Reader: reader,
 		Writer: writer,

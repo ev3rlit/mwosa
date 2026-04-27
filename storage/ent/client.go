@@ -9,12 +9,12 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/migrate"
+	"github.com/ev3rlit/mwosa/storage/ent/migrate"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
-	"github.com/ev3rlit/mwosa/storage/sqlite/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
 )
 
 // Client is the client that holds all ent builders.

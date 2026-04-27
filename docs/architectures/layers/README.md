@@ -331,7 +331,10 @@ indicator/
 예시 위치:
 
 ```text
-storage/sqlite/
+storage/
+storage/schema/
+storage/ent/
+storage/<resource>/
 ```
 
 ## Presentation Layer
@@ -414,7 +417,7 @@ presentation
 | use case / application service | service                          |
 | entity / value object          | domain                           |
 | repository / gateway           | persistence / provider interface |
-| database adapter               | storage/sqlite                   |
+| database adapter               | storage                          |
 | response presenter             | presentation                     |
 | JSON HTTP response             | table / json / ndjson / csv      |
 
