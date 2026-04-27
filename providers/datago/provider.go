@@ -10,6 +10,7 @@ import (
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
+	"github.com/samber/oops"
 )
 
 type Config = datagoclient.Config
@@ -30,7 +31,7 @@ type Provider struct {
 func New(config Config) (*Provider, error) {
 	client, err := datagoclient.New(config)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice).Wrap(err)
 	}
 	return NewWithClient(client), nil
 }
@@ -119,14 +120,14 @@ func instrumentSearchProfile() instrument.Profile {
 
 func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput) (dailybar.FetchResult, error) {
 	if err := validateMarket(provider.RoleDailyBar, input.Market, input.Symbol, input.SecurityType); err != nil {
-		return dailybar.FetchResult{}, err
+		return dailybar.FetchResult{}, oops.In("datago_adapter").With("role", provider.RoleDailyBar, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
 	}
 	operation, err := operationForSecurityType(provider.RoleDailyBar, input.SecurityType, input.Symbol)
 	if err != nil {
-		return dailybar.FetchResult{}, err
+		return dailybar.FetchResult{}, oops.In("datago_adapter").With("role", provider.RoleDailyBar, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
 	}
 	if p.client == nil {
-		return dailybar.FetchResult{}, fmt.Errorf("datago adapter client is nil provider=%s group=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice)
+		return dailybar.FetchResult{}, oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice).New("datago adapter client is nil")
 	}
 
 	params := url.Values{}
@@ -150,7 +151,7 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 		Limit:     input.Limit,
 	})
 	if err != nil {
-		return dailybar.FetchResult{}, err
+		return dailybar.FetchResult{}, oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice, "operation", operation, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrapf(err, "fetch datago daily bars")
 	}
 
 	bars := make([]dailybar.Bar, 0, len(result.Items))
@@ -169,14 +170,14 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 
 func (p *Provider) searchInstruments(ctx context.Context, input instrument.SearchInput) (instrument.SearchResult, error) {
 	if err := validateMarket(provider.RoleInstrument, input.Market, input.Query, input.SecurityType); err != nil {
-		return instrument.SearchResult{}, err
+		return instrument.SearchResult{}, oops.In("datago_adapter").With("role", provider.RoleInstrument, "market", input.Market, "security_type", input.SecurityType, "query", input.Query).Wrap(err)
 	}
 	operations, err := operationsForSearch(input.SecurityType, input.Query)
 	if err != nil {
-		return instrument.SearchResult{}, err
+		return instrument.SearchResult{}, oops.In("datago_adapter").With("role", provider.RoleInstrument, "market", input.Market, "security_type", input.SecurityType, "query", input.Query).Wrap(err)
 	}
 	if p.client == nil {
-		return instrument.SearchResult{}, fmt.Errorf("datago adapter client is nil provider=%s group=%s", provider.ProviderDataGo, provider.GroupSecuritiesProductPrice)
+		return instrument.SearchResult{}, oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice).New("datago adapter client is nil")
 	}
 
 	instruments := make([]instrument.Instrument, 0)
@@ -195,7 +196,7 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 			Limit:     input.Limit,
 		})
 		if err != nil {
-			return instrument.SearchResult{}, err
+			return instrument.SearchResult{}, oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice, "operation", spec.Operation, "market", input.Market, "security_type", spec.SecurityType, "query", input.Query).Wrapf(err, "fetch datago instruments")
 		}
 		totalCount += result.TotalCount
 		for _, item := range result.Items {
@@ -230,7 +231,7 @@ func operationsForSearch(securityType provider.SecurityType, symbol string) ([]o
 	if securityType != "" {
 		operation, err := operationForSecurityType(provider.RoleInstrument, securityType, symbol)
 		if err != nil {
-			return nil, err
+			return nil, oops.In("datago_adapter").With("role", provider.RoleInstrument, "security_type", securityType, "symbol", symbol).Wrap(err)
 		}
 		return []operationSpec{{SecurityType: securityType, Operation: operation}}, nil
 	}

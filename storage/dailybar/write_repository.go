@@ -2,7 +2,6 @@ package dailybar
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
@@ -10,6 +9,7 @@ import (
 	"github.com/ev3rlit/mwosa/storage"
 	entdb "github.com/ev3rlit/mwosa/storage/ent"
 	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/samber/oops"
 )
 
 type writeRepository struct {
@@ -28,12 +28,12 @@ func NewWriteRepository(database *storage.Database) (daily.WriteRepository, erro
 func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailybar.Bar) (daily.WriteResult, error) {
 	client, err := r.database.Client(ctx)
 	if err != nil {
-		return daily.WriteResult{}, err
+		return daily.WriteResult{}, oops.In("dailybar_repository").With("bars", len(bars)).Wrap(err)
 	}
 
 	tx, err := client.Tx(ctx)
 	if err != nil {
-		return daily.WriteResult{}, fmt.Errorf("begin daily bar sqlite transaction: %w", err)
+		return daily.WriteResult{}, oops.In("dailybar_repository").With("bars", len(bars)).Wrapf(err, "begin daily bar sqlite transaction")
 	}
 	committed := false
 	defer func() {
@@ -44,11 +44,11 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 
 	for _, bar := range bars {
 		if err := validateBarKey(bar); err != nil {
-			return daily.WriteResult{}, err
+			return daily.WriteResult{}, oops.In("dailybar_repository").Wrap(err)
 		}
 		extensionsJSON, err := encodeExtensions(bar.Extensions)
 		if err != nil {
-			return daily.WriteResult{}, err
+			return daily.WriteResult{}, oops.In("dailybar_repository").With("provider", bar.Provider, "group", bar.Group, "market", bar.Market, "security_type", bar.SecurityType, "date", bar.TradingDate, "symbol", bar.Symbol).Wrap(err)
 		}
 		now := time.Now()
 		err = tx.DailyBar.Create().
@@ -99,12 +99,12 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 			}).
 			Exec(ctx)
 		if err != nil {
-			return daily.WriteResult{}, fmt.Errorf("upsert daily bar sqlite row market=%s security_type=%s date=%s symbol=%s provider=%s group=%s: %w", bar.Market, bar.SecurityType, bar.TradingDate, bar.Symbol, bar.Provider, bar.Group, err)
+			return daily.WriteResult{}, oops.In("dailybar_repository").With("market", bar.Market, "security_type", bar.SecurityType, "date", bar.TradingDate, "symbol", bar.Symbol, "provider", bar.Provider, "group", bar.Group).Wrapf(err, "upsert daily bar sqlite row")
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return daily.WriteResult{}, fmt.Errorf("commit daily bar sqlite transaction: %w", err)
+		return daily.WriteResult{}, oops.In("dailybar_repository").With("bars", len(bars)).Wrapf(err, "commit daily bar sqlite transaction")
 	}
 	committed = true
 

@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/oops"
 	_ "modernc.org/sqlite"
 )
 
@@ -257,7 +258,7 @@ func (dateRange datagoDateRange) String() string {
 
 func fetchAllDatagoETFPriceInfo(ctx context.Context, client *http.Client, config datagoProbeConfig, dateRange datagoDateRange, numOfRows int) ([]map[string]any, error) {
 	if numOfRows <= 0 {
-		return nil, fmt.Errorf("numOfRows must be positive: %d", numOfRows)
+		return nil, oops.In("sqlite_capacity_runtime").With("num_of_rows", numOfRows).Errorf("numOfRows must be positive: %d", numOfRows)
 	}
 
 	var allRows []map[string]any
@@ -314,7 +315,7 @@ func fetchDatagoETFPriceInfoPage(ctx context.Context, client *http.Client, confi
 		return nil, 0, err
 	}
 	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return nil, 0, fmt.Errorf("datago getETFPriceInfo failed: status=%s body=%s", response.Status, trimForError(body))
+		return nil, 0, oops.In("sqlite_capacity_runtime").With("status", response.Status, "body", trimForError(body)).New("datago getETFPriceInfo failed")
 	}
 
 	envelope, err := decodeDatagoEnvelope(body)
@@ -322,7 +323,7 @@ func fetchDatagoETFPriceInfoPage(ctx context.Context, client *http.Client, confi
 		return nil, 0, err
 	}
 	if envelope.Header.ResultCode != "" && envelope.Header.ResultCode != "00" {
-		return nil, 0, fmt.Errorf("datago getETFPriceInfo returned resultCode=%s resultMsg=%s", envelope.Header.ResultCode, envelope.Header.ResultMsg)
+		return nil, 0, oops.In("sqlite_capacity_runtime").With("result_code", envelope.Header.ResultCode, "result_msg", envelope.Header.ResultMsg).New("datago getETFPriceInfo returned non-ok result code")
 	}
 	return envelope.Body.Items.Item, envelope.Body.TotalCount, nil
 }
@@ -336,7 +337,7 @@ func decodeDatagoEnvelope(body []byte) (datagoEnvelope, error) {
 		datagoEnvelope
 	}
 	if err := decoder.Decode(&root); err != nil {
-		return datagoEnvelope{}, fmt.Errorf("decode datago JSON response: %w; body=%s", err, trimForError(body))
+		return datagoEnvelope{}, oops.In("sqlite_capacity_runtime").With("body", trimForError(body)).Wrapf(err, "decode datago JSON response")
 	}
 	if root.Response != nil {
 		return *root.Response, nil

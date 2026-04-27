@@ -2,9 +2,9 @@ package instrument
 
 import (
 	"context"
-	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	"github.com/samber/oops"
 )
 
 type Profile struct {
@@ -84,7 +84,7 @@ func NewSearch(profile Profile, search SearchFunc) Search {
 
 func (s Search) SearchInstruments(ctx context.Context, input SearchInput) (SearchResult, error) {
 	if s.search == nil {
-		return SearchResult{}, fmt.Errorf("instrument search role is not configured")
+		return SearchResult{}, oops.In("provider_role").With("role", provider.RoleInstrument).New("instrument search role is not configured")
 	}
 	return s.search(ctx, input)
 }

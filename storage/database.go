@@ -3,8 +3,6 @@ package storage
 import (
 	"context"
 	stdsql "database/sql"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/ev3rlit/mwosa/storage/ent"
+	"github.com/samber/oops"
 	_ "modernc.org/sqlite"
 )
 
@@ -28,7 +27,7 @@ func NewDatabase(path string) *Database {
 
 func (db *Database) Client(ctx context.Context) (*ent.Client, error) {
 	if db == nil || strings.TrimSpace(db.path) == "" {
-		return nil, fmt.Errorf("sqlite database path is empty")
+		return nil, oops.In("storage_database").New("sqlite database path is empty")
 	}
 
 	db.mu.Lock()
@@ -38,23 +37,26 @@ func (db *Database) Client(ctx context.Context) (*ent.Client, error) {
 		return db.client, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(db.path), 0o755); err != nil {
-		return nil, fmt.Errorf("create sqlite database directory: %w", err)
+		return nil, oops.In("storage_database").With("path", db.path, "directory", filepath.Dir(db.path)).Wrapf(err, "create sqlite database directory")
 	}
 
 	rawDB, err := stdsql.Open("sqlite", db.path)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite database %s: %w", db.path, err)
+		return nil, oops.In("storage_database").With("path", db.path).Wrapf(err, "open sqlite database")
 	}
 	rawDB.SetMaxOpenConns(1)
 
 	if err := setupDatabase(ctx, rawDB); err != nil {
 		_ = rawDB.Close()
-		return nil, err
+		return nil, oops.In("storage_database").With("path", db.path).Wrap(err)
 	}
 
 	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.SQLite, rawDB)))
 	if err := client.Schema.Create(ctx); err != nil {
-		return nil, errors.Join(fmt.Errorf("apply sqlite ent schema: %w", err), client.Close())
+		return nil, oops.Join(
+			oops.In("storage_database").With("path", db.path).Wrapf(err, "apply sqlite ent schema"),
+			oops.In("storage_database").With("path", db.path).Wrap(client.Close()),
+		)
 	}
 	db.client = client
 	return db.client, nil
@@ -74,7 +76,7 @@ func (db *Database) Close() error {
 	err := db.client.Close()
 	db.client = nil
 	if err != nil {
-		return fmt.Errorf("close sqlite database %s: %w", db.path, err)
+		return oops.In("storage_database").With("path", db.path).Wrapf(err, "close sqlite database")
 	}
 	return nil
 }
@@ -85,7 +87,7 @@ func setupDatabase(ctx context.Context, db *stdsql.DB) error {
 		`PRAGMA foreign_keys = ON`,
 	} {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("configure sqlite database: %w", err)
+			return oops.In("storage_database").With("statement", statement).Wrapf(err, "configure sqlite database")
 		}
 	}
 	return nil

@@ -2,9 +2,9 @@ package dailybar
 
 import (
 	"context"
-	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	"github.com/samber/oops"
 )
 
 type RangeQuerySupport string
@@ -103,7 +103,7 @@ func NewFetch(profile Profile, fetch FetchFunc) Fetch {
 
 func (f Fetch) FetchDailyBars(ctx context.Context, input FetchInput) (FetchResult, error) {
 	if f.fetch == nil {
-		return FetchResult{}, fmt.Errorf("dailybar fetch role is not configured")
+		return FetchResult{}, oops.In("provider_role").With("role", provider.RoleDailyBar).New("dailybar fetch role is not configured")
 	}
 	return f.fetch(ctx, input)
 }

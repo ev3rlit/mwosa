@@ -7,6 +7,7 @@ import (
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/samber/oops"
 )
 
 type ReadRepository interface {
@@ -64,16 +65,16 @@ type CollectResult struct {
 
 func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
 	if s.Reader == nil {
-		return BarsResult{}, fmt.Errorf("daily service read repository is nil")
+		return BarsResult{}, oops.In("daily_service").New("daily service read repository is nil")
 	}
 	dates, err := resolveDateRange(req.From, req.To, req.AsOf)
 	if err != nil {
-		return BarsResult{}, err
+		return BarsResult{}, oops.In("daily_service").With("symbol", req.Symbol, "from", req.From, "to", req.To, "as_of", req.AsOf).Wrap(err)
 	}
 	query := queryFromRequest(req, dates)
 	bars, err := s.Reader.QueryDailyBars(ctx, query)
 	if err != nil {
-		return BarsResult{}, err
+		return BarsResult{}, oops.In("daily_service").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrapf(err, "get daily bars")
 	}
 	if len(bars) == 0 {
 		return BarsResult{}, notFound(req, query)
@@ -83,34 +84,34 @@ func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
 
 func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 	if req.Symbol == "" {
-		return BarsResult{}, fmt.Errorf("ensure daily requires symbol")
+		return BarsResult{}, oops.In("daily_service").New("ensure daily requires symbol")
 	}
 	dates, err := resolveDateRange(req.From, req.To, req.AsOf)
 	if err != nil {
-		return BarsResult{}, err
+		return BarsResult{}, oops.In("daily_service").With("symbol", req.Symbol, "from", req.From, "to", req.To, "as_of", req.AsOf).Wrap(err)
 	}
 	if len(dates) == 0 {
-		return BarsResult{}, fmt.Errorf("ensure daily requires --as-of or --from/--to")
+		return BarsResult{}, oops.In("daily_service").With("symbol", req.Symbol).New("ensure daily requires --as-of or --from/--to")
 	}
 
 	query := queryFromRequest(req, dates)
 	if s.Reader == nil {
-		return BarsResult{}, fmt.Errorf("daily service read repository is nil")
+		return BarsResult{}, oops.In("daily_service").New("daily service read repository is nil")
 	}
 	existing, err := s.Reader.QueryDailyBars(ctx, query)
 	if err != nil {
-		return BarsResult{}, err
+		return BarsResult{}, oops.In("daily_service").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrapf(err, "query existing daily bars")
 	}
 	missingDates := datesWithoutSymbol(existing, dates, req.Symbol)
 	for _, date := range missingDates {
 		if _, err := s.collectDate(ctx, req, date); err != nil {
-			return BarsResult{}, err
+			return BarsResult{}, oops.In("daily_service").With("market", withDefaultMarket(req.Market), "security_type", req.SecurityType, "symbol", req.Symbol, "date", apiDate(date)).Wrapf(err, "collect missing daily bars")
 		}
 	}
 
 	bars, err := s.Reader.QueryDailyBars(ctx, query)
 	if err != nil {
-		return BarsResult{}, err
+		return BarsResult{}, oops.In("daily_service").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrapf(err, "query stored daily bars")
 	}
 	if len(bars) == 0 {
 		return BarsResult{}, notFound(req, query)
@@ -121,7 +122,7 @@ func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 func (s Service) Sync(ctx context.Context, req Request) (CollectResult, error) {
 	date, err := parseDate(req.AsOf, "--as-of")
 	if err != nil {
-		return CollectResult{}, err
+		return CollectResult{}, oops.In("daily_service").With("as_of", req.AsOf).Wrap(err)
 	}
 	return s.collectDate(ctx, req, date)
 }
@@ -129,10 +130,10 @@ func (s Service) Sync(ctx context.Context, req Request) (CollectResult, error) {
 func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, error) {
 	dates, err := resolveDateRange(req.From, req.To, req.AsOf)
 	if err != nil {
-		return CollectResult{}, err
+		return CollectResult{}, oops.In("daily_service").With("from", req.From, "to", req.To, "as_of", req.AsOf).Wrap(err)
 	}
 	if len(dates) == 0 {
-		return CollectResult{}, fmt.Errorf("backfill daily requires --from/--to")
+		return CollectResult{}, oops.In("daily_service").New("backfill daily requires --from/--to")
 	}
 
 	result := CollectResult{
@@ -143,7 +144,7 @@ func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, erro
 	for _, date := range dates {
 		partial, err := s.collectDate(ctx, req, date)
 		if err != nil {
-			return CollectResult{}, err
+			return CollectResult{}, oops.In("daily_service").With("market", withDefaultMarket(req.Market), "security_type", req.SecurityType, "date", apiDate(date)).Wrapf(err, "backfill daily date")
 		}
 		result.ProviderID = partial.ProviderID
 		result.Group = partial.Group
@@ -157,13 +158,13 @@ func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, erro
 
 func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (CollectResult, error) {
 	if s.Router == nil {
-		return CollectResult{}, fmt.Errorf("daily service router is nil")
+		return CollectResult{}, oops.In("daily_service").New("daily service router is nil")
 	}
 	if s.Writer == nil {
-		return CollectResult{}, fmt.Errorf("daily service write repository is nil")
+		return CollectResult{}, oops.In("daily_service").New("daily service write repository is nil")
 	}
 	if req.SecurityType == "" {
-		return CollectResult{}, fmt.Errorf("daily collection requires --security-type")
+		return CollectResult{}, oops.In("daily_service").New("daily collection requires --security-type")
 	}
 
 	market := withDefaultMarket(req.Market)
@@ -175,7 +176,7 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 		Symbol:         req.Symbol,
 	})
 	if err != nil {
-		return CollectResult{}, err
+		return CollectResult{}, oops.In("daily_service").With("provider", req.ProviderID, "prefer_provider", req.PreferProvider, "market", market, "security_type", req.SecurityType, "symbol", req.Symbol).Wrapf(err, "route daily bars")
 	}
 
 	result, err := fetcher.FetchDailyBars(ctx, dailybar.FetchInput{
@@ -185,11 +186,11 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 		To:           apiDate(date),
 	})
 	if err != nil {
-		return CollectResult{}, err
+		return CollectResult{}, oops.In("daily_service").With("provider", req.ProviderID, "market", market, "security_type", req.SecurityType, "date", apiDate(date)).Wrapf(err, "fetch daily bars")
 	}
 	writeResult, err := s.Writer.UpsertDailyBars(ctx, result.Bars)
 	if err != nil {
-		return CollectResult{}, err
+		return CollectResult{}, oops.In("daily_service").With("provider", result.Provider.ID, "group", result.Group, "market", market, "security_type", req.SecurityType, "date", apiDate(date), "bars", len(result.Bars)).Wrapf(err, "store daily bars")
 	}
 
 	return CollectResult{
@@ -245,12 +246,18 @@ func notFound(req Request, query Query) error {
 	if query.From == "" && query.To == "" {
 		hint = fmt.Sprintf("run `mwosa ensure daily %s --as-of <YYYYMMDD>`", req.Symbol)
 	}
-	return &NotFoundError{
+	return oops.In("daily_service").With(
+		"market", query.Market,
+		"security_type", query.SecurityType,
+		"symbol", req.Symbol,
+		"from", query.From,
+		"to", query.To,
+	).Wrap(&NotFoundError{
 		Symbol:       req.Symbol,
 		Market:       query.Market,
 		SecurityType: query.SecurityType,
 		From:         query.From,
 		To:           query.To,
 		Hint:         hint,
-	}
+	})
 }

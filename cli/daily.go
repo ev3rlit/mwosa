@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"strconv"
 
@@ -12,6 +10,7 @@ import (
 	"github.com/ev3rlit/mwosa/service/daily"
 	"github.com/ev3rlit/mwosa/storage"
 	dailybarstorage "github.com/ev3rlit/mwosa/storage/dailybar"
+	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 )
 
@@ -206,14 +205,14 @@ func closeDailyService(service dailyService, err *error) {
 	if service.close == nil {
 		return
 	}
-	*err = errors.Join(*err, service.close())
+	*err = oops.Join(*err, service.close())
 }
 
 func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
 	database := storage.NewDatabase(opts.Database)
 	reader, writer, err := dailybarstorage.NewRepositories(database)
 	if err != nil {
-		return dailyService{}, err
+		return dailyService{}, oops.In("cli").Wrapf(err, "create daily repositories")
 	}
 	service := daily.Service{
 		Reader: reader,
@@ -228,10 +227,10 @@ func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
 	if shouldRegisterDataGo {
 		p, err := newDataGoProviderFromEnv()
 		if err != nil {
-			return dailyService{}, err
+			return dailyService{}, oops.In("cli").With("provider", provider.ProviderDataGo).Wrap(err)
 		}
 		if err := datago.Register(registry, p); err != nil {
-			return dailyService{}, err
+			return dailyService{}, oops.In("cli").With("provider", provider.ProviderDataGo).Wrapf(err, "register datago provider")
 		}
 	}
 	service.Router = dailybar.NewRouter(provider.NewRouter(registry))
@@ -244,7 +243,7 @@ func newDataGoProviderFromEnv() (*datago.Provider, error) {
 		serviceKey = os.Getenv("DATAGO_SERVICE_KEY")
 	}
 	if serviceKey == "" {
-		return nil, fmt.Errorf("datago service key is required: set MWOSA_DATAGO_SERVICE_KEY or DATAGO_SERVICE_KEY")
+		return nil, oops.In("cli").With("provider", provider.ProviderDataGo).New("datago service key is required: set MWOSA_DATAGO_SERVICE_KEY or DATAGO_SERVICE_KEY")
 	}
 
 	config := datago.Config{
@@ -254,7 +253,7 @@ func newDataGoProviderFromEnv() (*datago.Provider, error) {
 	if value := os.Getenv("MWOSA_DATAGO_NUM_OF_ROWS"); value != "" {
 		numOfRows, err := strconv.Atoi(value)
 		if err != nil {
-			return nil, fmt.Errorf("MWOSA_DATAGO_NUM_OF_ROWS must be an integer: %w", err)
+			return nil, oops.In("cli").With("env", "MWOSA_DATAGO_NUM_OF_ROWS", "value", value).Wrapf(err, "MWOSA_DATAGO_NUM_OF_ROWS must be an integer")
 		}
 		config.NumOfRows = numOfRows
 	}

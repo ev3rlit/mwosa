@@ -2,9 +2,9 @@ package quote
 
 import (
 	"context"
-	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	"github.com/samber/oops"
 )
 
 type Profile struct {
@@ -64,7 +64,7 @@ func NewSnapshot(profile Profile, snapshot SnapshotFunc) Snapshot {
 
 func (s Snapshot) FetchQuoteSnapshot(ctx context.Context, input SnapshotInput) (SnapshotResult, error) {
 	if s.snapshot == nil {
-		return SnapshotResult{}, fmt.Errorf("quote snapshot role is not configured")
+		return SnapshotResult{}, oops.In("provider_role").With("role", provider.RoleQuote).New("quote snapshot role is not configured")
 	}
 	return s.snapshot(ctx, input)
 }

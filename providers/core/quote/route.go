@@ -2,9 +2,9 @@ package quote
 
 import (
 	"context"
-	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	"github.com/samber/oops"
 )
 
 type RouteInput struct {
@@ -50,11 +50,11 @@ func NewRouter(router coreRouter) Router {
 func (r routeAdapter) RouteQuoteSnapshot(ctx context.Context, input RouteInput) (Snapshotter, error) {
 	candidate, err := r.router.Route(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return nil, err
+		return nil, oops.In("quote_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
 	}
 	snapshotter, ok := candidate.Impl.(Snapshotter)
 	if !ok {
-		return nil, fmt.Errorf("routed quote implementation does not satisfy Snapshotter provider=%s", candidate.Provider.ID)
+		return nil, oops.In("quote_router").With("provider", candidate.Provider.ID).New("routed quote implementation does not satisfy Snapshotter")
 	}
 	return snapshotter, nil
 }
@@ -62,13 +62,13 @@ func (r routeAdapter) RouteQuoteSnapshot(ctx context.Context, input RouteInput) 
 func (r routeAdapter) PlanQuoteSnapshot(ctx context.Context, input RouteInput) (RoutePlan, error) {
 	plan, err := r.router.Plan(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return RoutePlan{}, err
+		return RoutePlan{}, oops.In("quote_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
 	}
 	candidates := make([]RouteCandidate, 0, len(plan.Candidates))
 	for _, candidate := range plan.Candidates {
 		snapshotter, ok := candidate.Impl.(Snapshotter)
 		if !ok {
-			return RoutePlan{}, fmt.Errorf("routed quote implementation does not satisfy Snapshotter provider=%s", candidate.Provider.ID)
+			return RoutePlan{}, oops.In("quote_router").With("provider", candidate.Provider.ID).New("routed quote implementation does not satisfy Snapshotter")
 		}
 		candidates = append(candidates, RouteCandidate{
 			Provider:    candidate.Provider,

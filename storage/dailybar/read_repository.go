@@ -2,7 +2,6 @@ package dailybar
 
 import (
 	"context"
-	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
@@ -10,6 +9,7 @@ import (
 	"github.com/ev3rlit/mwosa/storage"
 	entdb "github.com/ev3rlit/mwosa/storage/ent"
 	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/samber/oops"
 )
 
 type readRepository struct {
@@ -34,7 +34,7 @@ func NewRepositories(database *storage.Database) (daily.ReadRepository, daily.Wr
 
 func requireDatabase(database *storage.Database) error {
 	if database == nil {
-		return fmt.Errorf("daily bar repository database is nil")
+		return oops.In("dailybar_repository").New("daily bar repository database is nil")
 	}
 	return nil
 }
@@ -42,7 +42,7 @@ func requireDatabase(database *storage.Database) error {
 func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
 	client, err := r.database.Client(ctx)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("dailybar_repository").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrap(err)
 	}
 
 	market := query.Market
@@ -74,14 +74,14 @@ func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) 
 
 	rows, err := builder.All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("query daily bars sqlite market=%s security_type=%s symbol=%s from=%s to=%s: %w", query.Market, query.SecurityType, query.Symbol, query.From, query.To, err)
+		return nil, oops.In("dailybar_repository").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrapf(err, "query daily bars sqlite")
 	}
 
 	bars := make([]coredailybar.Bar, 0, len(rows))
 	for _, row := range rows {
 		bar, err := entDailyBarToCanonical(row)
 		if err != nil {
-			return nil, err
+			return nil, oops.In("dailybar_repository").With("row_id", row.ID).Wrap(err)
 		}
 		bars = append(bars, bar)
 	}

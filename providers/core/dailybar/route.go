@@ -2,9 +2,9 @@ package dailybar
 
 import (
 	"context"
-	"fmt"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	"github.com/samber/oops"
 )
 
 type RouteInput struct {
@@ -50,11 +50,11 @@ func NewRouter(router coreRouter) Router {
 func (r routeAdapter) RouteDailyBars(ctx context.Context, input RouteInput) (Fetcher, error) {
 	candidate, err := r.router.Route(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return nil, err
+		return nil, oops.In("dailybar_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
 	}
 	fetcher, ok := candidate.Impl.(Fetcher)
 	if !ok {
-		return nil, fmt.Errorf("routed dailybar implementation does not satisfy Fetcher provider=%s", candidate.Provider.ID)
+		return nil, oops.In("dailybar_router").With("provider", candidate.Provider.ID).New("routed dailybar implementation does not satisfy Fetcher")
 	}
 	return fetcher, nil
 }
@@ -62,13 +62,13 @@ func (r routeAdapter) RouteDailyBars(ctx context.Context, input RouteInput) (Fet
 func (r routeAdapter) PlanDailyBars(ctx context.Context, input RouteInput) (RoutePlan, error) {
 	plan, err := r.router.Plan(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return RoutePlan{}, err
+		return RoutePlan{}, oops.In("dailybar_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
 	}
 	candidates := make([]RouteCandidate, 0, len(plan.Candidates))
 	for _, candidate := range plan.Candidates {
 		fetcher, ok := candidate.Impl.(Fetcher)
 		if !ok {
-			return RoutePlan{}, fmt.Errorf("routed dailybar implementation does not satisfy Fetcher provider=%s", candidate.Provider.ID)
+			return RoutePlan{}, oops.In("dailybar_router").With("provider", candidate.Provider.ID).New("routed dailybar implementation does not satisfy Fetcher")
 		}
 		candidates = append(candidates, RouteCandidate{
 			Provider: candidate.Provider,

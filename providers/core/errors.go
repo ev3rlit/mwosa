@@ -1,12 +1,13 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/samber/oops"
 )
 
-var ErrNoProvider = errors.New("no provider candidate")
+var ErrNoProvider = oops.New("no provider candidate")
 
 type UnsupportedError struct {
 	Capability   Role
@@ -54,5 +55,14 @@ func (e *UnsupportedError) Is(target error) bool {
 }
 
 func NewUnsupported(input UnsupportedError) error {
-	return &input
+	return oops.In("provider").With(
+		"capability", input.Capability,
+		"provider", input.ProviderID,
+		"group", input.GroupID,
+		"operation", input.OperationID,
+		"market", input.Market,
+		"security_type", input.SecurityType,
+		"symbol", input.Symbol,
+		"reason", input.Reason,
+	).Wrap(&input)
 }
