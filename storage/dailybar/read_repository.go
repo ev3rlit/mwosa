@@ -33,9 +33,17 @@ func NewRepositories(database *storage.Database) (daily.ReadRepository, daily.Wr
 }
 
 func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
+	errb := oops.In("dailybar_repository").With(
+		"market", query.Market,
+		"security_type", query.SecurityType,
+		"symbol", query.Symbol,
+		"from", query.From,
+		"to", query.To,
+	)
+
 	client, err := r.database.Client(ctx)
 	if err != nil {
-		return nil, oops.In("dailybar_repository").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrap(err)
+		return nil, errb.Wrap(err)
 	}
 
 	market := query.Market
@@ -67,14 +75,14 @@ func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) 
 
 	rows, err := builder.All(ctx)
 	if err != nil {
-		return nil, oops.In("dailybar_repository").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To).Wrapf(err, "query daily bars sqlite")
+		return nil, errb.Wrapf(err, "query daily bars sqlite")
 	}
 
 	bars := make([]coredailybar.Bar, 0, len(rows))
 	for _, row := range rows {
 		bar, err := entDailyBarToCanonical(row)
 		if err != nil {
-			return nil, oops.In("dailybar_repository").With("row_id", row.ID).Wrap(err)
+			return nil, errb.With("row_id", row.ID).Wrap(err)
 		}
 		bars = append(bars, bar)
 	}

@@ -12,7 +12,14 @@ import (
 
 func validateBarKey(bar coredailybar.Bar) error {
 	if bar.Market == "" || bar.SecurityType == "" || bar.TradingDate == "" || bar.Symbol == "" || bar.Provider == "" || bar.Group == "" {
-		return oops.In("dailybar_repository").With("provider", bar.Provider, "group", bar.Group, "market", bar.Market, "security_type", bar.SecurityType, "date", bar.TradingDate, "symbol", bar.Symbol).New("daily bar missing sqlite key")
+		return oops.In("dailybar_repository").With(
+			"provider", bar.Provider,
+			"group", bar.Group,
+			"market", bar.Market,
+			"security_type", bar.SecurityType,
+			"date", bar.TradingDate,
+			"symbol", bar.Symbol,
+		).New("daily bar missing sqlite key")
 	}
 	return nil
 }
@@ -45,7 +52,14 @@ func entDailyBarToCanonical(row *ent.DailyBar) (coredailybar.Bar, error) {
 	}
 	extensions, err := decodeExtensions(row.ExtensionsJSON)
 	if err != nil {
-		return coredailybar.Bar{}, oops.In("dailybar_repository").With("provider", row.Provider, "group", row.ProviderGroup, "market", row.Market, "security_type", row.SecurityType, "date", row.TradingDate, "symbol", row.Symbol).Wrap(err)
+		return coredailybar.Bar{}, oops.In("dailybar_repository").With(
+			"provider", row.Provider,
+			"group", row.ProviderGroup,
+			"market", row.Market,
+			"security_type", row.SecurityType,
+			"date", row.TradingDate,
+			"symbol", row.Symbol,
+		).Wrap(err)
 	}
 	return coredailybar.Bar{
 		Provider:     provider.ProviderID(row.Provider),

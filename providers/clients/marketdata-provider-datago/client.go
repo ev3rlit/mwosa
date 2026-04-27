@@ -23,11 +23,16 @@ type Client struct {
 
 func New(config Config) (*Client, error) {
 	config = config.withDefaults()
+	errb := oops.In("datago_client").With(
+		"provider", ProviderDataGo,
+		"group", GroupSecuritiesProductPrice,
+	)
+
 	if strings.TrimSpace(config.ServiceKey) == "" {
-		return nil, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice).New("datago client config: serviceKey is required")
+		return nil, errb.New("datago client config: serviceKey is required")
 	}
 	if _, err := url.ParseRequestURI(config.BaseURL); err != nil {
-		return nil, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "base_url", config.BaseURL).Wrapf(err, "datago client config: invalid baseURL")
+		return nil, errb.With("base_url", config.BaseURL).Wrapf(err, "datago client config: invalid baseURL")
 	}
 	return &Client{
 		serviceKey: config.ServiceKey,
@@ -49,8 +54,14 @@ type PriceResult struct {
 }
 
 func (c *Client) FetchPrices(ctx context.Context, query PriceQuery) (PriceResult, error) {
+	errb := oops.In("datago_client").With(
+		"provider", ProviderDataGo,
+		"group", GroupSecuritiesProductPrice,
+		"operation", query.Operation,
+	)
+
 	if query.Operation == "" {
-		return PriceResult{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice).New("datago fetch prices: operation is required")
+		return PriceResult{}, errb.New("datago fetch prices: operation is required")
 	}
 
 	allItems := make([]PriceItem, 0)
@@ -60,7 +71,7 @@ func (c *Client) FetchPrices(ctx context.Context, query PriceQuery) (PriceResult
 	for {
 		response, err := c.fetchPage(ctx, query.Operation, query.Params, pageNo)
 		if err != nil {
-			return PriceResult{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", query.Operation, "page", pageNo).Wrapf(err, "fetch datago price page")
+			return PriceResult{}, errb.With("page", pageNo).Wrapf(err, "fetch datago price page")
 		}
 		totalCount = response.Body.TotalCount
 		allItems = append(allItems, response.Body.Items...)
@@ -79,10 +90,17 @@ func (c *Client) FetchPrices(ctx context.Context, query PriceQuery) (PriceResult
 }
 
 func (c *Client) fetchPage(ctx context.Context, operation string, params url.Values, pageNo int) (apiResponse, error) {
+	errb := oops.In("datago_client").With(
+		"provider", ProviderDataGo,
+		"group", GroupSecuritiesProductPrice,
+		"operation", operation,
+		"page", pageNo,
+	)
+
 	endpoint := fmt.Sprintf("%s/%s", c.baseURL, operation)
 	reqURL, err := url.Parse(endpoint)
 	if err != nil {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation).Wrapf(err, "datago request build failed")
+		return apiResponse{}, errb.Wrapf(err, "datago request build failed")
 	}
 
 	values := cloneValues(params)
@@ -94,29 +112,30 @@ func (c *Client) fetchPage(ctx context.Context, operation string, params url.Val
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation).Wrapf(err, "datago request build failed")
+		return apiResponse{}, errb.Wrapf(err, "datago request build failed")
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation, "page", pageNo).Wrapf(err, "datago remote request failed")
+		return apiResponse{}, errb.Wrapf(err, "datago remote request failed")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation, "page", pageNo, "status", resp.StatusCode).Wrapf(err, "datago remote response read failed")
+		return apiResponse{}, errb.With("status", resp.StatusCode).Wrapf(err, "datago remote response read failed")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation, "page", pageNo, "status", resp.StatusCode, "body", strings.TrimSpace(string(body))).Errorf("datago remote error provider=%s group=%s operation=%s page=%d status=%d body=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, strings.TrimSpace(string(body)))
+		bodyText := strings.TrimSpace(string(body))
+		return apiResponse{}, errb.With("status", resp.StatusCode, "body", bodyText).Errorf("datago remote error provider=%s group=%s operation=%s page=%d status=%d body=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, bodyText)
 	}
 
 	decoded, err := decodeAPIResponse(body)
 	if err != nil {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation, "page", pageNo).Wrapf(err, "datago response decode failed")
+		return apiResponse{}, errb.Wrapf(err, "datago response decode failed")
 	}
 	if decoded.Header.ResultCode != "" && decoded.Header.ResultCode != "00" {
-		return apiResponse{}, oops.In("datago_client").With("provider", ProviderDataGo, "group", GroupSecuritiesProductPrice, "operation", operation, "page", pageNo, "result_code", decoded.Header.ResultCode, "result_msg", decoded.Header.ResultMsg).Errorf("datago remote error provider=%s group=%s operation=%s page=%d result_code=%s result_msg=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, decoded.Header.ResultCode, decoded.Header.ResultMsg)
+		return apiResponse{}, errb.With("result_code", decoded.Header.ResultCode, "result_msg", decoded.Header.ResultMsg).Errorf("datago remote error provider=%s group=%s operation=%s page=%d result_code=%s result_msg=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, decoded.Header.ResultCode, decoded.Header.ResultMsg)
 	}
 	return decoded, nil
 }
