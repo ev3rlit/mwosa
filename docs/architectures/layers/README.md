@@ -307,7 +307,8 @@ indicator/
 구성:
 
 - SQLite canonical database
-- explicit SQL migration files
+- Ent schema types
+- generated Ent client
 - query/index helpers
 - provenance columns
 - latest quote view or table
@@ -315,7 +316,8 @@ indicator/
 책임:
 
 - canonical record append/read/delete
-- SQLite schema 와 index 관리
+- SQLite schema 와 index 를 Ent type 기준으로 관리
+- service 가 의존하는 `ReadRepository` / `WriteRepository` 구현
 - reindex 지원
 - storage error 표준화
 

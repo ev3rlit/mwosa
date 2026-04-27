@@ -85,30 +85,31 @@
 - `storage/sqlite`
 - `testing/experiments/sqlite_capacity_runtime`
 
-### SQL access
+### Database access
 
-- `sqlc`
-- `database/sql`
+- `Ent`
+- `modernc.org/sqlite`
 
 결정:
 
-- 동적 query builder 나 full ORM 을 기본 스택으로 두지 않는다.
-- 기능별 SQL 을 명시적으로 작성하고, `sqlc` 로 type-safe Go 코드를 생성한다.
-- 복잡한 ranking, window function, 지표 계산 쿼리는 SQL 그대로 관리한다.
+- schema source of truth 는 `.sql` 파일이 아니라 Go type 으로 둔다.
+- Ent schema type 은 `storage/sqlite/ent/schema` 아래에서 관리한다.
+- Ent generated code 는 `storage/sqlite/ent` 아래에 두고, 직접 수정하지 않는다.
+- service layer 는 Ent client 나 generated entity 를 직접 알지 않는다.
+- persistence layer 는 `ReadRepository` 와 `WriteRepository` interface 를 분리해서 구현한다.
 - embedded SQLite 는 네트워크 왕복 비용이 없으므로, 작은 CLI 조회 경로에서는 전통적인 N+1 회피를 우선 설계 목표로 두지 않는다.
-- 전체 ETF, 장기간 일봉, 백테스트, 지표 재계산처럼 반복 범위가 큰 작업은 set-based SQL, batch query, prepared statement 를 우선한다.
-- ORM 은 사용자 설정이나 단순 CRUD 도메인이 충분히 커질 때 다시 검토한다.
+- 전체 ETF, 장기간 일봉, 백테스트, 지표 재계산처럼 반복 범위가 큰 작업은 Ent query 를 우선하되, 필요하면 persistence layer 안에서만 명시 SQL helper 를 보조적으로 사용할 수 있다.
 
 ### Database migration
 
-- `Explicit SQL migration files`
+- `Ent type-managed schema`
 
 결정:
 
-- auto migration 을 기본값으로 두지 않는다.
-- schema 변경은 사람이 읽을 수 있는 SQL migration 파일로 관리한다.
-- migration runner 는 실제 storage 구현 단계에서 가장 작은 도구를 선택한다.
-- migration SQL 은 SQLite 를 우선으로 작성하되, PostgreSQL 전환 가능성을 해치지 않는 표현을 선호한다.
+- schema 변경은 Ent schema type 변경과 generated code 갱신으로 관리한다.
+- CLI command 가 SQLite 저장소에 실제로 접근할 때 Ent schema create/migration 을 실행한다.
+- 현재 단계에서는 별도 `.sql` migration 파일을 source of truth 로 만들지 않는다.
+- destructive schema 변경은 자동으로 숨기지 않고 별도 결정과 테스트를 거친다.
 
 ### Provider implementation
 
