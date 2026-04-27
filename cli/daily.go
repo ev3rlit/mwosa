@@ -209,10 +209,12 @@ func closeDailyService(service dailyService, err *error) {
 }
 
 func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
+	errb := oops.In("cli")
+
 	database := storage.NewDatabase(opts.Database)
 	reader, writer, err := dailybarstorage.NewRepositories(database)
 	if err != nil {
-		return dailyService{}, oops.In("cli").Wrapf(err, "create daily repositories")
+		return dailyService{}, errb.Wrapf(err, "create daily repositories")
 	}
 	service := daily.Service{
 		Reader: reader,
@@ -225,12 +227,13 @@ func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
 	registry := provider.NewRegistry()
 	shouldRegisterDataGo := opts.Provider == "" || opts.Provider == string(provider.ProviderDataGo) || opts.PreferProvider == string(provider.ProviderDataGo)
 	if shouldRegisterDataGo {
+		providerErrb := errb.With("provider", provider.ProviderDataGo)
 		p, err := newDataGoProviderFromEnv()
 		if err != nil {
-			return dailyService{}, oops.In("cli").With("provider", provider.ProviderDataGo).Wrap(err)
+			return dailyService{}, providerErrb.Wrap(err)
 		}
 		if err := datago.Register(registry, p); err != nil {
-			return dailyService{}, oops.In("cli").With("provider", provider.ProviderDataGo).Wrapf(err, "register datago provider")
+			return dailyService{}, providerErrb.Wrapf(err, "register datago provider")
 		}
 	}
 	service.Router = dailybar.NewRouter(provider.NewRouter(registry))
@@ -238,12 +241,13 @@ func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
 }
 
 func newDataGoProviderFromEnv() (*datago.Provider, error) {
+	errb := oops.In("cli").With("provider", provider.ProviderDataGo)
 	serviceKey := os.Getenv("MWOSA_DATAGO_SERVICE_KEY")
 	if serviceKey == "" {
 		serviceKey = os.Getenv("DATAGO_SERVICE_KEY")
 	}
 	if serviceKey == "" {
-		return nil, oops.In("cli").With("provider", provider.ProviderDataGo).New("datago service key is required: set MWOSA_DATAGO_SERVICE_KEY or DATAGO_SERVICE_KEY")
+		return nil, errb.New("datago service key is required: set MWOSA_DATAGO_SERVICE_KEY or DATAGO_SERVICE_KEY")
 	}
 
 	config := datago.Config{
@@ -253,7 +257,7 @@ func newDataGoProviderFromEnv() (*datago.Provider, error) {
 	if value := os.Getenv("MWOSA_DATAGO_NUM_OF_ROWS"); value != "" {
 		numOfRows, err := strconv.Atoi(value)
 		if err != nil {
-			return nil, oops.In("cli").With("env", "MWOSA_DATAGO_NUM_OF_ROWS", "value", value).Wrapf(err, "MWOSA_DATAGO_NUM_OF_ROWS must be an integer")
+			return nil, errb.With("env", "MWOSA_DATAGO_NUM_OF_ROWS", "value", value).Wrapf(err, "MWOSA_DATAGO_NUM_OF_ROWS must be an integer")
 		}
 		config.NumOfRows = numOfRows
 	}

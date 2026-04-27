@@ -35,19 +35,21 @@ func NewRegistry() *Registry {
 }
 
 func (r *Registry) Register(provider IdentityProvider, roles ...RoleRegistration) error {
+	errb := oops.In("provider_registry")
 	if provider == nil {
-		return oops.In("provider_registry").New("register provider role: provider identity is nil")
+		return errb.New("register provider role: provider identity is nil")
 	}
 	identity := provider.ProviderIdentity()
 	if identity.ID == "" {
-		return oops.In("provider_registry").New("register provider role: provider id is empty")
+		return errb.New("register provider role: provider id is empty")
 	}
+	providerErrb := errb.With("provider", identity.ID)
 	for _, role := range roles {
 		if role.Profile.Role == "" {
-			return oops.In("provider_registry").With("provider", identity.ID).New("register provider role: role is empty")
+			return providerErrb.New("register provider role: role is empty")
 		}
 		if role.Impl == nil {
-			return oops.In("provider_registry").With("provider", identity.ID, "role", role.Profile.Role).New("register provider role: implementation is nil")
+			return providerErrb.With("role", role.Profile.Role).New("register provider role: implementation is nil")
 		}
 		r.entries = append(r.entries, RoleEntry{
 			Provider: identity,

@@ -39,22 +39,24 @@ func NewRouter(registry *Registry) *Router {
 }
 
 func (r *Router) Route(ctx context.Context, input RouteInput) (RouteCandidate, error) {
+	errb := oops.In("provider_router").With("role", input.Role, "market", input.Market, "security_type", input.SecurityType, "provider", input.ProviderID, "symbol", input.Symbol)
 	plan, err := r.Plan(ctx, input)
 	if err != nil {
-		return RouteCandidate{}, oops.In("provider_router").With("role", input.Role, "market", input.Market, "security_type", input.SecurityType, "provider", input.ProviderID, "symbol", input.Symbol).Wrap(err)
+		return RouteCandidate{}, errb.Wrap(err)
 	}
 	if len(plan.Candidates) == 0 {
-		return RouteCandidate{}, oops.In("provider_router").With("role", input.Role, "market", input.Market, "security_type", input.SecurityType, "provider", input.ProviderID, "symbol", input.Symbol).Wrapf(ErrNoProvider, "role=%s market=%s security_type=%s provider=%s symbol=%s", input.Role, input.Market, input.SecurityType, input.ProviderID, input.Symbol)
+		return RouteCandidate{}, errb.Wrapf(ErrNoProvider, "role=%s market=%s security_type=%s provider=%s symbol=%s", input.Role, input.Market, input.SecurityType, input.ProviderID, input.Symbol)
 	}
 	return plan.Candidates[0], nil
 }
 
 func (r *Router) Plan(ctx context.Context, input RouteInput) (RoutePlan, error) {
+	errb := oops.In("provider_router").With("role", input.Role, "market", input.Market, "security_type", input.SecurityType, "provider", input.ProviderID, "group", input.Group, "operation", input.Operation, "symbol", input.Symbol)
 	if err := ctx.Err(); err != nil {
-		return RoutePlan{}, oops.In("provider_router").With("role", input.Role).Wrap(err)
+		return RoutePlan{}, errb.Wrap(err)
 	}
 	if r == nil || r.registry == nil {
-		return RoutePlan{}, oops.In("provider_router").With("role", input.Role, "reason", "registry is nil").Wrapf(ErrNoProvider, "registry is nil role=%s", input.Role)
+		return RoutePlan{}, errb.With("reason", "registry is nil").Wrapf(ErrNoProvider, "registry is nil role=%s", input.Role)
 	}
 
 	candidates := make([]RouteCandidate, 0)
@@ -94,7 +96,7 @@ func (r *Router) Plan(ctx context.Context, input RouteInput) (RoutePlan, error) 
 	})
 
 	if len(candidates) == 0 {
-		return RoutePlan{}, oops.In("provider_router").With("role", input.Role, "market", input.Market, "security_type", input.SecurityType, "provider", input.ProviderID, "group", input.Group, "operation", input.Operation, "symbol", input.Symbol).Wrapf(ErrNoProvider, "role=%s market=%s security_type=%s provider=%s group=%s operation=%s symbol=%s", input.Role, input.Market, input.SecurityType, input.ProviderID, input.Group, input.Operation, input.Symbol)
+		return RoutePlan{}, errb.Wrapf(ErrNoProvider, "role=%s market=%s security_type=%s provider=%s group=%s operation=%s symbol=%s", input.Role, input.Market, input.SecurityType, input.ProviderID, input.Group, input.Operation, input.Symbol)
 	}
 
 	return RoutePlan{Candidates: candidates}, nil

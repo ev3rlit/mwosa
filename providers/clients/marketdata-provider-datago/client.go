@@ -166,6 +166,7 @@ type apiBody struct {
 }
 
 func decodeAPIResponse(body []byte) (apiResponse, error) {
+	errb := oops.In("datago_client")
 	var raw struct {
 		Header apiHeader `json:"header"`
 		Body   struct {
@@ -181,12 +182,12 @@ func decodeAPIResponse(body []byte) (apiResponse, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	if err := decoder.Decode(&raw); err != nil {
-		return apiResponse{}, oops.In("datago_client").Wrapf(err, "decode datago JSON envelope")
+		return apiResponse{}, errb.Wrapf(err, "decode datago JSON envelope")
 	}
 
 	items, err := decodeItems(raw.Body.Items.Item)
 	if err != nil {
-		return apiResponse{}, oops.In("datago_client").Wrapf(err, "decode datago items")
+		return apiResponse{}, errb.Wrapf(err, "decode datago items")
 	}
 	return apiResponse{
 		Header: raw.Header,
@@ -229,6 +230,7 @@ func (p *PriceItem) UnmarshalJSON(data []byte) error {
 }
 
 func decodeItems(raw json.RawMessage) ([]PriceItem, error) {
+	errb := oops.In("datago_client")
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return nil, nil
@@ -238,16 +240,16 @@ func decodeItems(raw json.RawMessage) ([]PriceItem, error) {
 	case '[':
 		var items []PriceItem
 		if err := json.Unmarshal(trimmed, &items); err != nil {
-			return nil, oops.In("datago_client").Wrapf(err, "decode datago item array")
+			return nil, errb.Wrapf(err, "decode datago item array")
 		}
 		return items, nil
 	case '{':
 		var item PriceItem
 		if err := json.Unmarshal(trimmed, &item); err != nil {
-			return nil, oops.In("datago_client").Wrapf(err, "decode datago item object")
+			return nil, errb.Wrapf(err, "decode datago item object")
 		}
 		return []PriceItem{item}, nil
 	default:
-		return nil, oops.In("datago_client").With("item", string(trimmed)).Errorf("unsupported item shape: %s", string(trimmed))
+		return nil, errb.With("item", string(trimmed)).Errorf("unsupported item shape: %s", string(trimmed))
 	}
 }

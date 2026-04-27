@@ -48,27 +48,29 @@ func NewRouter(router coreRouter) Router {
 }
 
 func (r routeAdapter) RouteInstrumentSearch(ctx context.Context, input RouteInput) (Searcher, error) {
+	errb := oops.In("instrument_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol)
 	candidate, err := r.router.Route(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return nil, oops.In("instrument_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
+		return nil, errb.Wrap(err)
 	}
 	searcher, ok := candidate.Impl.(Searcher)
 	if !ok {
-		return nil, oops.In("instrument_router").With("provider", candidate.Provider.ID).New("routed instrument implementation does not satisfy Searcher")
+		return nil, errb.With("provider", candidate.Provider.ID).New("routed instrument implementation does not satisfy Searcher")
 	}
 	return searcher, nil
 }
 
 func (r routeAdapter) PlanInstrumentSearch(ctx context.Context, input RouteInput) (RoutePlan, error) {
+	errb := oops.In("instrument_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol)
 	plan, err := r.router.Plan(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return RoutePlan{}, oops.In("instrument_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
+		return RoutePlan{}, errb.Wrap(err)
 	}
 	candidates := make([]RouteCandidate, 0, len(plan.Candidates))
 	for _, candidate := range plan.Candidates {
 		searcher, ok := candidate.Impl.(Searcher)
 		if !ok {
-			return RoutePlan{}, oops.In("instrument_router").With("provider", candidate.Provider.ID).New("routed instrument implementation does not satisfy Searcher")
+			return RoutePlan{}, errb.With("provider", candidate.Provider.ID).New("routed instrument implementation does not satisfy Searcher")
 		}
 		candidates = append(candidates, RouteCandidate{
 			Provider: candidate.Provider,

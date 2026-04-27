@@ -48,27 +48,29 @@ func NewRouter(router coreRouter) Router {
 }
 
 func (r routeAdapter) RouteQuoteSnapshot(ctx context.Context, input RouteInput) (Snapshotter, error) {
+	errb := oops.In("quote_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol)
 	candidate, err := r.router.Route(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return nil, oops.In("quote_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
+		return nil, errb.Wrap(err)
 	}
 	snapshotter, ok := candidate.Impl.(Snapshotter)
 	if !ok {
-		return nil, oops.In("quote_router").With("provider", candidate.Provider.ID).New("routed quote implementation does not satisfy Snapshotter")
+		return nil, errb.With("provider", candidate.Provider.ID).New("routed quote implementation does not satisfy Snapshotter")
 	}
 	return snapshotter, nil
 }
 
 func (r routeAdapter) PlanQuoteSnapshot(ctx context.Context, input RouteInput) (RoutePlan, error) {
+	errb := oops.In("quote_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol)
 	plan, err := r.router.Plan(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return RoutePlan{}, oops.In("quote_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
+		return RoutePlan{}, errb.Wrap(err)
 	}
 	candidates := make([]RouteCandidate, 0, len(plan.Candidates))
 	for _, candidate := range plan.Candidates {
 		snapshotter, ok := candidate.Impl.(Snapshotter)
 		if !ok {
-			return RoutePlan{}, oops.In("quote_router").With("provider", candidate.Provider.ID).New("routed quote implementation does not satisfy Snapshotter")
+			return RoutePlan{}, errb.With("provider", candidate.Provider.ID).New("routed quote implementation does not satisfy Snapshotter")
 		}
 		candidates = append(candidates, RouteCandidate{
 			Provider:    candidate.Provider,

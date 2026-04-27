@@ -48,27 +48,29 @@ func NewRouter(router coreRouter) Router {
 }
 
 func (r routeAdapter) RouteDailyBars(ctx context.Context, input RouteInput) (Fetcher, error) {
+	errb := oops.In("dailybar_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol)
 	candidate, err := r.router.Route(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return nil, oops.In("dailybar_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
+		return nil, errb.Wrap(err)
 	}
 	fetcher, ok := candidate.Impl.(Fetcher)
 	if !ok {
-		return nil, oops.In("dailybar_router").With("provider", candidate.Provider.ID).New("routed dailybar implementation does not satisfy Fetcher")
+		return nil, errb.With("provider", candidate.Provider.ID).New("routed dailybar implementation does not satisfy Fetcher")
 	}
 	return fetcher, nil
 }
 
 func (r routeAdapter) PlanDailyBars(ctx context.Context, input RouteInput) (RoutePlan, error) {
+	errb := oops.In("dailybar_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol)
 	plan, err := r.router.Plan(ctx, toCoreRouteInput(input))
 	if err != nil {
-		return RoutePlan{}, oops.In("dailybar_router").With("provider", input.ProviderID, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrap(err)
+		return RoutePlan{}, errb.Wrap(err)
 	}
 	candidates := make([]RouteCandidate, 0, len(plan.Candidates))
 	for _, candidate := range plan.Candidates {
 		fetcher, ok := candidate.Impl.(Fetcher)
 		if !ok {
-			return RoutePlan{}, oops.In("dailybar_router").With("provider", candidate.Provider.ID).New("routed dailybar implementation does not satisfy Fetcher")
+			return RoutePlan{}, errb.With("provider", candidate.Provider.ID).New("routed dailybar implementation does not satisfy Fetcher")
 		}
 		candidates = append(candidates, RouteCandidate{
 			Provider: candidate.Provider,
