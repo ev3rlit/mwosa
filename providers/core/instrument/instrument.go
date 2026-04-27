@@ -69,6 +69,7 @@ type SearchResult struct {
 }
 
 type Searcher interface {
+	provider.RoleProvider
 	SearchInstruments(ctx context.Context, input SearchInput) (SearchResult, error)
 	InstrumentSearchProfile() Profile
 }
@@ -93,4 +94,11 @@ func (s Search) SearchInstruments(ctx context.Context, input SearchInput) (Searc
 
 func (s Search) InstrumentSearchProfile() Profile {
 	return s.profile
+}
+
+func (s Search) RoleRegistration() provider.RoleRegistration {
+	return provider.RoleRegistration{
+		Profile: s.profile.RoleProfile(),
+		Impl:    s,
+	}
 }

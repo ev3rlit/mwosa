@@ -88,6 +88,7 @@ type FetchResult struct {
 }
 
 type Fetcher interface {
+	provider.RoleProvider
 	FetchDailyBars(ctx context.Context, input FetchInput) (FetchResult, error)
 	DailyBarProfile() Profile
 }
@@ -112,4 +113,11 @@ func (f Fetch) FetchDailyBars(ctx context.Context, input FetchInput) (FetchResul
 
 func (f Fetch) DailyBarProfile() Profile {
 	return f.profile
+}
+
+func (f Fetch) RoleRegistration() provider.RoleRegistration {
+	return provider.RoleRegistration{
+		Profile: f.profile.RoleProfile(),
+		Impl:    f,
+	}
 }

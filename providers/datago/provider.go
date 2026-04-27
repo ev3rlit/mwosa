@@ -9,6 +9,7 @@ import (
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
+	"github.com/ev3rlit/mwosa/providers/spec"
 	"github.com/samber/oops"
 )
 
@@ -23,8 +24,8 @@ type priceClient interface {
 type Provider struct {
 	provider.Identity
 
-	dailybar.Fetch
-	instrument.Search
+	DailyBars   dailybar.Fetcher
+	Instruments instrument.Searcher
 
 	client priceClient
 }
@@ -47,97 +48,62 @@ func NewWithClient(client priceClient) *Provider {
 		client: client,
 	}
 
-	p.Fetch = dailybar.NewFetch(dailyBarProfile(), p.fetchDailyBars)
-	p.Search = instrument.NewSearch(instrumentSearchProfile(), p.searchInstruments)
-	return p
-}
-
-func (p *Provider) RoleRegistrations() []provider.RoleRegistration {
-	return []provider.RoleRegistration{
-		{
-			Profile: p.DailyBarProfile().RoleProfile(),
-			Impl:    p,
-		},
-		{
-			Profile: p.InstrumentSearchProfile().RoleProfile(),
-			Impl:    p,
-		},
-	}
-}
-
-func Register(registry *provider.Registry, p *Provider) error {
-	return registry.Register(p, p.RoleRegistrations()...)
-}
-
-func dailyBarProfile() dailybar.Profile {
-	return dailybar.Profile{
-		Markets: []provider.Market{provider.MarketKRX},
-		SecurityTypes: []provider.SecurityType{
+	p.DailyBars = spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
+		Markets(provider.MarketKRX).
+		SecurityTypes(
 			provider.SecurityTypeETF,
 			provider.SecurityTypeETN,
 			provider.SecurityTypeELW,
-		},
-		Group: provider.GroupSecuritiesProductPrice,
-		Operations: []provider.OperationID{
+		).
+		Group(provider.GroupSecuritiesProductPrice).
+		Operations(
 			provider.OperationGetETFPriceInfo,
 			provider.OperationGetETNPriceInfo,
 			provider.OperationGetELWPriceInfo,
-		},
-		AuthScope:  provider.CredentialScopeDataGo,
-		RangeQuery: dailybar.RangeQuerySupported,
-		Freshness:  provider.FreshnessDaily,
-		Compatibility: provider.Compatibility{
-			DataLatency:         provider.DataLatencyPreviousBusinessDay,
-			LagBusinessDays:     1,
-			CurrentDaySupported: false,
-			Notes: []string{
-				"latest available basDt is typically the previous business day",
-				"current trading-day data is not supported",
-			},
-		},
-		RequiresAuth: true,
-		Priority:     50,
-		Limitations: []string{
+		).
+		RequiresAuth(provider.CredentialScopeDataGo).
+		RangeQuery(dailybar.RangeQuerySupported).
+		CompatibilityNotes(
+			"latest available basDt is typically the previous business day",
+			"current trading-day data is not supported",
+		).
+		Priority(50).
+		Limitations(
 			"daily basDt data only; not a realtime or current trading-day provider",
 			"latest available data is typically D-1 business day EOD",
 			"ELW uses explicit security_type=elw because canonical schema policy is separate from ETF/ETN",
-		},
-	}
-}
-
-func instrumentSearchProfile() instrument.Profile {
-	return instrument.Profile{
-		Markets: []provider.Market{provider.MarketKRX},
-		SecurityTypes: []provider.SecurityType{
+		).
+		MustBuild()
+	p.Instruments = spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
+		Markets(provider.MarketKRX).
+		SecurityTypes(
 			provider.SecurityTypeETF,
 			provider.SecurityTypeETN,
 			provider.SecurityTypeELW,
-		},
-		Group: provider.GroupSecuritiesProductPrice,
-		Operations: []provider.OperationID{
+		).
+		Group(provider.GroupSecuritiesProductPrice).
+		Operations(
 			provider.OperationGetETFPriceInfo,
 			provider.OperationGetETNPriceInfo,
 			provider.OperationGetELWPriceInfo,
-		},
-		AuthScope: provider.CredentialScopeDataGo,
-		Freshness: provider.FreshnessDaily,
-		Compatibility: provider.Compatibility{
-			DataLatency:         provider.DataLatencyPreviousBusinessDay,
-			LagBusinessDays:     1,
-			CurrentDaySupported: false,
-			Notes: []string{
-				"instrument snapshots are derived from D-1 business day EOD price rows",
-				"current trading-day data is not supported",
-			},
-		},
-		RequiresAuth: true,
-		Priority:     50,
-		Limitations: []string{
+		).
+		RequiresAuth(provider.CredentialScopeDataGo).
+		CompatibilityNotes(
+			"instrument snapshots are derived from D-1 business day EOD price rows",
+			"current trading-day data is not supported",
+		).
+		Priority(50).
+		Limitations(
 			"searches public D-1 business day EOD price rows and derives instrument snapshots",
 			"not suitable for realtime or current trading-day instrument state",
 			"ELW search requires explicit security_type=elw",
-		},
-	}
+		).
+		MustBuild()
+	return p
+}
+
+func Register(registry *provider.Registry, p *Provider) error {
+	return registry.RegisterProvider(p)
 }
 
 func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput) (dailybar.FetchResult, error) {

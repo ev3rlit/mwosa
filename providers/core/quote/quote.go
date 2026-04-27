@@ -49,6 +49,7 @@ type SnapshotResult struct {
 }
 
 type Snapshotter interface {
+	provider.RoleProvider
 	FetchQuoteSnapshot(ctx context.Context, input SnapshotInput) (SnapshotResult, error)
 	QuoteProfile() Profile
 }
@@ -73,4 +74,11 @@ func (s Snapshot) FetchQuoteSnapshot(ctx context.Context, input SnapshotInput) (
 
 func (s Snapshot) QuoteProfile() Profile {
 	return s.profile
+}
+
+func (s Snapshot) RoleRegistration() provider.RoleRegistration {
+	return provider.RoleRegistration{
+		Profile: s.profile.RoleProfile(),
+		Impl:    s,
+	}
 }

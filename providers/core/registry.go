@@ -1,6 +1,10 @@
 package core
 
-import "github.com/samber/oops"
+import (
+	"reflect"
+
+	"github.com/samber/oops"
+)
 
 type RoleProfile struct {
 	Role          Role
@@ -21,6 +25,10 @@ type RoleRegistration struct {
 	Impl    any
 }
 
+type RoleProvider interface {
+	RoleRegistration() RoleRegistration
+}
+
 type RoleEntry struct {
 	Provider Identity
 	Profile  RoleProfile
@@ -33,6 +41,56 @@ type Registry struct {
 
 func NewRegistry() *Registry {
 	return &Registry{}
+}
+
+func (r *Registry) RegisterProvider(provider IdentityProvider) error {
+	errb := oops.In("provider_registry")
+	if provider == nil {
+		return errb.New("register provider: provider identity is nil")
+	}
+
+	value := reflect.ValueOf(provider)
+	if isNilReflectValue(value) {
+		return errb.New("register provider: provider identity is nil")
+	}
+	identity := provider.ProviderIdentity()
+	if identity.ID == "" {
+		return errb.New("register provider: provider id is empty")
+	}
+
+	value = reflect.Indirect(value)
+	if !value.IsValid() || value.Kind() != reflect.Struct {
+		return errb.With("provider", identity.ID).New("register provider: provider must be a struct or struct pointer")
+	}
+
+	roleProviderType := reflect.TypeOf((*RoleProvider)(nil)).Elem()
+	registrations := make([]RoleRegistration, 0)
+	for i := 0; i < value.NumField(); i++ {
+		fieldInfo := value.Type().Field(i)
+		if !fieldInfo.IsExported() {
+			continue
+		}
+		field := value.Field(i)
+		if !field.CanInterface() {
+			continue
+		}
+		if !field.Type().Implements(roleProviderType) {
+			continue
+		}
+		if isNilReflectValue(field) {
+			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: role field is nil")
+		}
+		roleProvider, ok := field.Interface().(RoleProvider)
+		if !ok {
+			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: role field does not implement RoleProvider")
+		}
+		registrations = append(registrations, roleProvider.RoleRegistration())
+	}
+	if len(registrations) == 0 {
+		return errb.With("provider", identity.ID).New("register provider: provider has no role fields")
+	}
+
+	return r.Register(provider, registrations...)
 }
 
 func (r *Registry) Register(provider IdentityProvider, roles ...RoleRegistration) error {
@@ -72,4 +130,16 @@ func (r *Registry) Entries(role Role) []RoleEntry {
 		}
 	}
 	return entries
+}
+
+func isNilReflectValue(value reflect.Value) bool {
+	if !value.IsValid() {
+		return true
+	}
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
