@@ -12,15 +12,17 @@ import (
 	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
 )
 
-type DailyBarWriteRepository struct {
+type writeRepository struct {
 	database *storage.Database
 }
 
-func NewDailyBarWriteRepository(databasePath string) *DailyBarWriteRepository {
-	return &DailyBarWriteRepository{database: storage.NewDatabase(databasePath)}
+var _ daily.WriteRepository = (*writeRepository)(nil)
+
+func NewWriteRepository(databasePath string) daily.WriteRepository {
+	return &writeRepository{database: storage.NewDatabase(databasePath)}
 }
 
-func (r *DailyBarWriteRepository) UpsertDailyBars(ctx context.Context, bars []coredailybar.Bar) (daily.WriteResult, error) {
+func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailybar.Bar) (daily.WriteResult, error) {
 	client, err := r.open(ctx)
 	if err != nil {
 		return daily.WriteResult{}, err
@@ -110,7 +112,7 @@ func (r *DailyBarWriteRepository) UpsertDailyBars(ctx context.Context, bars []co
 	}, nil
 }
 
-func (r *DailyBarWriteRepository) open(ctx context.Context) (*entdb.Client, error) {
+func (r *writeRepository) open(ctx context.Context) (*entdb.Client, error) {
 	if r == nil || r.database == nil {
 		return nil, fmt.Errorf("daily bar write repository database is nil")
 	}

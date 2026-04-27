@@ -12,20 +12,22 @@ import (
 	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
 )
 
-type DailyBarReadRepository struct {
+type readRepository struct {
 	database *storage.Database
 }
 
-func NewDailyBarReadRepository(databasePath string) *DailyBarReadRepository {
-	return &DailyBarReadRepository{database: storage.NewDatabase(databasePath)}
+var _ daily.ReadRepository = (*readRepository)(nil)
+
+func NewReadRepository(databasePath string) daily.ReadRepository {
+	return &readRepository{database: storage.NewDatabase(databasePath)}
 }
 
-func NewRepositories(databasePath string) (*DailyBarReadRepository, *DailyBarWriteRepository) {
+func NewRepositories(databasePath string) (daily.ReadRepository, daily.WriteRepository) {
 	database := storage.NewDatabase(databasePath)
-	return &DailyBarReadRepository{database: database}, &DailyBarWriteRepository{database: database}
+	return &readRepository{database: database}, &writeRepository{database: database}
 }
 
-func (r *DailyBarReadRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
+func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) ([]coredailybar.Bar, error) {
 	client, err := r.open(ctx)
 	if err != nil {
 		return nil, err
@@ -75,7 +77,7 @@ func (r *DailyBarReadRepository) QueryDailyBars(ctx context.Context, query daily
 	return bars, nil
 }
 
-func (r *DailyBarReadRepository) open(ctx context.Context) (*entdb.Client, error) {
+func (r *readRepository) open(ctx context.Context) (*entdb.Client, error) {
 	if r == nil || r.database == nil {
 		return nil, fmt.Errorf("daily bar read repository database is nil")
 	}
