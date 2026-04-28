@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"os"
-
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/datago"
@@ -224,34 +222,12 @@ func newDailyService(opts *Options, withProvider bool) (dailyService, error) {
 	}
 
 	registry := provider.NewRegistry()
-	shouldRegisterDataGo := opts.Provider == "" || opts.Provider == string(provider.ProviderDataGo) || opts.PreferProvider == string(provider.ProviderDataGo)
-	if shouldRegisterDataGo {
-		providerErrb := errb.With("provider", provider.ProviderDataGo)
-		p, err := newDataGoProviderFromEnv()
-		if err != nil {
-			return dailyService{}, providerErrb.Wrap(err)
-		}
-		if err := datago.Register(registry, p); err != nil {
-			return dailyService{}, providerErrb.Wrapf(err, "register datago provider")
-		}
+	if err := registry.RegisterConfiguredFromEnv(provider.RegisterOptions{
+		ProviderID:     provider.ProviderID(opts.Provider),
+		PreferProvider: provider.ProviderID(opts.PreferProvider),
+	}, datago.NewBuilder()); err != nil {
+		return dailyService{}, errb.Wrapf(err, "register configured providers")
 	}
 	service.Router = dailybar.NewRouter(provider.NewRouter(registry))
 	return dailyService{service: service, close: database.Close}, nil
-}
-
-func newDataGoProviderFromEnv() (*datago.Provider, error) {
-	errb := oops.In("cli").With("provider", provider.ProviderDataGo)
-	serviceKey := os.Getenv("MWOSA_DATAGO_SERVICE_KEY")
-	if serviceKey == "" {
-		serviceKey = os.Getenv("DATAGO_SERVICE_KEY")
-	}
-	if serviceKey == "" {
-		return nil, errb.New("datago service key is required: set MWOSA_DATAGO_SERVICE_KEY or DATAGO_SERVICE_KEY")
-	}
-
-	config := datago.Config{
-		ServiceKey: serviceKey,
-		BaseURL:    os.Getenv("MWOSA_DATAGO_BASE_URL"),
-	}
-	return datago.New(config)
 }

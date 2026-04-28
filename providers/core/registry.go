@@ -122,6 +122,57 @@ func (r *Registry) Register(provider IdentityProvider, roles ...RoleRegistration
 	return nil
 }
 
+func (r *Registry) RegisterConfigured(opts RegisterOptions, config Config, builders ...ProviderBuilder) error {
+	errb := oops.In("provider_registry")
+	if r == nil {
+		return errb.New("register configured providers: registry is nil")
+	}
+	for _, builder := range builders {
+		if builder == nil {
+			return errb.New("register configured providers: builder is nil")
+		}
+		if err := r.registerConfiguredProvider(opts, config, builder); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Registry) RegisterConfiguredFromEnv(opts RegisterOptions, builders ...ProviderBuilder) error {
+	return r.RegisterConfigured(opts, ConfigFromEnv(), builders...)
+}
+
+func (r *Registry) registerConfiguredProvider(opts RegisterOptions, config Config, builder ProviderBuilder) error {
+	providerID := builder.ID()
+	errb := oops.In("provider_registry").With("provider", providerID)
+	if providerID == "" {
+		return errb.New("register configured provider: builder id is empty")
+	}
+
+	decision := builder.Decide(opts, config)
+	if !decision.Register {
+		return nil
+	}
+
+	providerInstance, err := builder.Build(config)
+	errb = errb.With("reason", decision.Reason)
+	if err != nil {
+		return errb.Wrapf(err, "build configured provider reason=%s", decision.Reason)
+	}
+	if providerInstance == nil {
+		return errb.New("build configured provider returned nil")
+	}
+
+	identity := providerInstance.ProviderIdentity()
+	if identity.ID != providerID {
+		return errb.With("actual_provider", identity.ID).New("configured provider builder returned mismatched provider id")
+	}
+	if err := r.RegisterProvider(providerInstance); err != nil {
+		return errb.Wrapf(err, "register configured provider")
+	}
+	return nil
+}
+
 func (r *Registry) Entries(role Role) []RoleEntry {
 	entries := make([]RoleEntry, 0)
 	for _, entry := range r.entries {
