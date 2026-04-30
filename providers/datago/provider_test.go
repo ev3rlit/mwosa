@@ -54,7 +54,7 @@ func TestFetchDailyBarsDecodesSingleObjectItem(t *testing.T) {
 	defer server.Close()
 
 	p := newTestProvider(t, server.URL)
-	result, err := p.DailyBars.FetchDailyBars(context.Background(), dailybar.FetchInput{
+	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
 		Symbol:       "069500",
@@ -110,7 +110,7 @@ func TestFetchDailyBarsDecodesOnlyRequestedPage(t *testing.T) {
 	defer server.Close()
 
 	p := newTestProvider(t, server.URL)
-	result, err := p.DailyBars.FetchDailyBars(context.Background(), dailybar.FetchInput{
+	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETN,
 		Symbol:       "580001",
@@ -146,7 +146,7 @@ func TestSearchInstrumentsReturnsEmptyResult(t *testing.T) {
 	defer server.Close()
 
 	p := newTestProvider(t, server.URL)
-	result, err := p.Instruments.SearchInstruments(context.Background(), instrumentInput("missing"))
+	result, err := p.SearchInstruments(context.Background(), instrumentInput("missing"))
 	if err != nil {
 		t.Fatalf("search instruments: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestRemoteErrorIncludesProviderContext(t *testing.T) {
 	defer server.Close()
 
 	p := newTestProvider(t, server.URL)
-	_, err := p.DailyBars.FetchDailyBars(context.Background(), dailybar.FetchInput{
+	_, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
 		Symbol:       "069500",
@@ -182,7 +182,7 @@ func TestRemoteErrorIncludesProviderContext(t *testing.T) {
 
 func TestUnsupportedSecurityTypeIsNotHiddenAsEmptySuccess(t *testing.T) {
 	p := NewWithClient(nil)
-	_, err := p.DailyBars.FetchDailyBars(context.Background(), dailybar.FetchInput{
+	_, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeStock,
 		Symbol:       "005930",

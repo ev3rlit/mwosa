@@ -13,26 +13,23 @@ import (
 type registryTestProvider struct {
 	provider.Identity
 
+	dailybar.Fetcher
+}
+
+type namedRoleFieldProvider struct {
+	provider.Identity
+
 	DailyBars dailybar.Fetcher
 }
 
-func TestRegisterProviderCollectsPublicRoleFields(t *testing.T) {
+func TestRegisterProviderCollectsEmbeddedRoleFields(t *testing.T) {
 	registry := provider.NewRegistry()
 	p := &registryTestProvider{
 		Identity: provider.Identity{
 			ID:          provider.ProviderID("test"),
 			DisplayName: "test",
 		},
-		DailyBars: spec.PreviousBusinessDayDailyBar(func(context.Context, dailybar.FetchInput) (dailybar.FetchResult, error) {
-			return dailybar.FetchResult{}, nil
-		}).
-			Markets(provider.MarketKRX).
-			SecurityTypes(provider.SecurityTypeETF).
-			Group(provider.GroupID("testGroup")).
-			Operations(provider.OperationID("testOperation")).
-			RequiresAuth(provider.CredentialScopeDataGo).
-			RangeQuery(dailybar.RangeQuerySupported).
-			MustBuild(),
+		Fetcher: newRegistryTestDailyBarFetcher(),
 	}
 
 	if err := registry.RegisterProvider(p); err != nil {
@@ -54,7 +51,26 @@ func TestRegisterProviderCollectsPublicRoleFields(t *testing.T) {
 	}
 }
 
-func TestRegisterProviderRejectsNilPublicRoleField(t *testing.T) {
+func TestRegisterProviderIgnoresNamedRoleFields(t *testing.T) {
+	registry := provider.NewRegistry()
+	p := &namedRoleFieldProvider{
+		Identity: provider.Identity{
+			ID:          provider.ProviderID("test"),
+			DisplayName: "test",
+		},
+		DailyBars: newRegistryTestDailyBarFetcher(),
+	}
+
+	err := registry.RegisterProvider(p)
+	if err == nil {
+		t.Fatal("register provider error = nil, want no embedded role fields error")
+	}
+	if !strings.Contains(err.Error(), "provider has no role fields") {
+		t.Fatalf("error = %q, want no role fields context", err.Error())
+	}
+}
+
+func TestRegisterProviderRejectsNilEmbeddedRoleField(t *testing.T) {
 	registry := provider.NewRegistry()
 	p := &registryTestProvider{
 		Identity: provider.Identity{
@@ -67,7 +83,20 @@ func TestRegisterProviderRejectsNilPublicRoleField(t *testing.T) {
 	if err == nil {
 		t.Fatal("register provider error = nil, want nil role field error")
 	}
-	if !strings.Contains(err.Error(), "role field is nil") {
+	if !strings.Contains(err.Error(), "embedded role field is nil") {
 		t.Fatalf("error = %q, want role field context", err.Error())
 	}
+}
+
+func newRegistryTestDailyBarFetcher() dailybar.Fetcher {
+	return spec.PreviousBusinessDayDailyBar(func(context.Context, dailybar.FetchInput) (dailybar.FetchResult, error) {
+		return dailybar.FetchResult{}, nil
+	}).
+		Markets(provider.MarketKRX).
+		SecurityTypes(provider.SecurityTypeETF).
+		Group(provider.GroupID("testGroup")).
+		Operations(provider.OperationID("testOperation")).
+		RequiresAuth(provider.CredentialScopeDataGo).
+		RangeQuery(dailybar.RangeQuerySupported).
+		MustBuild()
 }

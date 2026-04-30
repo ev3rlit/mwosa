@@ -106,7 +106,7 @@ func (b fakeBuilder) Build(provider.Config) (provider.IdentityProvider, error) {
 type fakeProvider struct {
 	provider.Identity
 
-	DailyBars dailybar.Fetcher
+	dailybar.Fetcher
 }
 
 func newFakeProvider(id provider.ProviderID) *fakeProvider {
@@ -115,7 +115,7 @@ func newFakeProvider(id provider.ProviderID) *fakeProvider {
 			ID: id,
 		},
 	}
-	p.DailyBars = dailybar.NewFetch(dailybar.Profile{
+	p.Fetcher = dailybar.NewFetch(dailybar.Profile{
 		Markets:       []provider.Market{provider.MarketKRX},
 		SecurityTypes: []provider.SecurityType{provider.SecurityTypeETF},
 		Group:         provider.GroupID("fakeGroup"),

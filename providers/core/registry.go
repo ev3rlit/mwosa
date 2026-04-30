@@ -67,6 +67,9 @@ func (r *Registry) RegisterProvider(provider IdentityProvider) error {
 	registrations := make([]RoleRegistration, 0)
 	for i := 0; i < value.NumField(); i++ {
 		fieldInfo := value.Type().Field(i)
+		if !fieldInfo.Anonymous {
+			continue
+		}
 		if !fieldInfo.IsExported() {
 			continue
 		}
@@ -78,11 +81,11 @@ func (r *Registry) RegisterProvider(provider IdentityProvider) error {
 			continue
 		}
 		if isNilReflectValue(field) {
-			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: role field is nil")
+			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: embedded role field is nil")
 		}
 		roleProvider, ok := field.Interface().(RoleProvider)
 		if !ok {
-			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: role field does not implement RoleProvider")
+			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: embedded role field does not implement RoleProvider")
 		}
 		registrations = append(registrations, roleProvider.RoleRegistration())
 	}

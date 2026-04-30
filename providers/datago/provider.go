@@ -24,8 +24,8 @@ type priceClient interface {
 type Provider struct {
 	provider.Identity
 
-	DailyBars   dailybar.Fetcher
-	Instruments instrument.Searcher
+	dailybar.Fetcher
+	instrument.Searcher
 
 	client priceClient
 }
@@ -48,7 +48,7 @@ func NewWithClient(client priceClient) *Provider {
 		client: client,
 	}
 
-	p.DailyBars = spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
+	p.Fetcher = spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
 		Markets(provider.MarketKRX).
 		SecurityTypes(
 			provider.SecurityTypeETF,
@@ -74,7 +74,7 @@ func NewWithClient(client priceClient) *Provider {
 			"ELW uses explicit security_type=elw because canonical schema policy is separate from ETF/ETN",
 		).
 		MustBuild()
-	p.Instruments = spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
+	p.Searcher = spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
 		Markets(provider.MarketKRX).
 		SecurityTypes(
 			provider.SecurityTypeETF,
