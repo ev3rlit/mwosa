@@ -26,6 +26,10 @@ go.work.sum
 # env file
 .env
 
+# Local provider client secrets and probe outputs
+clients/**/*.local.json
+clients/**/e2e-output*.json
+
 # macOS
 .DS_Store
 

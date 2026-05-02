@@ -39,7 +39,7 @@ provider 가 REST API 를 사용할 수도 있지만, 모든 provider 가 REST A
 1. 필요한 role interface 를 먼저 확인한다.
 2. provider 가 지원하는 capability 와 제한사항을 profile 로 적는다.
 3. provider 구현체가 REST 인지 SDK 인지 파일 기반인지 확인한다.
-4. `mwosa` repository root 의 `go.work` 에 포함되는 독립 Go module 로 provider client 를 만든다.
+4. `mwosa` repository root 의 `go.work` 에 포함되는 `clients/<client-name>` 독립 Go module 로 provider client 를 만든다.
 5. 구현체에 맞는 transport/library 를 provider client module 안에서 선택한다.
 6. request builder, fake transport, 응답 파서, provider-native error 를 client module 단위 테스트로 검증한다.
 7. 단위 테스트를 통과한 client 만 CLI adapter 에 연결한다.

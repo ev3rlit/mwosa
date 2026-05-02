@@ -130,8 +130,8 @@
 
 예:
 
-- provider client module: `./providers/clients/marketdata-provider-kis`
-- provider client module: `./providers/clients/datago-etp`
+- provider client module: `./clients/marketdata-provider-kis`
+- provider client module: `./clients/datago-etp`
 - in-repo adapter: `providers/kis`
 - in-repo adapter: `providers/datago`
 

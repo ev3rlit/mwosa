@@ -262,7 +262,7 @@ CLI 골격 다음에 이어질 작업:
 왜 중요한가:
 
 - `mwosa` repository root 는 `go.work` 기반 Go workspace 로 관리한다.
-- provider client 는 workspace 안의 독립 Go module 로 둔다.
+- provider client 는 `clients` 아래의 독립 Go module 로 둔다.
 - CLI module 은 `providers/core` 와 provider 별 adapter 를 가진다.
 - provider 등록 전 client module 단위 테스트를 먼저 통과시킨다.
 - provider-native result 와 canonical record 를 섞으면 나중에 확장이 어려워진다.

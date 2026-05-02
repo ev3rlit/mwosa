@@ -9,7 +9,7 @@
 - 레이어 경계를 지킵니다. CLI는 의존성을 조립하고, service는 role
   interface와 repository interface만 사용하며, provider 구현 세부사항은
   service로 새지 않게 합니다.
-- provider client는 독립적으로 관리합니다. `providers/clients` 아래의
+- provider client는 독립적으로 관리합니다. `clients` 아래의
   provider client는 자체 `go.mod`와 테스트를 가진 별도 Go 모듈입니다.
 - 변경 범위는 좁게 유지합니다. 현재 경계 안에서 해결할 수 있는 요청에
   불필요한 대형 리팩터링을 붙이지 않습니다.

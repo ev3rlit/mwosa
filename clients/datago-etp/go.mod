@@ -1,4 +1,4 @@
-module github.com/ev3rlit/mwosa/providers/clients/datago-etp
+module github.com/ev3rlit/mwosa/clients/datago-etp
 
 go 1.25.6
 

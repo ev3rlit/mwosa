@@ -9,7 +9,7 @@
 현재 문서는 첫 group 인 `securitiesProductPrice` 를 기준으로 작성한다. 이 group 은 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집한다.
 
 원본 OpenAPI 스펙은 provider client module 안의
-`providers/clients/datago-etp/docs/securitiesProductPrice.openapi.yaml` 에 보관한다.
+`clients/datago-etp/docs/securitiesProductPrice.openapi.yaml` 에 보관한다.
 
 이 provider 의 client 구현체는 `mwosa` workspace 안의 **독립 Go module** 로 관리한다. `mwosa` repository root 의 `go.work` 로 CLI module 과 함께 개발하고, 필요하면 나중에 별도 repository 로 분리할 수 있다.
 
@@ -26,13 +26,13 @@
 ## 위치
 
 - provider 문서: `docs/providers/datago/README.md`
-- 원본 스펙: `providers/clients/datago-etp/docs/securitiesProductPrice.openapi.yaml`
+- 원본 스펙: `clients/datago-etp/docs/securitiesProductPrice.openapi.yaml`
 - 공통 저장 계약: `docs/canonical-schema.md`
 
 권장 패키지 분리:
 
 - provider client module:
-  - 예: `providers/clients/datago-etp`
+  - 예: `clients/datago-etp`
 - in-CLI adapter:
   - 예: `providers/datago`
 
@@ -404,7 +404,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 이 provider 문서를 기준으로 다음 구현을 진행한다.
 
-1. provider client module `providers/clients/datago-etp` 생성
+1. provider client module `clients/datago-etp` 생성
 2. client module 내부 provider group / operation registry 작성
 3. `securitiesProductPrice` OpenAPI query builder 작성
 4. client module 내부 item normalization 구현

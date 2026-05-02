@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	datagoetp "github.com/ev3rlit/mwosa/providers/clients/datago-etp"
+	datagoetp "github.com/ev3rlit/mwosa/clients/datago-etp"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"

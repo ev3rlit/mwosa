@@ -19,7 +19,7 @@
 | operation | provider group 안의 실제 호출 단위다. 예: `getETFPriceInfo`, `getETNPriceInfo` |
 | credential scope | 인증 정보가 적용되는 범위다. provider 전체에 적용될 수도 있고, provider group 별로 달라질 수도 있다. |
 | provider implementation | 외부 API 를 직접 호출하는 client 구현체다. 인증, pagination, 원본 응답 파싱을 담당하며, 코드에서는 provider client module 로 둔다. |
-| provider client module | provider implementation 을 담는 독립 Go module 이다. `mwosa` workspace 안에 두되, 자체 `go.mod` 와 테스트를 가진다. |
+| provider client module | provider implementation 을 담는 독립 Go module 이다. `mwosa` workspace 의 `clients` 아래에 두되, 자체 `go.mod` 와 테스트를 가진다. |
 | provider adapter | provider implementation 을 `mwosa` 내부 role interface 와 canonical data 로 연결하는 코드다. CLI config 변환, request/result 변환, error 변환, normalization 연결을 담당한다. |
 | provider bridge | provider adapter 역할을 설명할 때만 쓰는 보조 표현이다. package, folder, type 이름의 접미사로는 쓰지 않는다. |
 | Go workspace | `mwosa` repository root 에 둔 `go.work` 로 여러 Go module 을 함께 개발하는 구조다. CLI module 과 provider client module 을 같은 프로젝트 안에서 독립적으로 관리할 때 사용한다. |
@@ -60,7 +60,7 @@ provider client 는 CLI 밖에서도 독립적으로 테스트할 수 있어야 
 
 `mwosa` repository root 는 Go workspace 로 관리한다. root 의 `go.work` 는 CLI module 과 provider client module 들을 함께 묶는다.
 
-각 provider client 는 workspace 안에 생성되는 독립 Go module 이다. 각 client module 은 자체 `go.mod` 를 가지고, provider API 호출, 인증, pagination, 원본 응답 파싱, provider-native error 처리를 자기 module 안에서 끝낸다.
+각 provider client 는 workspace 안에 생성되는 독립 Go module 이다. 위치는 `clients/<client-name>` 아래에 둔다. 각 client module 은 자체 `go.mod` 를 가지고, provider API 호출, 인증, pagination, 원본 응답 파싱, provider-native error 처리를 자기 module 안에서 끝낸다.
 
 이 구조에서는 provider client 를 `mwosa` 에 등록하기 전에 먼저 client module 단위로 테스트한다. 예를 들어 `providers/datago` adapter 를 붙이기 전에 `datago-etp` module 안에서 request builder, fake transport, 응답 파서, error mapping 테스트를 통과시킨다.
 
@@ -104,6 +104,13 @@ embedded role field 만 봐도 provider 가 어떤 역할을 제공하는지 알
 provider 역할 interface, registry, router 는 `providers/core` 아래에 둔다. provider 별 adapter 도 같은 `providers` 아래에 두고, 폴더 이름은 provider 이름을 그대로 쓴다.
 
 ```text
+clients/
+  datago-etp/
+    go.mod
+    client.go
+    docs/
+      securitiesProductPrice.openapi.yaml
+
 providers/
   core/
     identity.go
@@ -138,6 +145,8 @@ providers/
     compatibility.go
     role.go
 ```
+
+`clients` 는 외부 API client module 의 공간이다. 이 폴더 아래 코드는 `mwosa` 의 CLI, service, storage 에 의존하지 않고 provider-native 요청과 응답을 다룬다.
 
 `providers/core` 는 위치 이름이고, 코드에서는 필요하면 import alias 로 `provider` 라고 읽을 수 있다.
 
