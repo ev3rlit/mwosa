@@ -213,10 +213,10 @@ backfill daily --market krx --security-type etf --from <YYYYMMDD> --to <YYYYMMDD
 `datago` 변환 규칙:
 
 - `sync daily` 는 `as-of` -> `basDt` 로 변환해 해당 날짜의 시장/자산군 batch 를 수집한다.
-- `backfill daily` 는 날짜 범위를 하루씩 순회하며 `basDt` batch 수집을 반복한다.
+- `backfill daily` 는 날짜 범위를 하루씩 순회하며 `basDt` batch 수집을 반복한다. `--workers` 를 주면 날짜별 fetch 를 병렬화하되 SQLite write 는 순차 처리한다.
 - `ensure daily <security_code>` 는 필요한 날짜가 없으면 해당 날짜의 batch 를 먼저 수집한 뒤 저장소에서 `security_code` 를 조회한다.
 - `resultType=json`
-- `numOfRows`, `pageNo`, `totalCount` 를 노출하되 client 가 모든 page 를 자동 순회하지 않는다.
+- page-level client 는 `numOfRows`, `pageNo`, `totalCount` 를 노출한다. `sync/backfill/ensure` 의 batch 수집은 all-page helper 를 사용해 남은 page 를 끝까지 순회한다.
 - `provider=datago`, `provider_group=securitiesProductPrice`, 실제 operation 을 provenance 로 남긴다.
 - 최신 데이터 요청은 오늘이 아니라 latest available basDt, 즉 보통 D-1 영업일 기준으로 해석한다.
 
@@ -379,7 +379,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 - `mwosa get daily 491820 --from 20240101 --to 20240415`
 - `mwosa sync daily --market krx --security-type etf --as-of 20260424 --provider datago`
-- `mwosa backfill daily --market krx --security-type etf --from 20240101 --to 20240415 --provider datago`
+- `mwosa backfill daily --market krx --security-type etf --from 20240101 --to 20240415 --workers 4 --provider datago`
 - `mwosa search instrument "KODEX 미국채"`
 - `mwosa ensure daily 069500 --from 20240101 --to 20240415`
 

@@ -36,6 +36,11 @@ The client exposes both page-level and all-page helpers:
   first, read `totalCount`, then fetch only the remaining pages. When `NumOfRows`
   is omitted, all-page helpers use `DefaultAllNumOfRows`.
 
+Transient HTTP failures are retried by default. The client retries network
+errors and HTTP `408`, `429`, `500`, `502`, `503`, and `504` responses with a
+small exponential backoff, while provider result-code errors remain explicit
+failures.
+
 Run the live e2e tests explicitly with `DATAGO_ETP_E2E=1`.
 
 ```sh

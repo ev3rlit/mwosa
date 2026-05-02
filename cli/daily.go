@@ -16,6 +16,7 @@ type dailyFlags struct {
 	From         string
 	To           string
 	AsOf         string
+	Workers      int
 }
 
 func newGetCommand(opts *Options) *cobra.Command {
@@ -169,6 +170,7 @@ func newBackfillDailyCommand(opts *Options) *cobra.Command {
 				SecurityType:   provider.SecurityType(flags.SecurityType),
 				From:           flags.From,
 				To:             flags.To,
+				Workers:        flags.Workers,
 			})
 			if err != nil {
 				return err
@@ -179,6 +181,7 @@ func newBackfillDailyCommand(opts *Options) *cobra.Command {
 	addSecurityTypeFlag(cmd, &flags)
 	cmd.Flags().StringVar(&flags.From, "from", flags.From, "start trading date, YYYYMMDD or YYYY-MM-DD")
 	cmd.Flags().StringVar(&flags.To, "to", flags.To, "end trading date, YYYYMMDD or YYYY-MM-DD")
+	cmd.Flags().IntVar(&flags.Workers, "workers", 1, "number of date fetch workers")
 	return cmd
 }
 

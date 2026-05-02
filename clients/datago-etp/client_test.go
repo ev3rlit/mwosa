@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGetETFPriceInfoBuildsOpenAPIQueryAndParsesTypedResponse(t *testing.T) {
@@ -89,6 +90,44 @@ func TestNewUsesDefaultBaseURL(t *testing.T) {
 	}
 	if client.baseURL != DefaultBaseURL {
 		t.Fatalf("baseURL = %q, want %q", client.baseURL, DefaultBaseURL)
+	}
+}
+
+func TestSecuritiesProductPriceQueryWithInstrumentSearch(t *testing.T) {
+	codeQuery := SecuritiesProductPriceQuery{}.WithInstrumentSearch("069500")
+	if got := codeQuery.values().Get("likeSrtnCd"); got != "069500" {
+		t.Fatalf("likeSrtnCd = %q, want 069500", got)
+	}
+	if got := codeQuery.values().Get("likeItmsNm"); got != "" {
+		t.Fatalf("likeItmsNm = %q, want empty", got)
+	}
+
+	isinQuery := SecuritiesProductPriceQuery{}.WithInstrumentSearch("KR7069500007")
+	if got := isinQuery.values().Get("likeIsinCd"); got != "KR7069500007" {
+		t.Fatalf("likeIsinCd = %q, want KR7069500007", got)
+	}
+
+	nameQuery := SecuritiesProductPriceQuery{}.WithInstrumentSearch("KODEX 200")
+	if got := nameQuery.values().Get("likeItmsNm"); got != "KODEX 200" {
+		t.Fatalf("likeItmsNm = %q, want KODEX 200", got)
+	}
+}
+
+func TestSecuritiesProductPriceQueryWithInstrumentLookup(t *testing.T) {
+	isinQuery := SecuritiesProductPriceQuery{}.WithInstrumentLookup("KR7069500007")
+	if got := isinQuery.values().Get("isinCd"); got != "KR7069500007" {
+		t.Fatalf("isinCd = %q, want KR7069500007", got)
+	}
+	if got := isinQuery.values().Get("likeIsinCd"); got != "" {
+		t.Fatalf("likeIsinCd = %q, want empty", got)
+	}
+
+	nameQuery := SecuritiesProductPriceQuery{}.WithInstrumentLookup("KODEX 200")
+	if got := nameQuery.values().Get("itmsNm"); got != "KODEX 200" {
+		t.Fatalf("itmsNm = %q, want KODEX 200", got)
+	}
+	if got := nameQuery.values().Get("likeItmsNm"); got != "" {
+		t.Fatalf("likeItmsNm = %q, want empty", got)
 	}
 }
 
@@ -351,6 +390,48 @@ func TestGetETFPriceInfoRemoteErrorIncludesProviderContext(t *testing.T) {
 	}
 }
 
+func TestGetETFPriceInfoRetriesTransientStatus(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		if requests == 1 {
+			http.Error(w, "temporary upstream down", http.StatusBadGateway)
+			return
+		}
+		fmt.Fprint(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 100,
+				"pageNo": 1,
+				"totalCount": 1,
+				"items": {"item": {"basDt": "20240415", "srtnCd": "069500", "itmsNm": "KODEX 200"}}
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		ServiceKey:       "test-key",
+		BaseURL:          server.URL,
+		RetryMaxAttempts: 2,
+		RetryInitialWait: time.Millisecond,
+		RetryMaxWait:     time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("new datago client: %v", err)
+	}
+	result, err := client.GetETFPriceInfo(context.Background(), ETFPriceInfoQuery{})
+	if err != nil {
+		t.Fatalf("get ETF price info: %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("requests = %d, want 2", requests)
+	}
+	if len(result.Items) != 1 || result.Items[0].SrtnCd != "069500" {
+		t.Fatalf("items = %+v, want retried KODEX 200 row", result.Items)
+	}
+}
+
 func TestGetETFPriceInfoResultCodeErrorIncludesProviderContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, `{
@@ -380,8 +461,9 @@ func TestGetETFPriceInfoResultCodeErrorIncludesProviderContext(t *testing.T) {
 func newTestClient(t *testing.T, baseURL string) *Client {
 	t.Helper()
 	client, err := New(Config{
-		ServiceKey: "test-key",
-		BaseURL:    baseURL,
+		ServiceKey:       "test-key",
+		BaseURL:          baseURL,
+		RetryMaxAttempts: 1,
 	})
 	if err != nil {
 		t.Fatalf("new datago client: %v", err)

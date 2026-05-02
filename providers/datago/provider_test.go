@@ -20,9 +20,12 @@ func TestFetchDailyBarsDecodesSingleObjectItem(t *testing.T) {
 		if r.URL.Path != "/getETFPriceInfo" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		assertCommonQuery(t, r, "1", "100")
+		assertCommonQuery(t, r, "1", "1000")
 		if got := r.URL.Query().Get("resultType"); got != "json" {
 			t.Fatalf("resultType = %q, want json", got)
+		}
+		if got := r.URL.Query().Get("likeSrtnCd"); got != "069500" {
+			t.Fatalf("likeSrtnCd = %q, want 069500", got)
 		}
 		fmt.Fprint(w, `{
 			"header": {"resultCode": "00", "resultMsg": "OK"},
@@ -83,6 +86,111 @@ func TestFetchDailyBarsDecodesSingleObjectItem(t *testing.T) {
 	}
 	if bar.Extensions["nav"] != "35155.1" {
 		t.Fatalf("nav extension = %q, want 35155.1", bar.Extensions["nav"])
+	}
+}
+
+func TestFetchDailyBarsUsesNameSearch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getETFPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		assertCommonQuery(t, r, "1", "1000")
+		if got := r.URL.Query().Get("itmsNm"); got != "KODEX 200" {
+			t.Fatalf("itmsNm = %q, want KODEX 200", got)
+		}
+		if got := r.URL.Query().Get("likeSrtnCd"); got != "" {
+			t.Fatalf("likeSrtnCd = %q, want empty", got)
+		}
+		fmt.Fprint(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 100,
+				"pageNo": 1,
+				"totalCount": 1,
+				"items": {
+					"item": {
+						"basDt": "20240415",
+						"srtnCd": "069500",
+						"itmsNm": "KODEX 200",
+						"clpr": "35120"
+					}
+				}
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server.URL)
+	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeETF,
+		Symbol:       "KODEX 200",
+		From:         "20240415",
+		To:           "20240415",
+	})
+	if err != nil {
+		t.Fatalf("fetch daily bars: %v", err)
+	}
+	if len(result.Bars) != 1 || result.Bars[0].Symbol != "069500" {
+		t.Fatalf("bars = %+v, want KODEX 200 match", result.Bars)
+	}
+}
+
+func TestFetchDailyBarsCollectsAllPagesWhenLimitOmitted(t *testing.T) {
+	seenPages := make([]string, 0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getETFPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		pageNo := r.URL.Query().Get("pageNo")
+		seenPages = append(seenPages, pageNo)
+		assertCommonQuery(t, r, pageNo, "1000")
+		switch pageNo {
+		case "1":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 1001,
+					"items": {"item": [
+						{"basDt": "20240415", "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120"}
+					]}
+				}
+			}`)
+		case "2":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 2,
+					"totalCount": 1001,
+					"items": {"item": [
+						{"basDt": "20240415", "srtnCd": "069501", "itmsNm": "KODEX Next", "clpr": "1000"}
+					]}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected pageNo: %s", pageNo)
+		}
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server.URL)
+	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeETF,
+		From:         "20240415",
+		To:           "20240415",
+	})
+	if err != nil {
+		t.Fatalf("fetch daily bars: %v", err)
+	}
+	if strings.Join(seenPages, ",") != "1,2" {
+		t.Fatalf("seen pages = %v, want [1 2]", seenPages)
+	}
+	if len(result.Bars) != 2 || result.TotalCount != 1001 {
+		t.Fatalf("result = %+v, want two fetched bars with totalCount 1001", result)
 	}
 }
 
@@ -229,8 +337,9 @@ func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
 func newTestProvider(t *testing.T, baseURL string) *Provider {
 	t.Helper()
 	p, err := New(Config{
-		ServiceKey: "test-key",
-		BaseURL:    baseURL,
+		ServiceKey:       "test-key",
+		BaseURL:          baseURL,
+		RetryMaxAttempts: 1,
 	})
 	if err != nil {
 		t.Fatalf("new datago provider: %v", err)

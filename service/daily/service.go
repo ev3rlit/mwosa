@@ -3,11 +3,18 @@ package daily
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 	"time"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/samber/oops"
+)
+
+const (
+	defaultBackfillWorkers = 1
+	maxBackfillWorkers     = 16
 )
 
 type ReadRepository interface {
@@ -75,6 +82,7 @@ type Request struct {
 	From           string
 	To             string
 	AsOf           string
+	Workers        int
 }
 
 type BarsResult struct {
@@ -90,6 +98,8 @@ type CollectResult struct {
 	BarsFetched  int                   `json:"bars_fetched"`
 	BarsStored   int                   `json:"bars_stored"`
 	RowsAffected int                   `json:"rows_affected"`
+
+	bars []dailybar.Bar
 }
 
 func (s ReadService) Get(ctx context.Context, req Request) (BarsResult, error) {
@@ -140,15 +150,31 @@ func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 		return BarsResult{}, queryErrb.Wrapf(err, "query existing daily bars")
 	}
 	missingDates := datesWithoutSymbol(existing, dates, req.Symbol)
+	collectedBars := make([]dailybar.Bar, 0)
 	for _, date := range missingDates {
-		if _, err := s.collectDate(ctx, req, date); err != nil {
+		result, err := s.collectDate(ctx, req, date)
+		if err != nil {
 			return BarsResult{}, reqErrb.With("market", withDefaultMarket(req.Market), "security_type", req.SecurityType, "date", apiDate(date)).Wrapf(err, "collect missing daily bars")
 		}
+		collectedBars = append(collectedBars, result.bars...)
 	}
 
 	bars, err := s.reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, queryErrb.Wrapf(err, "query stored daily bars")
+	}
+	if len(bars) == 0 {
+		if resolvedSymbol := singleCollectedSymbol(collectedBars); resolvedSymbol != "" && resolvedSymbol != req.Symbol {
+			resolvedQuery := query
+			resolvedQuery.Symbol = resolvedSymbol
+			bars, err = s.reader.QueryDailyBars(ctx, resolvedQuery)
+			if err != nil {
+				return BarsResult{}, queryErrb.With("resolved_symbol", resolvedSymbol).Wrapf(err, "query stored daily bars by resolved symbol")
+			}
+		}
+	}
+	if len(bars) == 0 && len(collectedBars) > 0 {
+		return BarsResult{Bars: collectedBars}, nil
 	}
 	if len(bars) == 0 {
 		return BarsResult{}, notFound(req, query)
@@ -165,13 +191,20 @@ func (s Service) Sync(ctx context.Context, req Request) (CollectResult, error) {
 }
 
 func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, error) {
-	errb := oops.In("daily_service").With("from", req.From, "to", req.To, "as_of", req.AsOf)
+	errb := oops.In("daily_service").With("from", req.From, "to", req.To, "as_of", req.AsOf, "workers", req.Workers)
 	dates, err := resolveDateRange(req.From, req.To, req.AsOf)
 	if err != nil {
 		return CollectResult{}, errb.Wrap(err)
 	}
 	if len(dates) == 0 {
 		return CollectResult{}, errb.New("backfill daily requires --from/--to")
+	}
+	workers, err := normalizeBackfillWorkers(req.Workers)
+	if err != nil {
+		return CollectResult{}, errb.Wrap(err)
+	}
+	if workers > 1 && len(dates) > 1 {
+		return s.backfillWithWorkers(ctx, req, dates, workers)
 	}
 
 	result := CollectResult{
@@ -184,26 +217,111 @@ func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, erro
 		if err != nil {
 			return CollectResult{}, errb.With("market", withDefaultMarket(req.Market), "security_type", req.SecurityType, "date", apiDate(date)).Wrapf(err, "backfill daily date")
 		}
-		result.ProviderID = partial.ProviderID
-		result.Group = partial.Group
-		result.Dates = append(result.Dates, partial.Dates...)
-		result.BarsFetched += partial.BarsFetched
-		result.BarsStored += partial.BarsStored
-		result.RowsAffected += partial.RowsAffected
+		mergeCollectResult(&result, partial)
 	}
 	return result, nil
 }
 
 func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (CollectResult, error) {
+	result, err := s.fetchDate(ctx, req, date)
+	if err != nil {
+		return CollectResult{}, err
+	}
+	return s.storeCollection(ctx, result)
+}
+
+type dateJob struct {
+	index int
+	date  time.Time
+}
+
+type dateFetchResult struct {
+	index  int
+	result CollectResult
+	err    error
+}
+
+func (s Service) backfillWithWorkers(ctx context.Context, req Request, dates []time.Time, workers int) (CollectResult, error) {
+	errb := oops.In("daily_service").With("from", req.From, "to", req.To, "workers", workers)
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	jobs := make(chan dateJob)
+	results := make(chan dateFetchResult)
+	var wg sync.WaitGroup
+	for workerID := 0; workerID < workers; workerID++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				result, err := s.fetchDate(workerCtx, req, job.date)
+				select {
+				case results <- dateFetchResult{index: job.index, result: result, err: err}:
+				case <-workerCtx.Done():
+					return
+				}
+				if err != nil {
+					return
+				}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for index, date := range dates {
+			select {
+			case jobs <- dateJob{index: index, date: date}:
+			case <-workerCtx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	result := CollectResult{
+		Market:       withDefaultMarket(req.Market),
+		SecurityType: req.SecurityType,
+		Dates:        make([]string, 0, len(dates)),
+	}
+	var firstErr error
+	for fetched := range results {
+		if fetched.err != nil {
+			if firstErr == nil {
+				firstErr = errb.With("date", apiDate(dates[fetched.index])).Wrapf(fetched.err, "backfill daily worker fetch")
+				cancel()
+			}
+			continue
+		}
+		if firstErr != nil {
+			continue
+		}
+		partial, err := s.storeCollection(ctx, fetched.result)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = errb.With("date", fetched.result.Dates).Wrapf(err, "backfill daily worker store")
+				cancel()
+			}
+			continue
+		}
+		mergeCollectResult(&result, partial)
+	}
+	if firstErr != nil {
+		return CollectResult{}, firstErr
+	}
+	sort.Strings(result.Dates)
+	return result, nil
+}
+
+func (s Service) fetchDate(ctx context.Context, req Request, date time.Time) (CollectResult, error) {
 	market := withDefaultMarket(req.Market)
 	dateText := apiDate(date)
 	errb := oops.In("daily_service").With("market", market, "security_type", req.SecurityType, "date", dateText)
 
 	if s.router == nil {
 		return CollectResult{}, errb.New("daily service router is nil")
-	}
-	if s.writer == nil {
-		return CollectResult{}, errb.New("daily service write repository is nil")
 	}
 	if req.SecurityType == "" {
 		return CollectResult{}, errb.New("daily collection requires --security-type")
@@ -223,15 +341,12 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 	result, err := fetcher.FetchDailyBars(ctx, dailybar.FetchInput{
 		Market:       market,
 		SecurityType: req.SecurityType,
+		Symbol:       req.Symbol,
 		From:         dateText,
 		To:           dateText,
 	})
 	if err != nil {
 		return CollectResult{}, errb.With("provider", req.ProviderID).Wrapf(err, "fetch daily bars")
-	}
-	writeResult, err := s.writer.UpsertDailyBars(ctx, result.Bars)
-	if err != nil {
-		return CollectResult{}, errb.With("provider", result.Provider.ID, "group", result.Group, "bars", len(result.Bars)).Wrapf(err, "store daily bars")
 	}
 
 	return CollectResult{
@@ -241,9 +356,44 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 		Group:        result.Group,
 		Dates:        []string{isoDate(date)},
 		BarsFetched:  len(result.Bars),
-		BarsStored:   writeResult.BarsWritten,
-		RowsAffected: writeResult.RowsAffected,
+		bars:         result.Bars,
 	}, nil
+}
+
+func (s Service) storeCollection(ctx context.Context, result CollectResult) (CollectResult, error) {
+	errb := oops.In("daily_service").With("provider", result.ProviderID, "group", result.Group, "bars", len(result.bars))
+	if s.writer == nil {
+		return CollectResult{}, errb.New("daily service write repository is nil")
+	}
+	writeResult, err := s.writer.UpsertDailyBars(ctx, result.bars)
+	if err != nil {
+		return CollectResult{}, errb.Wrapf(err, "store daily bars")
+	}
+	result.BarsStored = writeResult.BarsWritten
+	result.RowsAffected = writeResult.RowsAffected
+	return result, nil
+}
+
+func normalizeBackfillWorkers(workers int) (int, error) {
+	if workers == 0 {
+		return defaultBackfillWorkers, nil
+	}
+	if workers < 0 {
+		return 0, oops.In("daily_service").With("workers", workers).Errorf("workers must be positive: %d", workers)
+	}
+	if workers > maxBackfillWorkers {
+		return 0, oops.In("daily_service").With("workers", workers, "max_workers", maxBackfillWorkers).Errorf("workers must be <= %d: %d", maxBackfillWorkers, workers)
+	}
+	return workers, nil
+}
+
+func mergeCollectResult(result *CollectResult, partial CollectResult) {
+	result.ProviderID = partial.ProviderID
+	result.Group = partial.Group
+	result.Dates = append(result.Dates, partial.Dates...)
+	result.BarsFetched += partial.BarsFetched
+	result.BarsStored += partial.BarsStored
+	result.RowsAffected += partial.RowsAffected
 }
 
 func queryFromRequest(req Request, dates []time.Time) Query {
@@ -280,6 +430,23 @@ func datesWithoutSymbol(existing []dailybar.Bar, dates []time.Time, symbol strin
 		}
 	}
 	return missing
+}
+
+func singleCollectedSymbol(bars []dailybar.Bar) string {
+	symbol := ""
+	for _, bar := range bars {
+		if bar.Symbol == "" {
+			continue
+		}
+		if symbol == "" {
+			symbol = bar.Symbol
+			continue
+		}
+		if bar.Symbol != symbol {
+			return ""
+		}
+	}
+	return symbol
 }
 
 func notFound(req Request, query Query) error {

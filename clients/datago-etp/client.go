@@ -10,14 +10,18 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/samber/oops"
 )
 
 type Client struct {
-	serviceKey string
-	baseURL    string
-	httpClient *http.Client
+	serviceKey       string
+	baseURL          string
+	httpClient       *http.Client
+	retryMaxAttempts int
+	retryInitialWait time.Duration
+	retryMaxWait     time.Duration
 }
 
 func New(config Config) (*Client, error) {
@@ -34,9 +38,12 @@ func New(config Config) (*Client, error) {
 		return nil, errb.With("base_url", config.BaseURL).Wrapf(err, "datago client config: invalid baseURL")
 	}
 	return &Client{
-		serviceKey: config.ServiceKey,
-		baseURL:    strings.TrimRight(config.BaseURL, "/"),
-		httpClient: config.HTTPClient,
+		serviceKey:       config.ServiceKey,
+		baseURL:          strings.TrimRight(config.BaseURL, "/"),
+		httpClient:       config.HTTPClient,
+		retryMaxAttempts: config.RetryMaxAttempts,
+		retryInitialWait: config.RetryInitialWait,
+		retryMaxWait:     config.RetryMaxWait,
 	}, nil
 }
 
@@ -221,10 +228,39 @@ func fetchPage[T any](c *Client, ctx context.Context, operation string, params u
 		"page", pageNo,
 	)
 
+	maxAttempts := c.retryMaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = 1
+	}
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		decoded, retryable, err := fetchPageOnce[T](c, ctx, operation, params, pageNo, numOfRows)
+		if err == nil {
+			return decoded, nil
+		}
+		lastErr = err
+		if !retryable || attempt == maxAttempts {
+			return apiResponse[T]{}, err
+		}
+		if err := sleepBeforeRetry(ctx, retryDelay(c, attempt)); err != nil {
+			return apiResponse[T]{}, errb.With("attempt", attempt).Wrap(oops.Join(lastErr, err))
+		}
+	}
+	return apiResponse[T]{}, errb.Wrap(lastErr)
+}
+
+func fetchPageOnce[T any](c *Client, ctx context.Context, operation string, params url.Values, pageNo int, numOfRows int) (apiResponse[T], bool, error) {
+	errb := oops.In("datago_client").With(
+		"provider", ProviderDataGo,
+		"group", GroupSecuritiesProductPrice,
+		"operation", operation,
+		"page", pageNo,
+	)
+
 	endpoint := fmt.Sprintf("%s/%s", c.baseURL, operation)
 	reqURL, err := url.Parse(endpoint)
 	if err != nil {
-		return apiResponse[T]{}, errb.Wrapf(err, "datago request build failed")
+		return apiResponse[T]{}, false, errb.Wrapf(err, "datago request build failed")
 	}
 
 	values := cloneValues(params)
@@ -237,32 +273,82 @@ func fetchPage[T any](c *Client, ctx context.Context, operation string, params u
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return apiResponse[T]{}, errb.Wrapf(err, "datago request build failed")
+		return apiResponse[T]{}, false, errb.Wrapf(err, "datago request build failed")
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return apiResponse[T]{}, errb.Wrapf(err, "datago remote request failed")
+		return apiResponse[T]{}, shouldRetryRequestError(ctx), errb.Wrapf(err, "datago remote request failed")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return apiResponse[T]{}, errb.With("status", resp.StatusCode).Wrapf(err, "datago remote response read failed")
+		return apiResponse[T]{}, true, errb.With("status", resp.StatusCode).Wrapf(err, "datago remote response read failed")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyText := strings.TrimSpace(string(body))
-		return apiResponse[T]{}, errb.With("status", resp.StatusCode, "body", bodyText).Errorf("datago remote error provider=%s group=%s operation=%s page=%d status=%d body=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, bodyText)
+		bodyText := trimForError(body)
+		return apiResponse[T]{}, shouldRetryStatus(resp.StatusCode), errb.With("status", resp.StatusCode, "body", bodyText).Errorf("datago remote error provider=%s group=%s operation=%s page=%d status=%d body=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, resp.StatusCode, bodyText)
 	}
 
 	decoded, err := decodeAPIResponse[T](body)
 	if err != nil {
-		return apiResponse[T]{}, errb.Wrapf(err, "datago response decode failed")
+		return apiResponse[T]{}, false, errb.Wrapf(err, "datago response decode failed")
 	}
 	if decoded.Header.ResultCode != "" && decoded.Header.ResultCode != "00" {
-		return apiResponse[T]{}, errb.With("result_code", decoded.Header.ResultCode, "result_msg", decoded.Header.ResultMsg).Errorf("datago remote error provider=%s group=%s operation=%s page=%d result_code=%s result_msg=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, decoded.Header.ResultCode, decoded.Header.ResultMsg)
+		return apiResponse[T]{}, false, errb.With("result_code", decoded.Header.ResultCode, "result_msg", decoded.Header.ResultMsg).Errorf("datago remote error provider=%s group=%s operation=%s page=%d result_code=%s result_msg=%s", ProviderDataGo, GroupSecuritiesProductPrice, operation, pageNo, decoded.Header.ResultCode, decoded.Header.ResultMsg)
 	}
-	return decoded, nil
+	return decoded, false, nil
+}
+
+func shouldRetryRequestError(ctx context.Context) bool {
+	return ctx.Err() == nil
+}
+
+func shouldRetryStatus(statusCode int) bool {
+	switch statusCode {
+	case http.StatusRequestTimeout, http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+func retryDelay(c *Client, attempt int) time.Duration {
+	delay := c.retryInitialWait
+	for i := 1; i < attempt; i++ {
+		delay *= 2
+		if delay >= c.retryMaxWait {
+			return c.retryMaxWait
+		}
+	}
+	if delay > c.retryMaxWait {
+		return c.retryMaxWait
+	}
+	return delay
+}
+
+func sleepBeforeRetry(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func trimForError(body []byte) string {
+	bodyText := strings.TrimSpace(string(body))
+	const limit = 1000
+	if len(bodyText) <= limit {
+		return bodyText
+	}
+	return bodyText[:limit] + "...(truncated)"
 }
 
 func pageCount(totalCount int, numOfRows int) int {

@@ -1,6 +1,9 @@
 package etp
 
-import "net/url"
+import (
+	"net/url"
+	"strings"
+)
 
 type SecuritiesProductPriceQuery struct {
 	NumOfRows       int
@@ -75,6 +78,36 @@ func (q SecuritiesProductPriceQuery) values() url.Values {
 	return values
 }
 
+func (q SecuritiesProductPriceQuery) WithInstrumentSearch(search string) SecuritiesProductPriceQuery {
+	return q.withInstrumentFilter(search, true)
+}
+
+func (q SecuritiesProductPriceQuery) WithInstrumentLookup(search string) SecuritiesProductPriceQuery {
+	return q.withInstrumentFilter(search, false)
+}
+
+func (q SecuritiesProductPriceQuery) withInstrumentFilter(search string, fuzzy bool) SecuritiesProductPriceQuery {
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return q
+	}
+	switch {
+	case looksLikeISIN(search):
+		if fuzzy {
+			q.LikeIsinCd = search
+		} else {
+			q.IsinCd = search
+		}
+	case looksLikeShortCode(search):
+		q.LikeSrtnCd = search
+	case fuzzy:
+		q.LikeItmsNm = search
+	default:
+		q.ItmsNm = search
+	}
+	return q
+}
+
 func (q ETFPriceInfoQuery) values() url.Values {
 	values := q.SecuritiesProductPriceQuery.values()
 	setIfNotEmpty(values, "beginFltRt", q.BeginFltRt)
@@ -140,4 +173,43 @@ func (q SecuritiesProductPriceQuery) forMetadataProbe() (SecuritiesProductPriceQ
 	q.PageNo = 1
 	q.NumOfRows = 1
 	return q, pageSize
+}
+
+func looksLikeShortCode(search string) bool {
+	if len(search) != 6 {
+		return false
+	}
+	for _, r := range search {
+		if !isASCIIAlnum(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func looksLikeISIN(search string) bool {
+	if len(search) != 12 {
+		return false
+	}
+	for index, r := range search {
+		switch {
+		case index < 2:
+			if !isASCIIAlpha(r) {
+				return false
+			}
+		default:
+			if !isASCIIAlnum(r) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isASCIIAlpha(r rune) bool {
+	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
+}
+
+func isASCIIAlnum(r rune) bool {
+	return isASCIIAlpha(r) || (r >= '0' && r <= '9')
 }

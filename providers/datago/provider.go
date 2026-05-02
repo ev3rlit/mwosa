@@ -3,7 +3,6 @@ package datago
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	datagoetp "github.com/ev3rlit/mwosa/clients/datago-etp"
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -17,8 +16,11 @@ type Config = datagoetp.Config
 
 type priceClient interface {
 	GetETFPriceInfo(context.Context, datagoetp.ETFPriceInfoQuery) (datagoetp.ETFPriceInfoResult, error)
+	GetAllETFPriceInfo(context.Context, datagoetp.ETFPriceInfoQuery) (datagoetp.ETFPriceInfoResult, error)
 	GetETNPriceInfo(context.Context, datagoetp.ETNPriceInfoQuery) (datagoetp.ETNPriceInfoResult, error)
+	GetAllETNPriceInfo(context.Context, datagoetp.ETNPriceInfoQuery) (datagoetp.ETNPriceInfoResult, error)
 	GetELWPriceInfo(context.Context, datagoetp.ELWPriceInfoQuery) (datagoetp.ELWPriceInfoResult, error)
+	GetAllELWPriceInfo(context.Context, datagoetp.ELWPriceInfoQuery) (datagoetp.ELWPriceInfoResult, error)
 }
 
 type Provider struct {
@@ -121,11 +123,9 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 	}
 
 	query := datagoetp.SecuritiesProductPriceQuery{
-		NumOfRows: numOfRowsForLimit(input.Limit),
+		NumOfRows: numOfRowsForDailyFetch(input.Limit),
 	}
-	if input.Symbol != "" {
-		query.LikeSrtnCd = input.Symbol
-	}
+	query = query.WithInstrumentLookup(input.Symbol)
 	if input.From != "" && input.From == input.To {
 		query.BasDt = input.From
 	} else {
@@ -137,7 +137,8 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 		}
 	}
 
-	result, err := p.fetchPriceRecords(ctx, operationSpec{SecurityType: input.SecurityType, Operation: operation}, query)
+	fetchAllPages := input.Limit <= 0
+	result, err := p.fetchPriceRecords(ctx, operationSpec{SecurityType: input.SecurityType, Operation: operation}, query, fetchAllPages)
 	if err != nil {
 		return dailybar.FetchResult{}, providerErrb.With("operation", operation, "market", input.Market, "security_type", input.SecurityType, "symbol", input.Symbol).Wrapf(err, "fetch datago daily bars")
 	}
@@ -174,15 +175,11 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 	totalCount := 0
 	for _, spec := range operations {
 		query := datagoetp.SecuritiesProductPriceQuery{
-			NumOfRows: numOfRowsForLimit(input.Limit),
+			NumOfRows: numOfRowsForSearch(input.Limit),
 		}
-		if looksLikeSecurityCode(input.Query) {
-			query.LikeSrtnCd = input.Query
-		} else if input.Query != "" {
-			query.LikeItmsNm = input.Query
-		}
+		query = query.WithInstrumentSearch(input.Query)
 
-		result, err := p.fetchPriceRecords(ctx, spec, query)
+		result, err := p.fetchPriceRecords(ctx, spec, query, false)
 		if err != nil {
 			return instrument.SearchResult{}, providerErrb.With("operation", spec.Operation, "market", input.Market, "security_type", spec.SecurityType, "query", input.Query).Wrapf(err, "fetch datago instruments")
 		}
@@ -286,13 +283,14 @@ func validateMarket(capability provider.Role, market provider.Market, symbol str
 	})
 }
 
-var securityCodePattern = regexp.MustCompile(`^[0-9A-Za-z]{3,12}$`)
-
-func looksLikeSecurityCode(query string) bool {
-	return securityCodePattern.MatchString(query)
+func numOfRowsForDailyFetch(limit int) int {
+	if limit > 0 && limit < datagoetp.DefaultAllNumOfRows {
+		return limit
+	}
+	return datagoetp.DefaultAllNumOfRows
 }
 
-func numOfRowsForLimit(limit int) int {
+func numOfRowsForSearch(limit int) int {
 	if limit > 0 && limit < datagoetp.DefaultNumOfRows {
 		return limit
 	}
@@ -307,7 +305,7 @@ func operationIDs(specs []operationSpec) []provider.OperationID {
 	return operations
 }
 
-func (p *Provider) fetchPriceRecords(ctx context.Context, spec operationSpec, query datagoetp.SecuritiesProductPriceQuery) (priceRecordsResult, error) {
+func (p *Provider) fetchPriceRecords(ctx context.Context, spec operationSpec, query datagoetp.SecuritiesProductPriceQuery, allPages bool) (priceRecordsResult, error) {
 	errb := oops.In("datago_adapter").With(
 		"provider", provider.ProviderDataGo,
 		"group", provider.GroupSecuritiesProductPrice,
@@ -317,25 +315,46 @@ func (p *Provider) fetchPriceRecords(ctx context.Context, spec operationSpec, qu
 
 	switch spec.Operation {
 	case provider.OperationGetETFPriceInfo:
-		result, err := p.client.GetETFPriceInfo(ctx, datagoetp.ETFPriceInfoQuery{
+		query := datagoetp.ETFPriceInfoQuery{
 			SecuritiesProductPriceQuery: query,
-		})
+		}
+		var result datagoetp.ETFPriceInfoResult
+		var err error
+		if allPages {
+			result, err = p.client.GetAllETFPriceInfo(ctx, query)
+		} else {
+			result, err = p.client.GetETFPriceInfo(ctx, query)
+		}
 		if err != nil {
 			return priceRecordsResult{}, errb.Wrap(err)
 		}
 		return priceRecordsResult{Records: recordsFromETF(result.Items), TotalCount: result.TotalCount}, nil
 	case provider.OperationGetETNPriceInfo:
-		result, err := p.client.GetETNPriceInfo(ctx, datagoetp.ETNPriceInfoQuery{
+		query := datagoetp.ETNPriceInfoQuery{
 			SecuritiesProductPriceQuery: query,
-		})
+		}
+		var result datagoetp.ETNPriceInfoResult
+		var err error
+		if allPages {
+			result, err = p.client.GetAllETNPriceInfo(ctx, query)
+		} else {
+			result, err = p.client.GetETNPriceInfo(ctx, query)
+		}
 		if err != nil {
 			return priceRecordsResult{}, errb.Wrap(err)
 		}
 		return priceRecordsResult{Records: recordsFromETN(result.Items), TotalCount: result.TotalCount}, nil
 	case provider.OperationGetELWPriceInfo:
-		result, err := p.client.GetELWPriceInfo(ctx, datagoetp.ELWPriceInfoQuery{
+		query := datagoetp.ELWPriceInfoQuery{
 			SecuritiesProductPriceQuery: query,
-		})
+		}
+		var result datagoetp.ELWPriceInfoResult
+		var err error
+		if allPages {
+			result, err = p.client.GetAllELWPriceInfo(ctx, query)
+		} else {
+			result, err = p.client.GetELWPriceInfo(ctx, query)
+		}
 		if err != nil {
 			return priceRecordsResult{}, errb.Wrap(err)
 		}

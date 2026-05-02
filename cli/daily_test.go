@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -20,8 +21,8 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 		if r.URL.Path != "/getETFPriceInfo" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if got := r.URL.Query().Get("likeSrtnCd"); got != "" {
-			t.Fatalf("ensure should collect the date batch, got likeSrtnCd=%q", got)
+		if got := r.URL.Query().Get("likeSrtnCd"); got != "069500" {
+			t.Fatalf("likeSrtnCd = %q, want 069500", got)
 		}
 		if got := r.URL.Query().Get("basDt"); got != "20240415" {
 			t.Fatalf("basDt = %q, want 20240415", got)
@@ -77,6 +78,113 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 	}
 	if !strings.Contains(getOut.String(), `"closing_price": "35120"`) {
 		t.Fatalf("get output should include stored close:\n%s", getOut.String())
+	}
+}
+
+func TestEnsureDailyCanSearchByInstrumentName(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getETFPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("itmsNm"); got != "KODEX 200" {
+			t.Fatalf("itmsNm = %q, want KODEX 200", got)
+		}
+		fmt.Fprint(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 100,
+				"pageNo": 1,
+				"totalCount": 1,
+				"items": {"item": [
+					{"basDt": "20240415", "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120", "trqu": "10"}
+				]}
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	databasePath := filepath.Join(t.TempDir(), "mwosa.db")
+	setDataGoEnv(t, server.URL)
+
+	var ensureOut bytes.Buffer
+	ensureCmd := NewRootCommand(BuildInfo{})
+	ensureCmd.SetOut(&ensureOut)
+	ensureCmd.SetErr(&ensureOut)
+	if err := executeForTest(context.Background(), ensureCmd,
+		"--database", databasePath,
+		"--output", "json",
+		"ensure", "daily", "KODEX 200",
+		"--as-of", "20240415",
+	); err != nil {
+		t.Fatalf("ensure daily: %v\n%s", err, ensureOut.String())
+	}
+	if !strings.Contains(ensureOut.String(), `"symbol": "069500"`) {
+		t.Fatalf("ensure output should include matched symbol:\n%s", ensureOut.String())
+	}
+}
+
+func TestSyncDailyCollectsAllPages(t *testing.T) {
+	seenPages := make([]string, 0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getETFPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		pageNo := r.URL.Query().Get("pageNo")
+		seenPages = append(seenPages, pageNo)
+		if got := r.URL.Query().Get("numOfRows"); got != "1000" {
+			t.Fatalf("numOfRows = %q, want 1000", got)
+		}
+		switch pageNo {
+		case "1":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 1001,
+					"items": {"item": [
+						{"basDt": "20240415", "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120", "trqu": "10"}
+					]}
+				}
+			}`)
+		case "2":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 2,
+					"totalCount": 1001,
+					"items": {"item": [
+						{"basDt": "20240415", "srtnCd": "069501", "itmsNm": "KODEX Next", "clpr": "1000", "trqu": "20"}
+					]}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected pageNo: %s", pageNo)
+		}
+	}))
+	defer server.Close()
+
+	databasePath := filepath.Join(t.TempDir(), "mwosa.db")
+	setDataGoEnv(t, server.URL)
+
+	var out bytes.Buffer
+	cmd := NewRootCommand(BuildInfo{})
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	if err := executeForTest(context.Background(), cmd,
+		"--database", databasePath,
+		"--output", "json",
+		"sync", "daily",
+		"--as-of", "20240415",
+	); err != nil {
+		t.Fatalf("sync daily: %v\n%s", err, out.String())
+	}
+	if strings.Join(seenPages, ",") != "1,2" {
+		t.Fatalf("seen pages = %v, want [1 2]", seenPages)
+	}
+	if !strings.Contains(out.String(), `"bars_fetched": 2`) {
+		t.Fatalf("sync output should summarize fetched bars:\n%s", out.String())
 	}
 }
 
@@ -140,6 +248,56 @@ func TestBackfillDailyCollectsEachDate(t *testing.T) {
 	}
 	if strings.Join(seenDates, ",") != "20240415,20240416" {
 		t.Fatalf("seen dates = %v, want 20240415 and 20240416", seenDates)
+	}
+	if !strings.Contains(out.String(), `"bars_fetched": 2`) {
+		t.Fatalf("backfill output should summarize fetched bars:\n%s", out.String())
+	}
+}
+
+func TestBackfillDailyAcceptsWorkers(t *testing.T) {
+	seenDates := make(map[string]bool)
+	var seenMu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getETFPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		basDt := r.URL.Query().Get("basDt")
+		seenMu.Lock()
+		seenDates[basDt] = true
+		seenMu.Unlock()
+		fmt.Fprintf(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 1000,
+				"pageNo": 1,
+				"totalCount": 1,
+				"items": {"item": {"basDt": %q, "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120"}}
+			}
+		}`, basDt)
+	}))
+	defer server.Close()
+
+	databasePath := filepath.Join(t.TempDir(), "mwosa.db")
+	setDataGoEnv(t, server.URL)
+
+	var out bytes.Buffer
+	cmd := NewRootCommand(BuildInfo{})
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	if err := executeForTest(context.Background(), cmd,
+		"--database", databasePath,
+		"--output", "json",
+		"backfill", "daily",
+		"--from", "20240415",
+		"--to", "20240416",
+		"--workers", "2",
+	); err != nil {
+		t.Fatalf("backfill daily: %v\n%s", err, out.String())
+	}
+	seenMu.Lock()
+	defer seenMu.Unlock()
+	if !seenDates["20240415"] || !seenDates["20240416"] {
+		t.Fatalf("seen dates = %v, want both backfill dates", seenDates)
 	}
 	if !strings.Contains(out.String(), `"bars_fetched": 2`) {
 		t.Fatalf("backfill output should summarize fetched bars:\n%s", out.String())
