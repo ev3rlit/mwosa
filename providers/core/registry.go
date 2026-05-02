@@ -2,6 +2,7 @@ package core
 
 import (
 	"reflect"
+	"sort"
 
 	"github.com/samber/oops"
 )
@@ -184,6 +185,26 @@ func (r *Registry) Entries(role Role) []RoleEntry {
 		}
 	}
 	return entries
+}
+
+func (r *Registry) Roles() []Role {
+	seen := make(map[Role]struct{})
+	roles := make([]Role, 0)
+	for _, entry := range r.entries {
+		role := entry.Profile.Role
+		if role == "" {
+			continue
+		}
+		if _, ok := seen[role]; ok {
+			continue
+		}
+		seen[role] = struct{}{}
+		roles = append(roles, role)
+	}
+	sort.Slice(roles, func(i, j int) bool {
+		return roles[i] < roles[j]
+	})
+	return roles
 }
 
 func isNilReflectValue(value reflect.Value) bool {

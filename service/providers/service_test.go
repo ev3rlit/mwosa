@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"testing"
 
@@ -97,6 +98,34 @@ func TestListFiltersRole(t *testing.T) {
 	}
 }
 
+func TestListUsesRegistryRolesByDefault(t *testing.T) {
+	roleMacro := provider.Role("macro")
+	registry := fakeRegistry{
+		roleMacro: []provider.RoleEntry{
+			{
+				Provider: provider.Identity{ID: provider.ProviderID("macro-provider")},
+				Profile:  provider.RoleProfile{Role: roleMacro},
+			},
+		},
+	}
+	service, err := NewService(registry)
+	if err != nil {
+		t.Fatalf("NewService error = %v", err)
+	}
+
+	result, err := service.List(context.Background(), ListRequest{})
+	if err != nil {
+		t.Fatalf("List error = %v", err)
+	}
+
+	if len(result.Providers) != 1 || result.Providers[0].Provider.ID != provider.ProviderID("macro-provider") {
+		t.Fatalf("providers = %+v, want macro-provider", result.Providers)
+	}
+	if len(result.Providers[0].Roles) != 1 || result.Providers[0].Roles[0].Role != roleMacro {
+		t.Fatalf("roles = %+v, want macro role", result.Providers[0].Roles)
+	}
+}
+
 func TestInspectReportsMissingProvider(t *testing.T) {
 	service, err := NewService(fakeRegistry{})
 	if err != nil {
@@ -113,4 +142,15 @@ type fakeRegistry map[provider.Role][]provider.RoleEntry
 
 func (r fakeRegistry) Entries(role provider.Role) []provider.RoleEntry {
 	return append([]provider.RoleEntry(nil), r[role]...)
+}
+
+func (r fakeRegistry) Roles() []provider.Role {
+	roles := make([]provider.Role, 0, len(r))
+	for role := range r {
+		roles = append(roles, role)
+	}
+	sort.Slice(roles, func(i, j int) bool {
+		return roles[i] < roles[j]
+	})
+	return roles
 }

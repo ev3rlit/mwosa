@@ -80,13 +80,14 @@ func TestSearchRequiresQuery(t *testing.T) {
 	}
 }
 
-func TestInspectReturnsFirstMatchedInstrument(t *testing.T) {
+func TestInspectReturnsExactMatchedInstrument(t *testing.T) {
 	searcher := instrumentrole.NewSearch(instrumentrole.Profile{}, func(_ context.Context, input instrumentrole.SearchInput) (instrumentrole.SearchResult, error) {
-		if input.Limit != 1 {
-			t.Fatalf("inspect search limit = %d, want 1", input.Limit)
+		if input.Limit != inspectSearchLimit {
+			t.Fatalf("inspect search limit = %d, want %d", input.Limit, inspectSearchLimit)
 		}
 		return instrumentrole.SearchResult{
 			Instruments: []instrumentrole.Instrument{
+				{SecurityCode: "069501", Name: "KODEX 200 Similar"},
 				{SecurityCode: "069500", Name: "KODEX 200"},
 			},
 			Provider:   provider.Identity{ID: provider.ProviderID("fake")},
@@ -105,6 +106,51 @@ func TestInspectReturnsFirstMatchedInstrument(t *testing.T) {
 	}
 	if result.Instrument.SecurityCode != "069500" || result.Provider.ID != provider.ProviderID("fake") {
 		t.Fatalf("inspect result = %+v", result)
+	}
+}
+
+func TestInspectMatchesISIN(t *testing.T) {
+	searcher := instrumentrole.NewSearch(instrumentrole.Profile{}, func(_ context.Context, input instrumentrole.SearchInput) (instrumentrole.SearchResult, error) {
+		return instrumentrole.SearchResult{
+			Instruments: []instrumentrole.Instrument{
+				{SecurityCode: "069500", ISIN: "KR7069500007", Name: "KODEX 200"},
+			},
+			Provider: provider.Identity{ID: provider.ProviderID("fake")},
+		}, nil
+	})
+	service, err := NewService(&fakeInstrumentRouter{searcher: searcher})
+	if err != nil {
+		t.Fatalf("NewService error = %v", err)
+	}
+
+	result, err := service.Inspect(context.Background(), InspectRequest{Symbol: "kr7069500007"})
+	if err != nil {
+		t.Fatalf("Inspect error = %v", err)
+	}
+	if result.Instrument.ISIN != "KR7069500007" {
+		t.Fatalf("inspect result = %+v, want ISIN match", result)
+	}
+}
+
+func TestInspectReportsNotFoundForOnlyFuzzyResults(t *testing.T) {
+	searcher := instrumentrole.NewSearch(instrumentrole.Profile{}, func(context.Context, instrumentrole.SearchInput) (instrumentrole.SearchResult, error) {
+		return instrumentrole.SearchResult{
+			Instruments: []instrumentrole.Instrument{
+				{SecurityCode: "069501", Name: "KODEX 200 Similar"},
+			},
+		}, nil
+	})
+	service, err := NewService(&fakeInstrumentRouter{searcher: searcher})
+	if err != nil {
+		t.Fatalf("NewService error = %v", err)
+	}
+
+	_, err = service.Inspect(context.Background(), InspectRequest{Symbol: "069500"})
+	if err == nil {
+		t.Fatal("Inspect error = nil, want not found")
+	}
+	if !strings.Contains(err.Error(), "instrument not found") {
+		t.Fatalf("error = %q, want not found context", err.Error())
 	}
 }
 

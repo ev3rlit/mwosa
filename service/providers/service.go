@@ -10,6 +10,7 @@ import (
 
 type Registry interface {
 	Entries(role provider.Role) []provider.RoleEntry
+	Roles() []provider.Role
 }
 
 type Service struct {
@@ -20,13 +21,6 @@ type Service struct {
 func NewService(registry Registry, roles ...provider.Role) (Service, error) {
 	if registry == nil {
 		return Service{}, oops.In("providers_service").New("providers service registry is nil")
-	}
-	if len(roles) == 0 {
-		roles = []provider.Role{
-			provider.RoleDailyBar,
-			provider.RoleInstrument,
-			provider.RoleQuote,
-		}
 	}
 	return Service{
 		registry: registry,
@@ -79,10 +73,7 @@ func (s Service) List(ctx context.Context, req ListRequest) (ListResult, error) 
 
 	byProvider := make(map[provider.ProviderID]int)
 	summaries := make([]ProviderSummary, 0)
-	for _, role := range s.roles {
-		if req.Role != "" && role != req.Role {
-			continue
-		}
+	for _, role := range s.rolesForRequest(req) {
 		for _, entry := range s.registry.Entries(role) {
 			if !matchesListRequest(req, entry) {
 				continue
@@ -122,6 +113,16 @@ func (s Service) Inspect(ctx context.Context, req InspectRequest) (ProviderSumma
 		return ProviderSummary{}, errb.Wrapf(provider.ErrNoProvider, "provider=%s", req.ProviderID)
 	}
 	return result.Providers[0], nil
+}
+
+func (s Service) rolesForRequest(req ListRequest) []provider.Role {
+	if req.Role != "" {
+		return []provider.Role{req.Role}
+	}
+	if len(s.roles) > 0 {
+		return append([]provider.Role(nil), s.roles...)
+	}
+	return s.registry.Roles()
 }
 
 func matchesListRequest(req ListRequest, entry provider.RoleEntry) bool {

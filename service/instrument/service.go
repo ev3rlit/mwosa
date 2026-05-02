@@ -18,6 +18,8 @@ type Service struct {
 	router Router
 }
 
+const inspectSearchLimit = 25
+
 func NewService(router Router) (Service, error) {
 	if router == nil {
 		return Service{}, oops.In("instrument_service").New("instrument service router is nil")
@@ -102,8 +104,9 @@ func (s Service) Search(ctx context.Context, req SearchRequest) (instrumentrole.
 }
 
 func (s Service) Inspect(ctx context.Context, req InspectRequest) (InspectResult, error) {
-	errb := oops.In("instrument_service").With("provider", req.ProviderID, "prefer_provider", req.PreferProvider, "market", req.Market, "security_type", req.SecurityType, "symbol", req.Symbol)
-	if req.Symbol == "" {
+	symbol := strings.TrimSpace(req.Symbol)
+	errb := oops.In("instrument_service").With("provider", req.ProviderID, "prefer_provider", req.PreferProvider, "market", req.Market, "security_type", req.SecurityType, "symbol", symbol)
+	if symbol == "" {
 		return InspectResult{}, errb.New("inspect instrument requires symbol")
 	}
 
@@ -112,23 +115,41 @@ func (s Service) Inspect(ctx context.Context, req InspectRequest) (InspectResult
 		PreferProvider: req.PreferProvider,
 		Market:         req.Market,
 		SecurityType:   req.SecurityType,
-		Query:          req.Symbol,
-		Limit:          1,
+		Query:          symbol,
+		Limit:          inspectSearchLimit,
 	})
 	if err != nil {
 		return InspectResult{}, errb.Wrap(err)
 	}
-	if len(result.Instruments) == 0 {
-		return InspectResult{}, errb.Wrap(&NotFoundError{
-			Query:        req.Symbol,
-			Market:       req.Market,
-			SecurityType: req.SecurityType,
-		})
+	for _, candidate := range result.Instruments {
+		if !matchesInstrumentIdentity(candidate, symbol) {
+			continue
+		}
+		return InspectResult{
+			Instrument: candidate,
+			Provider:   result.Provider,
+			Group:      result.Group,
+			Operations: result.Operations,
+		}, nil
 	}
-	return InspectResult{
-		Instrument: result.Instruments[0],
-		Provider:   result.Provider,
-		Group:      result.Group,
-		Operations: result.Operations,
-	}, nil
+
+	return InspectResult{}, errb.Wrap(&NotFoundError{
+		Query:        symbol,
+		Market:       req.Market,
+		SecurityType: req.SecurityType,
+	})
+}
+
+func matchesInstrumentIdentity(candidate instrumentrole.Instrument, symbol string) bool {
+	return matchesInstrumentIdentifier(candidate.SecurityCode, symbol) ||
+		matchesInstrumentIdentifier(candidate.ISIN, symbol) ||
+		matchesInstrumentIdentifier(candidate.ExchangeCode, symbol)
+}
+
+func matchesInstrumentIdentifier(value string, symbol string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	return strings.EqualFold(value, symbol)
 }

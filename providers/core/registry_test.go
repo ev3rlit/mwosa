@@ -51,6 +51,44 @@ func TestRegisterProviderCollectsEmbeddedRoleFields(t *testing.T) {
 	}
 }
 
+func TestRegistryRolesReturnsRegisteredRolesOnce(t *testing.T) {
+	registry := provider.NewRegistry()
+	identity := provider.Identity{ID: provider.ProviderID("test")}
+	if err := registry.Register(identity,
+		provider.RoleRegistration{
+			Profile: provider.RoleProfile{
+				Role:          provider.Role("macro"),
+				Compatibility: provider.Compatibility{DataLatency: provider.DataLatencyEndOfDay},
+			},
+			Impl: struct{}{},
+		},
+		provider.RoleRegistration{
+			Profile: provider.RoleProfile{
+				Role:          provider.RoleDailyBar,
+				Compatibility: provider.Compatibility{DataLatency: provider.DataLatencyPreviousBusinessDay},
+			},
+			Impl: struct{}{},
+		},
+		provider.RoleRegistration{
+			Profile: provider.RoleProfile{
+				Role:          provider.RoleDailyBar,
+				Compatibility: provider.Compatibility{DataLatency: provider.DataLatencyPreviousBusinessDay},
+			},
+			Impl: struct{}{},
+		},
+	); err != nil {
+		t.Fatalf("register roles: %v", err)
+	}
+
+	roles := registry.Roles()
+	if len(roles) != 2 {
+		t.Fatalf("roles len = %d, want 2: %v", len(roles), roles)
+	}
+	if roles[0] != provider.RoleDailyBar || roles[1] != provider.Role("macro") {
+		t.Fatalf("roles = %v, want sorted unique roles", roles)
+	}
+}
+
 func TestRegisterProviderIgnoresNamedRoleFields(t *testing.T) {
 	registry := provider.NewRegistry()
 	p := &namedRoleFieldProvider{
