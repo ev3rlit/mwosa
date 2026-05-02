@@ -181,7 +181,7 @@ func newBackfillDailyCommand(opts *Options) *cobra.Command {
 	addSecurityTypeFlag(cmd, &flags)
 	cmd.Flags().StringVar(&flags.From, "from", flags.From, "start trading date, YYYYMMDD or YYYY-MM-DD")
 	cmd.Flags().StringVar(&flags.To, "to", flags.To, "end trading date, YYYYMMDD or YYYY-MM-DD")
-	cmd.Flags().IntVar(&flags.Workers, "workers", 1, "number of date fetch workers")
+	cmd.Flags().IntVar(&flags.Workers, "workers", 1, "number of page fetch workers for range-capable providers")
 	return cmd
 }
 

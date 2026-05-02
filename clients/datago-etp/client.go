@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samber/oops"
@@ -91,7 +92,7 @@ func (c *Client) GetETFPriceInfoMetadata(ctx context.Context, query ETFPriceInfo
 
 func (c *Client) GetAllETFPriceInfo(ctx context.Context, query ETFPriceInfoQuery) (ETFPriceInfoResult, error) {
 	query.SecuritiesProductPriceQuery = query.forAllPages()
-	result, err := fetchAllPriceInfoPages[ETFPriceInfo](c, ctx, OperationGetETFPriceInfo, query.values(), query.numOfRows())
+	result, err := fetchAllPriceInfoPages[ETFPriceInfo](c, ctx, OperationGetETFPriceInfo, query.values(), query.numOfRows(), query.workers())
 	if err != nil {
 		return ETFPriceInfoResult{}, err
 	}
@@ -113,7 +114,7 @@ func (c *Client) GetETNPriceInfoMetadata(ctx context.Context, query ETNPriceInfo
 
 func (c *Client) GetAllETNPriceInfo(ctx context.Context, query ETNPriceInfoQuery) (ETNPriceInfoResult, error) {
 	query.SecuritiesProductPriceQuery = query.forAllPages()
-	result, err := fetchAllPriceInfoPages[ETNPriceInfo](c, ctx, OperationGetETNPriceInfo, query.values(), query.numOfRows())
+	result, err := fetchAllPriceInfoPages[ETNPriceInfo](c, ctx, OperationGetETNPriceInfo, query.values(), query.numOfRows(), query.workers())
 	if err != nil {
 		return ETNPriceInfoResult{}, err
 	}
@@ -135,7 +136,7 @@ func (c *Client) GetELWPriceInfoMetadata(ctx context.Context, query ELWPriceInfo
 
 func (c *Client) GetAllELWPriceInfo(ctx context.Context, query ELWPriceInfoQuery) (ELWPriceInfoResult, error) {
 	query.SecuritiesProductPriceQuery = query.forAllPages()
-	result, err := fetchAllPriceInfoPages[ELWPriceInfo](c, ctx, OperationGetELWPriceInfo, query.values(), query.numOfRows())
+	result, err := fetchAllPriceInfoPages[ELWPriceInfo](c, ctx, OperationGetELWPriceInfo, query.values(), query.numOfRows(), query.workers())
 	if err != nil {
 		return ELWPriceInfoResult{}, err
 	}
@@ -186,11 +187,12 @@ func fetchPriceInfoMetadata[T any](c *Client, ctx context.Context, operation str
 	}, nil
 }
 
-func fetchAllPriceInfoPages[T any](c *Client, ctx context.Context, operation string, params url.Values, numOfRows int) (priceInfoResult[T], error) {
+func fetchAllPriceInfoPages[T any](c *Client, ctx context.Context, operation string, params url.Values, numOfRows int, workers int) (priceInfoResult[T], error) {
 	errb := oops.In("datago_client").With(
 		"provider", ProviderDataGo,
 		"group", GroupSecuritiesProductPrice,
 		"operation", operation,
+		"workers", workers,
 	)
 
 	first, err := fetchPriceInfoPage[T](c, ctx, operation, params, 1, numOfRows)
@@ -204,12 +206,36 @@ func fetchAllPriceInfoPages[T any](c *Client, ctx context.Context, operation str
 		effectiveNumOfRows = numOfRows
 	}
 	pageCount := pageCount(first.TotalCount, effectiveNumOfRows)
-	for pageNo := 2; pageNo <= pageCount; pageNo++ {
-		next, err := fetchPriceInfoPage[T](c, ctx, operation, params, pageNo, numOfRows)
-		if err != nil {
-			return priceInfoResult[T]{}, errb.With("page", pageNo).Wrapf(err, "fetch datago price info page")
+	if pageCount <= 1 {
+		return priceInfoResult[T]{
+			Items:      items,
+			NumOfRows:  effectiveNumOfRows,
+			PageNo:     1,
+			TotalCount: first.TotalCount,
+		}, nil
+	}
+	if workers <= 1 {
+		for pageNo := 2; pageNo <= pageCount; pageNo++ {
+			next, err := fetchPriceInfoPage[T](c, ctx, operation, params, pageNo, numOfRows)
+			if err != nil {
+				return priceInfoResult[T]{}, errb.With("page", pageNo).Wrapf(err, "fetch datago price info page")
+			}
+			items = append(items, next.Items...)
 		}
-		items = append(items, next.Items...)
+		return priceInfoResult[T]{
+			Items:      items,
+			NumOfRows:  effectiveNumOfRows,
+			PageNo:     1,
+			TotalCount: first.TotalCount,
+		}, nil
+	}
+
+	remaining, err := fetchRemainingPriceInfoPages[T](c, ctx, operation, params, numOfRows, pageCount, workers)
+	if err != nil {
+		return priceInfoResult[T]{}, err
+	}
+	for pageNo := 2; pageNo <= pageCount; pageNo++ {
+		items = append(items, remaining[pageNo]...)
 	}
 
 	return priceInfoResult[T]{
@@ -218,6 +244,84 @@ func fetchAllPriceInfoPages[T any](c *Client, ctx context.Context, operation str
 		PageNo:     1,
 		TotalCount: first.TotalCount,
 	}, nil
+}
+
+type priceInfoPageResult[T any] struct {
+	pageNo int
+	items  []T
+	err    error
+}
+
+func fetchRemainingPriceInfoPages[T any](c *Client, ctx context.Context, operation string, params url.Values, numOfRows int, pageCount int, workers int) (map[int][]T, error) {
+	errb := oops.In("datago_client").With(
+		"provider", ProviderDataGo,
+		"group", GroupSecuritiesProductPrice,
+		"operation", operation,
+		"workers", workers,
+	)
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	jobs := make(chan int)
+	results := make(chan priceInfoPageResult[T])
+	var wg sync.WaitGroup
+	for workerID := 0; workerID < workers; workerID++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for pageNo := range jobs {
+				next, err := fetchPriceInfoPage[T](c, workerCtx, operation, params, pageNo, numOfRows)
+				result := priceInfoPageResult[T]{pageNo: pageNo, err: err}
+				if err == nil {
+					result.items = next.Items
+				}
+				select {
+				case results <- result:
+				case <-workerCtx.Done():
+					return
+				}
+				if err != nil {
+					return
+				}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for pageNo := 2; pageNo <= pageCount; pageNo++ {
+			select {
+			case jobs <- pageNo:
+			case <-workerCtx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	pages := make(map[int][]T, pageCount-1)
+	var firstErr error
+	for result := range results {
+		if result.err != nil {
+			if firstErr == nil {
+				firstErr = errb.With("page", result.pageNo).Wrapf(result.err, "fetch datago price info page")
+				cancel()
+			}
+			continue
+		}
+		pages[result.pageNo] = result.items
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	for pageNo := 2; pageNo <= pageCount; pageNo++ {
+		if _, ok := pages[pageNo]; !ok {
+			return nil, errb.With("page", pageNo).New("datago price info page result missing")
+		}
+	}
+	return pages, nil
 }
 
 func fetchPage[T any](c *Client, ctx context.Context, operation string, params url.Values, pageNo int, numOfRows int) (apiResponse[T], error) {

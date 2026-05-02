@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -246,6 +247,94 @@ func TestGetAllETFPriceInfoUsesFirstPageAsProbe(t *testing.T) {
 	}
 	if result.Items[0].SrtnCd != "069500" || result.Items[1].SrtnCd != "069501" {
 		t.Fatalf("unexpected items: %+v", result.Items)
+	}
+}
+
+func TestGetAllETFPriceInfoUsesWorkersForRemainingPages(t *testing.T) {
+	seenPages := make(map[string]bool)
+	var seenMu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getETFPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		pageNo := r.URL.Query().Get("pageNo")
+		seenMu.Lock()
+		seenPages[pageNo] = true
+		seenMu.Unlock()
+		assertQuery(t, r, "numOfRows", "1000")
+		assertQuery(t, r, "beginBasDt", "20260423")
+		assertQuery(t, r, "endBasDt", "20260424")
+
+		switch pageNo {
+		case "1":
+			fmt.Fprint(w, `{
+				"response": {
+					"header": {"resultCode": "00", "resultMsg": "OK"},
+					"body": {
+						"numOfRows": 1000,
+						"pageNo": 1,
+						"totalCount": 2001,
+						"items": {"item": [
+							{"basDt": "20260423", "srtnCd": "069500", "itmsNm": "KODEX 200"}
+						]}
+					}
+				}
+			}`)
+		case "2":
+			fmt.Fprint(w, `{
+				"response": {
+					"header": {"resultCode": "00", "resultMsg": "OK"},
+					"body": {
+						"numOfRows": 1000,
+						"pageNo": 2,
+						"totalCount": 2001,
+						"items": {"item": [
+							{"basDt": "20260424", "srtnCd": "069501", "itmsNm": "KODEX Next"}
+						]}
+					}
+				}
+			}`)
+		case "3":
+			fmt.Fprint(w, `{
+				"response": {
+					"header": {"resultCode": "00", "resultMsg": "OK"},
+					"body": {
+						"numOfRows": 1000,
+						"pageNo": 3,
+						"totalCount": 2001,
+						"items": {"item": [
+							{"basDt": "20260424", "srtnCd": "069502", "itmsNm": "KODEX Last"}
+						]}
+					}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected pageNo: %s", pageNo)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	result, err := client.GetAllETFPriceInfo(context.Background(), ETFPriceInfoQuery{
+		SecuritiesProductPriceQuery: SecuritiesProductPriceQuery{
+			BeginBasDt: "20260423",
+			EndBasDt:   "20260424",
+			Workers:    2,
+		},
+	})
+	if err != nil {
+		t.Fatalf("get all ETF price info: %v", err)
+	}
+	seenMu.Lock()
+	defer seenMu.Unlock()
+	if !seenPages["1"] || !seenPages["2"] || !seenPages["3"] {
+		t.Fatalf("seen pages = %v, want pages 1, 2, and 3", seenPages)
+	}
+	if len(result.Items) != 3 {
+		t.Fatalf("items len = %d, want 3", len(result.Items))
+	}
+	if got := []string{result.Items[0].SrtnCd, result.Items[1].SrtnCd, result.Items[2].SrtnCd}; strings.Join(got, ",") != "069500,069501,069502" {
+		t.Fatalf("items order = %v, want page order", got)
 	}
 }
 

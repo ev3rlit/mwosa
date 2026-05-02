@@ -145,6 +145,15 @@ func TestFetchDailyBarsCollectsAllPagesWhenLimitOmitted(t *testing.T) {
 		pageNo := r.URL.Query().Get("pageNo")
 		seenPages = append(seenPages, pageNo)
 		assertCommonQuery(t, r, pageNo, "1000")
+		if got := r.URL.Query().Get("beginBasDt"); got != "20240415" {
+			t.Fatalf("beginBasDt = %q, want 20240415", got)
+		}
+		if got := r.URL.Query().Get("endBasDt"); got != "20240417" {
+			t.Fatalf("endBasDt = %q, want 20240417", got)
+		}
+		if got := r.URL.Query().Get("basDt"); got != "" {
+			t.Fatalf("basDt = %q, want empty", got)
+		}
 		switch pageNo {
 		case "1":
 			fmt.Fprint(w, `{
@@ -181,7 +190,7 @@ func TestFetchDailyBarsCollectsAllPagesWhenLimitOmitted(t *testing.T) {
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
 		From:         "20240415",
-		To:           "20240415",
+		To:           "20240416",
 	})
 	if err != nil {
 		t.Fatalf("fetch daily bars: %v", err)

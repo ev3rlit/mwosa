@@ -8,6 +8,7 @@ import (
 type SecuritiesProductPriceQuery struct {
 	NumOfRows       int
 	PageNo          int
+	Workers         int
 	BasDt           string
 	BeginBasDt      string
 	EndBasDt        string
@@ -173,6 +174,13 @@ func (q SecuritiesProductPriceQuery) forMetadataProbe() (SecuritiesProductPriceQ
 	q.PageNo = 1
 	q.NumOfRows = 1
 	return q, pageSize
+}
+
+func (q SecuritiesProductPriceQuery) workers() int {
+	if q.Workers > 0 {
+		return q.Workers
+	}
+	return 1
 }
 
 func looksLikeShortCode(search string) bool {

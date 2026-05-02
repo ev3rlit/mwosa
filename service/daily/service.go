@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 	"time"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -203,21 +202,9 @@ func (s Service) Backfill(ctx context.Context, req Request) (CollectResult, erro
 	if err != nil {
 		return CollectResult{}, errb.Wrap(err)
 	}
-	if workers > 1 && len(dates) > 1 {
-		return s.backfillWithWorkers(ctx, req, dates, workers)
-	}
-
-	result := CollectResult{
-		Market:       withDefaultMarket(req.Market),
-		SecurityType: req.SecurityType,
-		Dates:        make([]string, 0, len(dates)),
-	}
-	for _, date := range dates {
-		partial, err := s.collectDate(ctx, req, date)
-		if err != nil {
-			return CollectResult{}, errb.With("market", withDefaultMarket(req.Market), "security_type", req.SecurityType, "date", apiDate(date)).Wrapf(err, "backfill daily date")
-		}
-		mergeCollectResult(&result, partial)
+	result, err := s.collectRange(ctx, req, dates[0], dates[len(dates)-1], workers)
+	if err != nil {
+		return CollectResult{}, errb.With("market", withDefaultMarket(req.Market), "security_type", req.SecurityType, "from", apiDate(dates[0]), "to", apiDate(dates[len(dates)-1])).Wrapf(err, "backfill daily range")
 	}
 	return result, nil
 }
@@ -230,95 +217,23 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 	return s.storeCollection(ctx, result)
 }
 
-type dateJob struct {
-	index int
-	date  time.Time
-}
-
-type dateFetchResult struct {
-	index  int
-	result CollectResult
-	err    error
-}
-
-func (s Service) backfillWithWorkers(ctx context.Context, req Request, dates []time.Time, workers int) (CollectResult, error) {
-	errb := oops.In("daily_service").With("from", req.From, "to", req.To, "workers", workers)
-	workerCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	jobs := make(chan dateJob)
-	results := make(chan dateFetchResult)
-	var wg sync.WaitGroup
-	for workerID := 0; workerID < workers; workerID++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for job := range jobs {
-				result, err := s.fetchDate(workerCtx, req, job.date)
-				select {
-				case results <- dateFetchResult{index: job.index, result: result, err: err}:
-				case <-workerCtx.Done():
-					return
-				}
-				if err != nil {
-					return
-				}
-			}
-		}()
-	}
-	go func() {
-		defer close(jobs)
-		for index, date := range dates {
-			select {
-			case jobs <- dateJob{index: index, date: date}:
-			case <-workerCtx.Done():
-				return
-			}
-		}
-	}()
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	result := CollectResult{
-		Market:       withDefaultMarket(req.Market),
-		SecurityType: req.SecurityType,
-		Dates:        make([]string, 0, len(dates)),
-	}
-	var firstErr error
-	for fetched := range results {
-		if fetched.err != nil {
-			if firstErr == nil {
-				firstErr = errb.With("date", apiDate(dates[fetched.index])).Wrapf(fetched.err, "backfill daily worker fetch")
-				cancel()
-			}
-			continue
-		}
-		if firstErr != nil {
-			continue
-		}
-		partial, err := s.storeCollection(ctx, fetched.result)
-		if err != nil {
-			if firstErr == nil {
-				firstErr = errb.With("date", fetched.result.Dates).Wrapf(err, "backfill daily worker store")
-				cancel()
-			}
-			continue
-		}
-		mergeCollectResult(&result, partial)
-	}
-	if firstErr != nil {
-		return CollectResult{}, firstErr
-	}
-	sort.Strings(result.Dates)
-	return result, nil
-}
-
 func (s Service) fetchDate(ctx context.Context, req Request, date time.Time) (CollectResult, error) {
+	return s.fetchRange(ctx, req, date, date, 1)
+}
+
+func (s Service) collectRange(ctx context.Context, req Request, from time.Time, to time.Time, workers int) (CollectResult, error) {
+	result, err := s.fetchRange(ctx, req, from, to, workers)
+	if err != nil {
+		return CollectResult{}, err
+	}
+	return s.storeCollection(ctx, result)
+}
+
+func (s Service) fetchRange(ctx context.Context, req Request, from time.Time, to time.Time, workers int) (CollectResult, error) {
 	market := withDefaultMarket(req.Market)
-	dateText := apiDate(date)
-	errb := oops.In("daily_service").With("market", market, "security_type", req.SecurityType, "date", dateText)
+	fromText := apiDate(from)
+	toText := apiDate(to)
+	errb := oops.In("daily_service").With("market", market, "security_type", req.SecurityType, "from", fromText, "to", toText, "workers", workers)
 
 	if s.router == nil {
 		return CollectResult{}, errb.New("daily service router is nil")
@@ -342,8 +257,9 @@ func (s Service) fetchDate(ctx context.Context, req Request, date time.Time) (Co
 		Market:       market,
 		SecurityType: req.SecurityType,
 		Symbol:       req.Symbol,
-		From:         dateText,
-		To:           dateText,
+		From:         fromText,
+		To:           toText,
+		Workers:      workers,
 	})
 	if err != nil {
 		return CollectResult{}, errb.With("provider", req.ProviderID).Wrapf(err, "fetch daily bars")
@@ -354,7 +270,7 @@ func (s Service) fetchDate(ctx context.Context, req Request, date time.Time) (Co
 		SecurityType: req.SecurityType,
 		ProviderID:   result.Provider.ID,
 		Group:        result.Group,
-		Dates:        []string{isoDate(date)},
+		Dates:        collectDatesFromBars(result.Bars),
 		BarsFetched:  len(result.Bars),
 		bars:         result.Bars,
 	}, nil
@@ -387,13 +303,18 @@ func normalizeBackfillWorkers(workers int) (int, error) {
 	return workers, nil
 }
 
-func mergeCollectResult(result *CollectResult, partial CollectResult) {
-	result.ProviderID = partial.ProviderID
-	result.Group = partial.Group
-	result.Dates = append(result.Dates, partial.Dates...)
-	result.BarsFetched += partial.BarsFetched
-	result.BarsStored += partial.BarsStored
-	result.RowsAffected += partial.RowsAffected
+func collectDatesFromBars(bars []dailybar.Bar) []string {
+	seen := make(map[string]bool)
+	dates := make([]string, 0)
+	for _, bar := range bars {
+		if bar.TradingDate == "" || seen[bar.TradingDate] {
+			continue
+		}
+		seen[bar.TradingDate] = true
+		dates = append(dates, bar.TradingDate)
+	}
+	sort.Strings(dates)
+	return dates
 }
 
 func queryFromRequest(req Request, dates []time.Time) Query {

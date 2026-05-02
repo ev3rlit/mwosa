@@ -213,10 +213,10 @@ backfill daily --market krx --security-type etf --from <YYYYMMDD> --to <YYYYMMDD
 `datago` 변환 규칙:
 
 - `sync daily` 는 `as-of` -> `basDt` 로 변환해 해당 날짜의 시장/자산군 batch 를 수집한다.
-- `backfill daily` 는 날짜 범위를 하루씩 순회하며 `basDt` batch 수집을 반복한다. `--workers` 를 주면 날짜별 fetch 를 병렬화하되 SQLite write 는 순차 처리한다.
+- `backfill daily` 는 `from/to` 를 `beginBasDt/endBasDt` 로 변환해 기간 batch 를 수집한다. CLI 의 `--to` 는 포함 범위지만, Datago `endBasDt` 는 미만 조건이라 adapter 에서 `to + 1일` 로 보낸다. 주말/휴장일은 Datago 응답에 자연스럽게 포함되지 않으므로 별도 calendar 필터가 필요 없다.
 - `ensure daily <security_code>` 는 필요한 날짜가 없으면 해당 날짜의 batch 를 먼저 수집한 뒤 저장소에서 `security_code` 를 조회한다.
 - `resultType=json`
-- page-level client 는 `numOfRows`, `pageNo`, `totalCount` 를 노출한다. `sync/backfill/ensure` 의 batch 수집은 all-page helper 를 사용해 남은 page 를 끝까지 순회한다.
+- page-level client 는 `numOfRows`, `pageNo`, `totalCount` 를 노출한다. `sync/backfill/ensure` 의 batch 수집은 all-page helper 를 사용해 남은 page 를 끝까지 순회하고, `--workers` 는 `backfill` 의 remaining page fetch 병렬도다.
 - `provider=datago`, `provider_group=securitiesProductPrice`, 실제 operation 을 provenance 로 남긴다.
 - 최신 데이터 요청은 오늘이 아니라 latest available basDt, 즉 보통 D-1 영업일 기준으로 해석한다.
 

@@ -190,8 +190,9 @@ mwosa inspect tool <name>
 | `mwosa export data <selector>`    | 데이터를 `json`, `ndjson`, `csv` 등으로 내보낸다.               |
 | `mwosa import data <path>`        | 외부 파일을 canonical 데이터로 가져온다.                        |
 
-`backfill daily` 는 날짜별 batch 를 병렬로 가져올 수 있다. 예를 들어 ETF 2년치
-일별 데이터를 가져올 때는 worker 수를 낮게 시작하고, 공공 API 상태를 보며 올린다.
+`backfill daily` 는 provider 가 기간 조회를 지원하면 날짜를 쪼개지 않고 기간
+batch 를 수집한다. Datago ETP 처럼 기간 조회가 page 로 나뉘는 provider 에서는
+`--workers` 가 page fetch 병렬도다.
 
 ```sh
 mwosa backfill daily --security-type etf --from 20240502 --to 20260502 --workers 4

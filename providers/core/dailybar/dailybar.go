@@ -51,6 +51,7 @@ type FetchInput struct {
 	From         string
 	To           string
 	Limit        int
+	Workers      int
 }
 
 type Bar struct {

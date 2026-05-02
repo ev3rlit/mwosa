@@ -108,15 +108,18 @@ func TestEnsurePassesSymbolToProviderFetch(t *testing.T) {
 	}
 }
 
-func TestBackfillAcceptsWorkers(t *testing.T) {
+func TestBackfillFetchesProviderRangeWithWorkers(t *testing.T) {
+	var gotFetch dailybar.FetchInput
 	fetcher := dailybar.NewFetch(dailybar.Profile{
 		Markets:       []provider.Market{provider.MarketKRX},
 		SecurityTypes: []provider.SecurityType{provider.SecurityTypeETF},
 		Compatibility: provider.Compatibility{DataLatency: provider.DataLatencyPreviousBusinessDay},
 	}, func(_ context.Context, input dailybar.FetchInput) (dailybar.FetchResult, error) {
+		gotFetch = input
 		return dailybar.FetchResult{
 			Bars: []dailybar.Bar{
-				{Symbol: "069500", TradingDate: input.From},
+				{Symbol: "069500", TradingDate: "2024-04-15"},
+				{Symbol: "069500", TradingDate: "2024-04-16"},
 			},
 			Provider: provider.Identity{ID: provider.ProviderID("fake")},
 			Group:    provider.GroupID("fakeGroup"),
@@ -140,6 +143,9 @@ func TestBackfillAcceptsWorkers(t *testing.T) {
 	}
 	if result.BarsFetched != 2 || result.BarsStored != 2 {
 		t.Fatalf("result = %+v, want fetched/stored 2", result)
+	}
+	if gotFetch.From != "20240415" || gotFetch.To != "20240416" || gotFetch.Workers != 2 {
+		t.Fatalf("fetch input = %+v, want range 20240415-20240416 with workers 2", gotFetch)
 	}
 	if strings.Join(result.Dates, ",") != "2024-04-15,2024-04-16" {
 		t.Fatalf("dates = %v, want sorted backfill dates", result.Dates)

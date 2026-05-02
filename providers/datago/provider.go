@@ -3,6 +3,7 @@ package datago
 import (
 	"context"
 	"fmt"
+	"time"
 
 	datagoetp "github.com/ev3rlit/mwosa/clients/datago-etp"
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -124,6 +125,7 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 
 	query := datagoetp.SecuritiesProductPriceQuery{
 		NumOfRows: numOfRowsForDailyFetch(input.Limit),
+		Workers:   input.Workers,
 	}
 	query = query.WithInstrumentLookup(input.Symbol)
 	if input.From != "" && input.From == input.To {
@@ -133,7 +135,11 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 			query.BeginBasDt = input.From
 		}
 		if input.To != "" {
-			query.EndBasDt = input.To
+			endBasDt, err := exclusiveEndBasDt(input.To)
+			if err != nil {
+				return dailybar.FetchResult{}, inputErrb.Wrap(err)
+			}
+			query.EndBasDt = endBasDt
 		}
 	}
 
@@ -295,6 +301,14 @@ func numOfRowsForSearch(limit int) int {
 		return limit
 	}
 	return datagoetp.DefaultNumOfRows
+}
+
+func exclusiveEndBasDt(value string) (string, error) {
+	parsed, err := time.Parse("20060102", value)
+	if err != nil {
+		return "", oops.In("datago_adapter").With("end_bas_dt", value).Wrapf(err, "parse datago exclusive endBasDt")
+	}
+	return parsed.AddDate(0, 0, 1).Format("20060102"), nil
 }
 
 func operationIDs(specs []operationSpec) []provider.OperationID {

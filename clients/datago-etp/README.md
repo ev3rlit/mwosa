@@ -34,7 +34,8 @@ The client exposes both page-level and all-page helpers:
   fetch a one-row probe and return `totalCount`, planned page size, and page count.
 - `GetAllETFPriceInfo`, `GetAllETNPriceInfo`, `GetAllELWPriceInfo`: fetch page 1
   first, read `totalCount`, then fetch only the remaining pages. When `NumOfRows`
-  is omitted, all-page helpers use `DefaultAllNumOfRows`.
+  is omitted, all-page helpers use `DefaultAllNumOfRows`. Set `Workers` on the
+  query to fetch the remaining pages concurrently.
 
 Transient HTTP failures are retried by default. The client retries network
 errors and HTTP `408`, `429`, `500`, `502`, `503`, and `504` responses with a

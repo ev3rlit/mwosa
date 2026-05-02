@@ -210,23 +210,34 @@ func TestGetDailyMissingDataReturnsEnsureHint(t *testing.T) {
 	}
 }
 
-func TestBackfillDailyCollectsEachDate(t *testing.T) {
-	seenDates := make([]string, 0)
+func TestBackfillDailyCollectsRange(t *testing.T) {
+	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
 		if r.URL.Path != "/getETFPriceInfo" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		basDt := r.URL.Query().Get("basDt")
-		seenDates = append(seenDates, basDt)
-		fmt.Fprintf(w, `{
+		if got := r.URL.Query().Get("beginBasDt"); got != "20240415" {
+			t.Fatalf("beginBasDt = %q, want 20240415", got)
+		}
+		if got := r.URL.Query().Get("endBasDt"); got != "20240417" {
+			t.Fatalf("endBasDt = %q, want 20240417", got)
+		}
+		if got := r.URL.Query().Get("basDt"); got != "" {
+			t.Fatalf("basDt = %q, want empty", got)
+		}
+		fmt.Fprint(w, `{
 			"header": {"resultCode": "00", "resultMsg": "OK"},
 			"body": {
-				"numOfRows": 100,
+				"numOfRows": 1000,
 				"pageNo": 1,
-				"totalCount": 1,
-				"items": {"item": {"basDt": %q, "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120"}}
+				"totalCount": 2,
+				"items": {"item": [
+					{"basDt": "20240415", "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120"},
+					{"basDt": "20240416", "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35200"}
+				]}
 			}
-		}`, basDt)
+		}`)
 	}))
 	defer server.Close()
 
@@ -246,34 +257,71 @@ func TestBackfillDailyCollectsEachDate(t *testing.T) {
 	); err != nil {
 		t.Fatalf("backfill daily: %v\n%s", err, out.String())
 	}
-	if strings.Join(seenDates, ",") != "20240415,20240416" {
-		t.Fatalf("seen dates = %v, want 20240415 and 20240416", seenDates)
+	if requests != 1 {
+		t.Fatalf("requests = %d, want one range request", requests)
 	}
 	if !strings.Contains(out.String(), `"bars_fetched": 2`) {
 		t.Fatalf("backfill output should summarize fetched bars:\n%s", out.String())
 	}
 }
 
-func TestBackfillDailyAcceptsWorkers(t *testing.T) {
-	seenDates := make(map[string]bool)
+func TestBackfillDailyUsesWorkersForPages(t *testing.T) {
+	seenPages := make(map[string]bool)
 	var seenMu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/getETFPriceInfo" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		basDt := r.URL.Query().Get("basDt")
+		if got := r.URL.Query().Get("beginBasDt"); got != "20240415" {
+			t.Fatalf("beginBasDt = %q, want 20240415", got)
+		}
+		if got := r.URL.Query().Get("endBasDt"); got != "20240417" {
+			t.Fatalf("endBasDt = %q, want 20240417", got)
+		}
+		pageNo := r.URL.Query().Get("pageNo")
 		seenMu.Lock()
-		seenDates[basDt] = true
+		seenPages[pageNo] = true
 		seenMu.Unlock()
-		fmt.Fprintf(w, `{
-			"header": {"resultCode": "00", "resultMsg": "OK"},
-			"body": {
-				"numOfRows": 1000,
-				"pageNo": 1,
-				"totalCount": 1,
-				"items": {"item": {"basDt": %q, "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120"}}
-			}
-		}`, basDt)
+		switch pageNo {
+		case "1":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 2001,
+					"items": {"item": [
+						{"basDt": "20240415", "srtnCd": "069500", "itmsNm": "KODEX 200", "clpr": "35120"}
+					]}
+				}
+			}`)
+		case "2":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 2,
+					"totalCount": 2001,
+					"items": {"item": [
+						{"basDt": "20240416", "srtnCd": "069501", "itmsNm": "KODEX Next", "clpr": "1000"}
+					]}
+				}
+			}`)
+		case "3":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 3,
+					"totalCount": 2001,
+					"items": {"item": [
+						{"basDt": "20240416", "srtnCd": "069502", "itmsNm": "KODEX Last", "clpr": "1001"}
+					]}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected pageNo: %s", pageNo)
+		}
 	}))
 	defer server.Close()
 
@@ -296,10 +344,10 @@ func TestBackfillDailyAcceptsWorkers(t *testing.T) {
 	}
 	seenMu.Lock()
 	defer seenMu.Unlock()
-	if !seenDates["20240415"] || !seenDates["20240416"] {
-		t.Fatalf("seen dates = %v, want both backfill dates", seenDates)
+	if !seenPages["1"] || !seenPages["2"] || !seenPages["3"] {
+		t.Fatalf("seen pages = %v, want pages 1, 2, and 3", seenPages)
 	}
-	if !strings.Contains(out.String(), `"bars_fetched": 2`) {
+	if !strings.Contains(out.String(), `"bars_fetched": 3`) {
 		t.Fatalf("backfill output should summarize fetched bars:\n%s", out.String())
 	}
 }
