@@ -31,10 +31,39 @@ type WriteResult struct {
 	BarsWritten  int
 }
 
+type ReadService struct {
+	reader ReadRepository
+}
+
 type Service struct {
-	Router dailybar.Router
-	Reader ReadRepository
-	Writer WriteRepository
+	router dailybar.Router
+	reader ReadRepository
+	writer WriteRepository
+}
+
+func NewReadService(reader ReadRepository) (ReadService, error) {
+	if reader == nil {
+		return ReadService{}, oops.In("daily_service").New("daily service read repository is nil")
+	}
+	return ReadService{reader: reader}, nil
+}
+
+func NewService(reader ReadRepository, writer WriteRepository, router dailybar.Router) (Service, error) {
+	errb := oops.In("daily_service")
+	if reader == nil {
+		return Service{}, errb.New("daily service read repository is nil")
+	}
+	if writer == nil {
+		return Service{}, errb.New("daily service write repository is nil")
+	}
+	if router == nil {
+		return Service{}, errb.New("daily service router is nil")
+	}
+	return Service{
+		router: router,
+		reader: reader,
+		writer: writer,
+	}, nil
 }
 
 type Request struct {
@@ -63,9 +92,9 @@ type CollectResult struct {
 	RowsAffected int                   `json:"rows_affected"`
 }
 
-func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
+func (s ReadService) Get(ctx context.Context, req Request) (BarsResult, error) {
 	reqErrb := oops.In("daily_service").With("symbol", req.Symbol, "from", req.From, "to", req.To, "as_of", req.AsOf)
-	if s.Reader == nil {
+	if s.reader == nil {
 		return BarsResult{}, reqErrb.New("daily service read repository is nil")
 	}
 	dates, err := resolveDateRange(req.From, req.To, req.AsOf)
@@ -74,7 +103,7 @@ func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
 	}
 	query := queryFromRequest(req, dates)
 	queryErrb := oops.In("daily_service").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To)
-	bars, err := s.Reader.QueryDailyBars(ctx, query)
+	bars, err := s.reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, queryErrb.Wrapf(err, "get daily bars")
 	}
@@ -82,6 +111,10 @@ func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
 		return BarsResult{}, notFound(req, query)
 	}
 	return BarsResult{Bars: bars}, nil
+}
+
+func (s Service) Get(ctx context.Context, req Request) (BarsResult, error) {
+	return ReadService{reader: s.reader}.Get(ctx, req)
 }
 
 func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
@@ -99,10 +132,10 @@ func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 
 	query := queryFromRequest(req, dates)
 	queryErrb := oops.In("daily_service").With("market", query.Market, "security_type", query.SecurityType, "symbol", query.Symbol, "from", query.From, "to", query.To)
-	if s.Reader == nil {
+	if s.reader == nil {
 		return BarsResult{}, queryErrb.New("daily service read repository is nil")
 	}
-	existing, err := s.Reader.QueryDailyBars(ctx, query)
+	existing, err := s.reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, queryErrb.Wrapf(err, "query existing daily bars")
 	}
@@ -113,7 +146,7 @@ func (s Service) Ensure(ctx context.Context, req Request) (BarsResult, error) {
 		}
 	}
 
-	bars, err := s.Reader.QueryDailyBars(ctx, query)
+	bars, err := s.reader.QueryDailyBars(ctx, query)
 	if err != nil {
 		return BarsResult{}, queryErrb.Wrapf(err, "query stored daily bars")
 	}
@@ -166,17 +199,17 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 	dateText := apiDate(date)
 	errb := oops.In("daily_service").With("market", market, "security_type", req.SecurityType, "date", dateText)
 
-	if s.Router == nil {
+	if s.router == nil {
 		return CollectResult{}, errb.New("daily service router is nil")
 	}
-	if s.Writer == nil {
+	if s.writer == nil {
 		return CollectResult{}, errb.New("daily service write repository is nil")
 	}
 	if req.SecurityType == "" {
 		return CollectResult{}, errb.New("daily collection requires --security-type")
 	}
 
-	fetcher, err := s.Router.RouteDailyBars(ctx, dailybar.RouteInput{
+	fetcher, err := s.router.RouteDailyBars(ctx, dailybar.RouteInput{
 		ProviderID:     req.ProviderID,
 		PreferProvider: req.PreferProvider,
 		Market:         market,
@@ -196,7 +229,7 @@ func (s Service) collectDate(ctx context.Context, req Request, date time.Time) (
 	if err != nil {
 		return CollectResult{}, errb.With("provider", req.ProviderID).Wrapf(err, "fetch daily bars")
 	}
-	writeResult, err := s.Writer.UpsertDailyBars(ctx, result.Bars)
+	writeResult, err := s.writer.UpsertDailyBars(ctx, result.Bars)
 	if err != nil {
 		return CollectResult{}, errb.With("provider", result.Provider.ID, "group", result.Group, "bars", len(result.Bars)).Wrapf(err, "store daily bars")
 	}
