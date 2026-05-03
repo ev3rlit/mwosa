@@ -5,6 +5,8 @@ import (
 	"io"
 	"runtime"
 
+	appconfig "github.com/ev3rlit/mwosa/app/config"
+	"github.com/ev3rlit/mwosa/providers/builtin"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/samber/oops"
@@ -23,6 +25,9 @@ type BuildInfo struct {
 }
 
 type Options struct {
+	// 선택. 비어 있으면 MWOSA_CONFIG 또는 OS 기본 config 경로를 따른다.
+	Config string
+
 	// 필수. 명령 결과를 출력할 형식이다.
 	Output OutputMode
 
@@ -37,6 +42,10 @@ type Options struct {
 
 	// 필수. 로컬 SQLite database 경로다.
 	Database string
+
+	ProviderConfig provider.Config
+	ConfigState    appconfig.Resolved
+	configLoaded   bool
 }
 
 func (opts Options) Validate() error {
@@ -60,9 +69,8 @@ func validateOutputMode(value any) error {
 
 func NewRootCommand(build BuildInfo) *cobra.Command {
 	opts := Options{
-		Output:   DefaultOutputMode,
-		Market:   string(provider.MarketKRX),
-		Database: ".mwosa-data/mwosa.db",
+		Output: DefaultOutputMode,
+		Market: string(provider.MarketKRX),
 	}
 
 	cmd := &cobra.Command{
@@ -70,8 +78,17 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		Short:         "Investment research CLI for provider-backed market data",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			return loadConfig(&opts)
+		},
 	}
 
+	cmd.PersistentFlags().StringVar(
+		&opts.Config,
+		"config",
+		opts.Config,
+		"config file path",
+	)
 	cmd.PersistentFlags().VarP(
 		&opts.Output,
 		"output",
@@ -104,12 +121,50 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 	)
 
 	cmd.AddCommand(newVersionCommand(build))
+	cmd.AddCommand(newInspectCommand(&opts))
+	cmd.AddCommand(newConfigCommand(&opts))
 	cmd.AddCommand(newGetCommand(&opts))
 	cmd.AddCommand(newEnsureCommand(&opts))
 	cmd.AddCommand(newSyncCommand(&opts))
 	cmd.AddCommand(newBackfillCommand(&opts))
 
 	return cmd
+}
+
+func loadConfig(opts *Options) error {
+	if opts == nil {
+		return oops.In("cli").New("cli options are nil")
+	}
+	if opts.configLoaded {
+		return nil
+	}
+	resolved, err := appconfig.LoadOrCreate(appconfig.Options{
+		ConfigPath:       opts.Config,
+		DatabasePath:     opts.Database,
+		Market:           opts.Market,
+		ProviderDefaults: providerDefaults(),
+	})
+	if err != nil {
+		return oops.In("cli").Wrapf(err, "load config")
+	}
+	opts.Config = resolved.ConfigPath
+	opts.Database = resolved.DatabasePath
+	opts.ProviderConfig = resolved.ProviderConfig
+	opts.ConfigState = resolved
+	opts.configLoaded = true
+	return nil
+}
+
+func providerDefaults() []appconfig.ProviderDefault {
+	builders := builtin.Builders()
+	defaults := make([]appconfig.ProviderDefault, 0, len(builders))
+	for _, builder := range builders {
+		defaultProvider, ok := builder.(appconfig.ProviderDefault)
+		if ok {
+			defaults = append(defaults, defaultProvider)
+		}
+	}
+	return defaults
 }
 
 func newVersionCommand(build BuildInfo) *cobra.Command {

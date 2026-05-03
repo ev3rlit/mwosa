@@ -197,6 +197,9 @@ func newAppRuntime(opts *Options, activateProviders bool) (*app.Runtime, error) 
 	if opts == nil {
 		return nil, oops.In("cli").New("cli options are nil")
 	}
+	if err := loadConfig(opts); err != nil {
+		return nil, err
+	}
 	if err := opts.Validate(); err != nil {
 		return nil, oops.In("cli").Wrapf(err, "validate cli options")
 	}
@@ -204,6 +207,7 @@ func newAppRuntime(opts *Options, activateProviders bool) (*app.Runtime, error) 
 		Database:          opts.Database,
 		ProviderID:        provider.ProviderID(opts.Provider),
 		PreferProvider:    provider.ProviderID(opts.PreferProvider),
+		ProviderConfig:    opts.ProviderConfig,
 		ActivateProviders: activateProviders,
 	})
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -45,6 +46,25 @@ func (c Config) String(path ...string) string {
 		return ""
 	}
 	return text
+}
+
+func (c Config) Bool(path ...string) (bool, bool) {
+	value, ok := c.Lookup(path...)
+	if !ok {
+		return false, false
+	}
+	switch typed := value.(type) {
+	case bool:
+		return typed, true
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(typed))
+		if err != nil {
+			return false, false
+		}
+		return parsed, true
+	default:
+		return false, false
+	}
 }
 
 func (c Config) Env(key string) string {

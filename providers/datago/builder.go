@@ -25,7 +25,29 @@ func (Builder) ID() provider.ProviderID {
 	return provider.ProviderDataGo
 }
 
+func (Builder) DefaultConfig() provider.Config {
+	return provider.Config{
+		"id":       string(provider.ProviderDataGo),
+		"enabled":  true,
+		"base_url": "",
+		"auth": map[string]any{
+			"service_key": "",
+		},
+		"groups": map[string]any{
+			string(provider.GroupSecuritiesProductPrice): map[string]any{
+				"enabled": true,
+			},
+		},
+	}
+}
+
 func (Builder) Decide(opts provider.RegisterOptions, config provider.Config) provider.RegistrationDecision {
+	if !enabledFromConfig(config) {
+		return provider.RegistrationDecision{
+			Register: false,
+			Reason:   "datago disabled",
+		}
+	}
 	requested := requestsDataGo(opts)
 	if forcedOtherProvider(opts) && !requested {
 		return provider.RegistrationDecision{
@@ -82,6 +104,11 @@ func baseURLFromConfig(config provider.Config) string {
 		return baseURL
 	}
 	return strings.TrimSpace(config.Env(baseURLEnv))
+}
+
+func enabledFromConfig(config provider.Config) bool {
+	enabled, ok := config.Bool("providers", "datago", "enabled")
+	return !ok || enabled
 }
 
 func requestsDataGo(opts provider.RegisterOptions) bool {

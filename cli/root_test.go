@@ -2,8 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	provider "github.com/ev3rlit/mwosa/providers/core"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -15,7 +20,7 @@ func TestVersionCommand(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	cmd.SetArgs([]string{"version"})
+	cmd.SetArgs([]string{"--config", t.TempDir() + "/config.json", "version"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute version: %v", err)
@@ -46,8 +51,68 @@ func TestRootHelpHasOutputFlag(t *testing.T) {
 	}
 
 	got := out.String()
-	if !strings.Contains(got, "--output") {
-		t.Fatalf("help output should include --output flag:\n%s", got)
+	for _, want := range []string{"--config", "--output"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("help output should include %s flag:\n%s", want, got)
+		}
+	}
+}
+
+func TestInspectConfigCreatesAndPrintsResolvedPaths(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "inspect", "config"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute inspect config: %v", err)
+	}
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("config file was not created: %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{`"config_file"`, configPath, `"providers"`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("inspect config output missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestConfigSetUpdatesProviderConfigAndMasksSecretOutput(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"--config", configPath,
+		"config", "set", "providers.datago.auth.service_key", "secret-key",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute config set: %v\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "secret-key") {
+		t.Fatalf("config set output should mask secret:\n%s", out.String())
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config file: %v", err)
+	}
+	var cfg struct {
+		Providers []provider.Config `json:"providers"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("parse config file: %v", err)
+	}
+	if len(cfg.Providers) == 0 {
+		t.Fatal("provider config was not written")
+	}
+	if got := cfg.Providers[0].String("auth", "service_key"); got != "secret-key" {
+		t.Fatalf("service key = %q, want secret-key", got)
 	}
 }
 
@@ -55,7 +120,7 @@ func TestOptionsValidateTreatsProviderFlagsAsOptional(t *testing.T) {
 	opts := Options{
 		Output:   OutputModeTable,
 		Market:   "krx",
-		Database: ".mwosa-data/mwosa.db",
+		Database: t.TempDir() + "/mwosa.db",
 	}
 
 	if err := opts.Validate(); err != nil {

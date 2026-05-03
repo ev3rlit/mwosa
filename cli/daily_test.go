@@ -49,7 +49,7 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 	ensureCmd := NewRootCommand(BuildInfo{})
 	ensureCmd.SetOut(&ensureOut)
 	ensureCmd.SetErr(&ensureOut)
-	if err := executeForTest(context.Background(), ensureCmd,
+	if err := executeForTest(t, context.Background(), ensureCmd,
 		"--database", databasePath,
 		"--output", "json",
 		"ensure", "daily", "069500",
@@ -68,7 +68,7 @@ func TestEnsureDailyFetchesBatchAndGetReadsStoredData(t *testing.T) {
 	getCmd := NewRootCommand(BuildInfo{})
 	getCmd.SetOut(&getOut)
 	getCmd.SetErr(&getOut)
-	if err := executeForTest(context.Background(), getCmd,
+	if err := executeForTest(t, context.Background(), getCmd,
 		"--database", databasePath,
 		"--output", "json",
 		"get", "daily", "069500",
@@ -110,7 +110,7 @@ func TestEnsureDailyCanSearchByInstrumentName(t *testing.T) {
 	ensureCmd := NewRootCommand(BuildInfo{})
 	ensureCmd.SetOut(&ensureOut)
 	ensureCmd.SetErr(&ensureOut)
-	if err := executeForTest(context.Background(), ensureCmd,
+	if err := executeForTest(t, context.Background(), ensureCmd,
 		"--database", databasePath,
 		"--output", "json",
 		"ensure", "daily", "KODEX 200",
@@ -172,7 +172,7 @@ func TestSyncDailyCollectsAllPages(t *testing.T) {
 	cmd := NewRootCommand(BuildInfo{})
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	if err := executeForTest(context.Background(), cmd,
+	if err := executeForTest(t, context.Background(), cmd,
 		"--database", databasePath,
 		"--output", "json",
 		"sync", "daily",
@@ -194,7 +194,7 @@ func TestGetDailyMissingDataReturnsEnsureHint(t *testing.T) {
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 
-	err := executeForTest(context.Background(), cmd,
+	err := executeForTest(t, context.Background(), cmd,
 		"--database", filepath.Join(t.TempDir(), "mwosa.db"),
 		"get", "daily", "069500",
 		"--from", "20240101",
@@ -248,7 +248,7 @@ func TestBackfillDailyCollectsRange(t *testing.T) {
 	cmd := NewRootCommand(BuildInfo{})
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	if err := executeForTest(context.Background(), cmd,
+	if err := executeForTest(t, context.Background(), cmd,
 		"--database", databasePath,
 		"--output", "json",
 		"backfill", "daily",
@@ -332,7 +332,7 @@ func TestBackfillDailyUsesWorkersForPages(t *testing.T) {
 	cmd := NewRootCommand(BuildInfo{})
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	if err := executeForTest(context.Background(), cmd,
+	if err := executeForTest(t, context.Background(), cmd,
 		"--database", databasePath,
 		"--output", "json",
 		"backfill", "daily",
@@ -358,7 +358,23 @@ func setDataGoEnv(t *testing.T, baseURL string) {
 	t.Setenv("MWOSA_DATAGO_BASE_URL", baseURL)
 }
 
-func executeForTest(ctx context.Context, cmd *cobra.Command, args ...string) error {
+func executeForTest(t *testing.T, ctx context.Context, cmd *cobra.Command, args ...string) error {
+	t.Helper()
+	if !hasConfigFlag(args) {
+		args = append([]string{"--config", filepath.Join(t.TempDir(), "config.json")}, args...)
+	}
 	cmd.SetArgs(args)
 	return cmd.ExecuteContext(ctx)
+}
+
+func hasConfigFlag(args []string) bool {
+	for index, arg := range args {
+		if arg == "--config" || strings.HasPrefix(arg, "--config=") {
+			return true
+		}
+		if index > 0 && args[index-1] == "--config" {
+			return true
+		}
+	}
+	return false
 }
