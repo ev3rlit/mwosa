@@ -64,7 +64,7 @@ func TestInspectConfigCreatesAndPrintsResolvedPaths(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "inspect", "config"})
+	cmd.SetArgs([]string{"--config", configPath, "inspect", "config"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute inspect config: %v", err)
@@ -77,6 +77,30 @@ func TestInspectConfigCreatesAndPrintsResolvedPaths(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("inspect config output missing %q in:\n%s", want, got)
 		}
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
+		t.Fatalf("inspect config output should be json: %v\n%s", err, got)
+	}
+}
+
+func TestInspectConfigAlwaysWritesJSON(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--config", configPath, "--output", "csv", "inspect", "config"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute inspect config: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
+		t.Fatalf("inspect config output should ignore tabular output modes: %v\n%s", err, out.String())
+	}
+	if _, ok := parsed["config_file"]; !ok {
+		t.Fatalf("inspect config json missing config_file: %#v", parsed)
 	}
 }
 
@@ -96,6 +120,10 @@ func TestConfigSetUpdatesProviderConfigAndMasksSecretOutput(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "secret-key") {
 		t.Fatalf("config set output should mask secret:\n%s", out.String())
+	}
+	var result map[string]any
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("config set output should be json: %v\n%s", err, out.String())
 	}
 
 	data, err := os.ReadFile(configPath)

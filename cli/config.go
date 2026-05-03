@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,7 +76,7 @@ func newInspectConfigCommand(opts *Options) *cobra.Command {
 			if err := loadConfig(opts); err != nil {
 				return err
 			}
-			return writeConfigInspect(cmd.OutOrStdout(), opts.Output, configInspectFromResolved(opts.ConfigState))
+			return writeConfigOutput(cmd.OutOrStdout(), configInspectFromResolved(opts.ConfigState))
 		},
 	}
 }
@@ -110,7 +109,7 @@ func newConfigSetCommand(opts *Options) *cobra.Command {
 			opts.ProviderConfig = resolved.ProviderConfig
 			opts.ConfigState = resolved
 			opts.configLoaded = true
-			return writeConfigSetResult(cmd.OutOrStdout(), opts.Output, configSetResult{
+			return writeConfigOutput(cmd.OutOrStdout(), configSetResult{
 				ConfigFile: resolved.ConfigPath,
 				Setting:    args[0],
 				Value:      maskedConfigSetValue(args[0], args[1]),
@@ -178,86 +177,15 @@ func providerInspectFromConfig(config provider.Config) providerInspectItem {
 	return item
 }
 
-func writeConfigInspect(w io.Writer, output OutputMode, result configInspectResult) error {
-	errb := oops.In("cli_output").With("format", output)
-	switch output {
-	case "", OutputModeTable:
-		_, _ = fmt.Fprintln(w, "section\tkey\tvalue\tsource")
-		_, _ = fmt.Fprintf(w, "config\tpath\t%s\t%s\n", result.ConfigFile.Path, result.ConfigFile.Source)
-		_, _ = fmt.Fprintf(w, "config\texists\t%t\t\n", result.ConfigFile.Exists)
-		_, _ = fmt.Fprintf(w, "config\tcreated\t%t\t\n", result.ConfigFile.Created)
-		_, _ = fmt.Fprintf(w, "database\tpath\t%s\t%s\n", result.DatabaseFile.Path, result.DatabaseFile.Source)
-		_, _ = fmt.Fprintf(w, "data\tpath\t%s\t\n", result.DataDir.Path)
-		_, _ = fmt.Fprintf(w, "data\texists\t%t\t\n", result.DataDir.Exists)
-		_, _ = fmt.Fprintf(w, "app\tmarket\t%s\tconfig_file\n", result.App.Market)
-		for _, provider := range result.Providers {
-			_, _ = fmt.Fprintf(w, "provider.%s\tenabled\t%t\tconfig_file\n", provider.ID, provider.Enabled)
-			for key, configured := range provider.Auth {
-				_, _ = fmt.Fprintf(w, "provider.%s.auth\t%s\tconfigured=%t\tconfig_file\n", provider.ID, key, configured)
-			}
-			for _, group := range provider.Groups {
-				_, _ = fmt.Fprintf(w, "provider.%s.group.%s\tenabled\t%t\tconfig_file\n", provider.ID, group.ID, group.Enabled)
-			}
-		}
-		return nil
-	case OutputModeJSON:
-		encoder := json.NewEncoder(w)
-		encoder.SetIndent("", "  ")
-		return errb.Wrap(encoder.Encode(result))
-	case OutputModeNDJSON:
-		return errb.Wrap(json.NewEncoder(w).Encode(result))
-	case OutputModeCSV:
-		writer := csv.NewWriter(w)
-		if err := writer.Write([]string{"section", "key", "value", "source"}); err != nil {
-			return errb.Wrapf(err, "write config inspect csv header")
-		}
-		rows := [][]string{
-			{"config", "path", result.ConfigFile.Path, result.ConfigFile.Source},
-			{"config", "exists", fmt.Sprint(result.ConfigFile.Exists), ""},
-			{"config", "created", fmt.Sprint(result.ConfigFile.Created), ""},
-			{"database", "path", result.DatabaseFile.Path, result.DatabaseFile.Source},
-			{"data", "path", result.DataDir.Path, ""},
-			{"data", "exists", fmt.Sprint(result.DataDir.Exists), ""},
-			{"app", "market", result.App.Market, "config_file"},
-		}
-		for _, row := range rows {
-			if err := writer.Write(row); err != nil {
-				return errb.Wrapf(err, "write config inspect csv row")
-			}
-		}
-		writer.Flush()
-		return errb.Wrap(writer.Error())
-	default:
-		return errb.Errorf("unsupported output format: %s", output)
+func writeConfigOutput(w io.Writer, result any) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return oops.In("cli_output").Wrapf(err, "marshal config output")
 	}
-}
-
-func writeConfigSetResult(w io.Writer, output OutputMode, result configSetResult) error {
-	errb := oops.In("cli_output").With("format", output)
-	switch output {
-	case "", OutputModeTable:
-		_, _ = fmt.Fprintln(w, "config_file\tsetting\tvalue")
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", result.ConfigFile, result.Setting, result.Value)
-		return nil
-	case OutputModeJSON:
-		encoder := json.NewEncoder(w)
-		encoder.SetIndent("", "  ")
-		return errb.Wrap(encoder.Encode(result))
-	case OutputModeNDJSON:
-		return errb.Wrap(json.NewEncoder(w).Encode(result))
-	case OutputModeCSV:
-		writer := csv.NewWriter(w)
-		if err := writer.Write([]string{"config_file", "setting", "value"}); err != nil {
-			return errb.Wrapf(err, "write config set csv header")
-		}
-		if err := writer.Write([]string{result.ConfigFile, result.Setting, result.Value}); err != nil {
-			return errb.Wrapf(err, "write config set csv row")
-		}
-		writer.Flush()
-		return errb.Wrap(writer.Error())
-	default:
-		return errb.Errorf("unsupported output format: %s", output)
+	if _, err := w.Write(append(data, '\n')); err != nil {
+		return oops.In("cli_output").Wrapf(err, "write config output")
 	}
+	return nil
 }
 
 func maskedConfigSetValue(path string, value string) string {
