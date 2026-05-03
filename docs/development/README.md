@@ -68,3 +68,8 @@ provider 가 REST API 를 사용할 수도 있지만, 모든 provider 가 REST A
 core contract 에 영향을 주는 선택은 `docs/architectures/layers/README.md` 또는 `docs/architectures/provider/README.md` 에 반영한다.
 
 기술 스택으로 고정할 만큼 반복 사용이 확인된 선택은 `docs/architectures/tech-stack/README.md` 로 옮긴다.
+
+## 관련 문서
+
+- `docs/development/git-branching/README.md`
+- `docs/development/release/README.md`

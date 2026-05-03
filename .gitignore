@@ -35,6 +35,7 @@ clients/**/e2e-output*.json
 
 # local probe outputs
 tmp/
+dist/
 
 # Editor/IDE
 # .idea/
