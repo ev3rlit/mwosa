@@ -21,6 +21,11 @@ const (
 	DatabasePathEnv = "MWOSA_DATABASE"
 )
 
+var (
+	defaultConfigPath   string
+	defaultDatabasePath string
+)
+
 type Source string
 
 const (
@@ -151,6 +156,9 @@ func SetValues(opts Options, values map[string]string) (Resolved, error) {
 }
 
 func DefaultConfigPath() (string, error) {
+	if strings.TrimSpace(defaultConfigPath) != "" {
+		return absolutePath(defaultConfigPath)
+	}
 	base, err := configBaseDir()
 	if err != nil {
 		return "", err
@@ -255,6 +263,9 @@ func splitSettingPath(path string) []string {
 }
 
 func DefaultDatabasePath() (string, error) {
+	if strings.TrimSpace(defaultDatabasePath) != "" {
+		return absolutePath(defaultDatabasePath)
+	}
 	base, err := dataBaseDir()
 	if err != nil {
 		return "", err

@@ -25,6 +25,7 @@ go.work.sum
 
 # env file
 .env
+.mwosa/
 
 # Local provider client secrets and probe outputs
 clients/**/*.local.json
@@ -36,6 +37,7 @@ clients/**/e2e-output*.json
 # local probe outputs
 tmp/
 dist/
+bin/
 
 # Editor/IDE
 # .idea/

@@ -61,6 +61,35 @@ func TestLoadOrCreateCreatesConfigWithAppAndProviderDefaults(t *testing.T) {
 	}
 }
 
+func TestDefaultPathsCanBeOverriddenByDevelopmentBuild(t *testing.T) {
+	previousConfigPath := defaultConfigPath
+	previousDatabasePath := defaultDatabasePath
+	t.Cleanup(func() {
+		defaultConfigPath = previousConfigPath
+		defaultDatabasePath = previousDatabasePath
+	})
+
+	projectDir := t.TempDir()
+	defaultConfigPath = filepath.Join(projectDir, ".mwosa", "config.json")
+	defaultDatabasePath = filepath.Join(projectDir, ".mwosa", "mwosa.db")
+
+	configPath, err := DefaultConfigPath()
+	if err != nil {
+		t.Fatalf("DefaultConfigPath error = %v", err)
+	}
+	databasePath, err := DefaultDatabasePath()
+	if err != nil {
+		t.Fatalf("DefaultDatabasePath error = %v", err)
+	}
+
+	if configPath != filepath.Join(projectDir, ".mwosa", "config.json") {
+		t.Fatalf("config path = %q, want project-local config path", configPath)
+	}
+	if databasePath != filepath.Join(projectDir, ".mwosa", "mwosa.db") {
+		t.Fatalf("database path = %q, want project-local database path", databasePath)
+	}
+}
+
 func TestLoadOrCreateMergesNewProviderDefaultsWithoutOverwritingExistingValues(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	existing := File{
