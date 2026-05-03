@@ -5,27 +5,90 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
 	"github.com/samber/oops"
 )
 
-func writeBars(w io.Writer, output string, bars []dailybar.Bar) error {
+type OutputMode string
+
+const (
+	DefaultOutputMode OutputMode = OutputModeTable
+
+	OutputModeTable  OutputMode = "table"
+	OutputModeJSON   OutputMode = "json"
+	OutputModeNDJSON OutputMode = "ndjson"
+	OutputModeCSV    OutputMode = "csv"
+)
+
+var supportedOutputModes = []OutputMode{
+	OutputModeTable,
+	OutputModeJSON,
+	OutputModeNDJSON,
+	OutputModeCSV,
+}
+
+func SupportedOutputModeStrings() []string {
+	values := make([]string, 0, len(supportedOutputModes))
+	for _, mode := range supportedOutputModes {
+		values = append(values, string(mode))
+	}
+	return values
+}
+
+func OutputModeHelp() string {
+	return "output format: " + strings.Join(SupportedOutputModeStrings(), ", ")
+}
+
+func ParseOutputMode(value string) (OutputMode, error) {
+	if value == "" {
+		return DefaultOutputMode, nil
+	}
+	for _, mode := range supportedOutputModes {
+		if value == string(mode) {
+			return mode, nil
+		}
+	}
+	return "", oops.In("cli_output").With("format", value).Errorf("unsupported output format: %s", value)
+}
+
+func (m OutputMode) String() string {
+	if m == "" {
+		return string(DefaultOutputMode)
+	}
+	return string(m)
+}
+
+func (m *OutputMode) Set(value string) error {
+	mode, err := ParseOutputMode(value)
+	if err != nil {
+		return err
+	}
+	*m = mode
+	return nil
+}
+
+func (m OutputMode) Type() string {
+	return "output"
+}
+
+func writeBars(w io.Writer, output OutputMode, bars []dailybar.Bar) error {
 	errb := oops.In("cli_output").With("format", output)
 
 	switch output {
-	case "", "table":
+	case "", OutputModeTable:
 		_, _ = fmt.Fprintln(w, "date\tsymbol\tname\tclose\tvolume\tprovider\tgroup\toperation")
 		for _, bar := range bars {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", bar.TradingDate, bar.Symbol, bar.Name, bar.Close, bar.Volume, bar.Provider, bar.Group, bar.Operation)
 		}
 		return nil
-	case "json":
+	case OutputModeJSON:
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
 		return errb.With("rows", len(bars)).Wrap(encoder.Encode(bars))
-	case "ndjson":
+	case OutputModeNDJSON:
 		encoder := json.NewEncoder(w)
 		for _, bar := range bars {
 			if err := encoder.Encode(bar); err != nil {
@@ -33,7 +96,7 @@ func writeBars(w io.Writer, output string, bars []dailybar.Bar) error {
 			}
 		}
 		return nil
-	case "csv":
+	case OutputModeCSV:
 		writer := csv.NewWriter(w)
 		if err := writer.Write([]string{"date", "symbol", "name", "close", "volume", "provider", "group", "operation"}); err != nil {
 			return errb.Wrapf(err, "write daily bar csv header")
@@ -50,22 +113,22 @@ func writeBars(w io.Writer, output string, bars []dailybar.Bar) error {
 	}
 }
 
-func writeCollectResult(w io.Writer, output string, result daily.CollectResult) error {
+func writeCollectResult(w io.Writer, output OutputMode, result daily.CollectResult) error {
 	errb := oops.In("cli_output").With("format", output)
 	resultErrb := errb.With("provider", result.ProviderID, "group", result.Group)
 
 	switch output {
-	case "", "table":
+	case "", OutputModeTable:
 		_, _ = fmt.Fprintln(w, "market\tsecurity_type\tprovider\tgroup\tdates\tfetched\tstored\trows_affected")
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n", result.Market, result.SecurityType, result.ProviderID, result.Group, len(result.Dates), result.BarsFetched, result.BarsStored, result.RowsAffected)
 		return nil
-	case "json":
+	case OutputModeJSON:
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
 		return resultErrb.Wrap(encoder.Encode(result))
-	case "ndjson":
+	case OutputModeNDJSON:
 		return resultErrb.Wrap(json.NewEncoder(w).Encode(result))
-	case "csv":
+	case OutputModeCSV:
 		writer := csv.NewWriter(w)
 		if err := writer.Write([]string{"market", "security_type", "provider", "group", "dates", "fetched", "stored", "rows_affected"}); err != nil {
 			return errb.Wrapf(err, "write collect csv header")

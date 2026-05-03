@@ -1,12 +1,9 @@
 package cli
 
 import (
+	"github.com/ev3rlit/mwosa/app"
 	provider "github.com/ev3rlit/mwosa/providers/core"
-	"github.com/ev3rlit/mwosa/providers/core/dailybar"
-	"github.com/ev3rlit/mwosa/providers/datago"
 	"github.com/ev3rlit/mwosa/service/daily"
-	"github.com/ev3rlit/mwosa/storage"
-	dailybarstorage "github.com/ev3rlit/mwosa/storage/dailybar"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 )
@@ -62,13 +59,13 @@ func newGetDailyCommand(opts *Options) *cobra.Command {
 		Short: "Read stored daily bars for a symbol",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			dailyService, err := newDailyReadService(opts)
+			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
 				return err
 			}
-			defer closeDailyReadService(dailyService, &err)
+			defer closeAppRuntime(runtime, &err)
 
-			result, err := dailyService.service.Get(cmd.Context(), daily.Request{
+			result, err := runtime.Services.Daily.Reader.Get(cmd.Context(), daily.Request{
 				Market:       provider.Market(opts.Market),
 				SecurityType: provider.SecurityType(flags.SecurityType),
 				Symbol:       args[0],
@@ -93,13 +90,13 @@ func newEnsureDailyCommand(opts *Options) *cobra.Command {
 		Short: "Fetch missing daily bars for a symbol and store them locally",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			dailyService, err := newDailyCollectService(opts)
+			runtime, err := newAppRuntime(opts, true)
 			if err != nil {
 				return err
 			}
-			defer closeDailyCollectService(dailyService, &err)
+			defer closeAppRuntime(runtime, &err)
 
-			result, err := dailyService.service.Ensure(cmd.Context(), daily.Request{
+			result, err := runtime.Services.Daily.Collector.Ensure(cmd.Context(), daily.Request{
 				ProviderID:     provider.ProviderID(opts.Provider),
 				PreferProvider: provider.ProviderID(opts.PreferProvider),
 				Market:         provider.Market(opts.Market),
@@ -126,13 +123,13 @@ func newSyncDailyCommand(opts *Options) *cobra.Command {
 		Short: "Collect one provider daily batch for a date",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			dailyService, err := newDailyCollectService(opts)
+			runtime, err := newAppRuntime(opts, true)
 			if err != nil {
 				return err
 			}
-			defer closeDailyCollectService(dailyService, &err)
+			defer closeAppRuntime(runtime, &err)
 
-			result, err := dailyService.service.Sync(cmd.Context(), daily.Request{
+			result, err := runtime.Services.Daily.Collector.Sync(cmd.Context(), daily.Request{
 				ProviderID:     provider.ProviderID(opts.Provider),
 				PreferProvider: provider.ProviderID(opts.PreferProvider),
 				Market:         provider.Market(opts.Market),
@@ -157,13 +154,13 @@ func newBackfillDailyCommand(opts *Options) *cobra.Command {
 		Short: "Collect provider daily batches for a date range",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			dailyService, err := newDailyCollectService(opts)
+			runtime, err := newAppRuntime(opts, true)
 			if err != nil {
 				return err
 			}
-			defer closeDailyCollectService(dailyService, &err)
+			defer closeAppRuntime(runtime, &err)
 
-			result, err := dailyService.service.Backfill(cmd.Context(), daily.Request{
+			result, err := runtime.Services.Daily.Collector.Backfill(cmd.Context(), daily.Request{
 				ProviderID:     provider.ProviderID(opts.Provider),
 				PreferProvider: provider.ProviderID(opts.PreferProvider),
 				Market:         provider.Market(opts.Market),
@@ -196,64 +193,24 @@ func addSecurityTypeFlag(cmd *cobra.Command, flags *dailyFlags) {
 	cmd.Flags().StringVar(&flags.SecurityType, "security-type", flags.SecurityType, "security type: etf, etn, elw")
 }
 
-type dailyReadService struct {
-	service daily.ReadService
-	close   func() error
+func newAppRuntime(opts *Options, activateProviders bool) (*app.Runtime, error) {
+	if opts == nil {
+		return nil, oops.In("cli").New("cli options are nil")
+	}
+	if err := opts.Validate(); err != nil {
+		return nil, oops.In("cli").Wrapf(err, "validate cli options")
+	}
+	return app.NewRuntime(app.Options{
+		Database:          opts.Database,
+		ProviderID:        provider.ProviderID(opts.Provider),
+		PreferProvider:    provider.ProviderID(opts.PreferProvider),
+		ActivateProviders: activateProviders,
+	})
 }
 
-type dailyCollectService struct {
-	service daily.Service
-	close   func() error
-}
-
-func closeDailyReadService(service dailyReadService, err *error) {
-	if service.close == nil {
+func closeAppRuntime(runtime *app.Runtime, err *error) {
+	if runtime == nil {
 		return
 	}
-	*err = oops.Join(*err, service.close())
-}
-
-func closeDailyCollectService(service dailyCollectService, err *error) {
-	if service.close == nil {
-		return
-	}
-	*err = oops.Join(*err, service.close())
-}
-
-func newDailyReadService(opts *Options) (dailyReadService, error) {
-	errb := oops.In("cli")
-
-	database := storage.NewDatabase(opts.Database)
-	reader, err := dailybarstorage.NewReadRepository(database)
-	if err != nil {
-		return dailyReadService{}, errb.Wrapf(err, "create daily read repository")
-	}
-	service, err := daily.NewReadService(reader)
-	if err != nil {
-		return dailyReadService{}, errb.Wrapf(err, "create daily read service")
-	}
-	return dailyReadService{service: service, close: database.Close}, nil
-}
-
-func newDailyCollectService(opts *Options) (dailyCollectService, error) {
-	errb := oops.In("cli")
-
-	database := storage.NewDatabase(opts.Database)
-	reader, writer, err := dailybarstorage.NewRepositories(database)
-	if err != nil {
-		return dailyCollectService{}, errb.Wrapf(err, "create daily repositories")
-	}
-	registry := provider.NewRegistry()
-	if err := registry.RegisterConfiguredFromEnv(provider.RegisterOptions{
-		ProviderID:     provider.ProviderID(opts.Provider),
-		PreferProvider: provider.ProviderID(opts.PreferProvider),
-	}, datago.NewBuilder()); err != nil {
-		return dailyCollectService{}, errb.Wrapf(err, "register configured providers")
-	}
-	router := dailybar.NewRouter(provider.NewRouter(registry))
-	service, err := daily.NewService(reader, writer, router)
-	if err != nil {
-		return dailyCollectService{}, errb.Wrapf(err, "create daily service")
-	}
-	return dailyCollectService{service: service, close: database.Close}, nil
+	*err = oops.Join(*err, runtime.Close())
 }

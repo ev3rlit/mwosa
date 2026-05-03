@@ -6,6 +6,8 @@ import (
 	"runtime"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 )
 
@@ -21,16 +23,44 @@ type BuildInfo struct {
 }
 
 type Options struct {
-	Output         string
-	Provider       string
+	// 필수. 명령 결과를 출력할 형식이다.
+	Output OutputMode
+
+	// 선택. 비어 있으면 provider router 가 요청에 맞는 provider 를 고른다.
+	Provider string
+
+	// 선택. 비어 있으면 provider router 의 기본 우선순위를 따른다.
 	PreferProvider string
-	Market         string
-	Database       string
+
+	// 필수. provider routing 과 storage query 에 사용할 시장 ID 다.
+	Market string
+
+	// 필수. 로컬 SQLite database 경로다.
+	Database string
+}
+
+func (opts Options) Validate() error {
+	return validation.ValidateStruct(&opts,
+		validation.Field(&opts.Output, validation.Required, validation.By(validateOutputMode)),
+		validation.Field(&opts.Provider),
+		validation.Field(&opts.PreferProvider),
+		validation.Field(&opts.Market, validation.Required),
+		validation.Field(&opts.Database, validation.Required),
+	)
+}
+
+func validateOutputMode(value any) error {
+	mode, ok := value.(OutputMode)
+	if !ok {
+		return oops.In("cli").New("output mode has invalid type")
+	}
+	_, err := ParseOutputMode(string(mode))
+	return err
 }
 
 func NewRootCommand(build BuildInfo) *cobra.Command {
 	opts := Options{
-		Output:   "table",
+		Output:   DefaultOutputMode,
 		Market:   string(provider.MarketKRX),
 		Database: ".mwosa-data/mwosa.db",
 	}
@@ -42,12 +72,11 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	cmd.PersistentFlags().StringVarP(
+	cmd.PersistentFlags().VarP(
 		&opts.Output,
 		"output",
 		"o",
-		opts.Output,
-		"output format: table, json, ndjson, csv",
+		OutputModeHelp(),
 	)
 	cmd.PersistentFlags().StringVar(
 		&opts.Provider,

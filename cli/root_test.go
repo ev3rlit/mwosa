@@ -50,3 +50,31 @@ func TestRootHelpHasOutputFlag(t *testing.T) {
 		t.Fatalf("help output should include --output flag:\n%s", got)
 	}
 }
+
+func TestOptionsValidateTreatsProviderFlagsAsOptional(t *testing.T) {
+	opts := Options{
+		Output:   OutputModeTable,
+		Market:   "krx",
+		Database: ".mwosa-data/mwosa.db",
+	}
+
+	if err := opts.Validate(); err != nil {
+		t.Fatalf("Validate error = %v, want nil", err)
+	}
+}
+
+func TestOptionsValidateRequiresCoreOptions(t *testing.T) {
+	opts := Options{
+		Output: OutputMode("xml"),
+	}
+
+	err := opts.Validate()
+	if err == nil {
+		t.Fatal("Validate error = nil, want validation errors")
+	}
+	for _, want := range []string{"Output", "Market", "Database"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("validation error missing %q in %q", want, err.Error())
+		}
+	}
+}
