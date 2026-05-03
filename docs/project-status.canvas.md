@@ -61,6 +61,9 @@ viewport:
 - `docs/architectures/layers/README.md`: 레이어 책임, 금지 방향, 디렉터리 예시
 - `docs/architectures/provider/README.md`: provider role/router/adapter 구조
 - `docs/architectures/indicator/README.md`: 지표와 추세 계산 레이어
+- `docs/architectures/packages/README.md`: 독립 core package 경계
+- `docs/architectures/packages/indicators/README.md`: 투자 보조지표 계산 패키지 논의
+- `docs/features/indicators/README.md`: 보조지표 패키지 구현 태스크
 - `docs/development/README.md`: 개발 협업 기준, HTTP client 선택 기준
 - `docs/providers/datago/README.md`: `datago` provider 와 첫 provider group 구현 계획
 
