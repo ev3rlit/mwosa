@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	entgo.io/ent v0.14.6
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/samber/oops v1.21.0
 	github.com/spf13/cobra v1.10.2
 	modernc.org/sqlite v1.50.0
