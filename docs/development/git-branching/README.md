@@ -9,8 +9,8 @@
 ## 기본 방향
 
 - `main` 은 항상 다음 릴리스 후보가 모이는 기준선이다.
-- `feat/*`, `fix/*`, `docs/*`, `exp/*` 는 원격에 push 할 수 있는 작업 브랜치다.
-- 리모트에 만들 수 있는 브랜치는 `main`, `release/*`, `feat/*`, `fix/*`, `docs/*`, `exp/*` 로 제한한다.
+- `feat/*`, `fix/*` 는 원격에 push 할 수 있는 작업 브랜치다.
+- 리모트에 만들 수 있는 브랜치는 `main`, `release/*`, `feat/*`, `fix/*` 로 제한한다.
 - `codex/*`, `claude/*` 처럼 도구나 워크트리 출처를 드러내는 접두사는 리모트 브랜치 이름으로 쓰지 않는다.
 - 사용자가 설치하는 기준은 브랜치가 아니라 `vX.Y.Z` 태그다.
 
@@ -21,12 +21,10 @@
 | `main` | local, remote | 검증된 변경이 모이는 기본 브랜치 |
 | `feat/<topic>` | local, remote | 작은 기능 구현 |
 | `fix/<topic>` | local, remote | 버그 수정 또는 설정 수정 |
-| `docs/<topic>` | local, remote | 문서 전용 변경 |
-| `exp/<topic>` | local, remote | 버려도 되는 실험 |
 | `release/vX.Y` | local, remote | `vX.Y.Z` 패치 릴리스 안정화 |
 | `vX.Y.Z` tag | remote | 사용자가 설치하는 고정 버전 |
 
-`feat/*`, `fix/*`, `docs/*`, `exp/*` 는 원격에 push 할 수 있지만 배포 기준은 아니다. PR, CI, 리뷰, 작업 공유를 위한 브랜치로 사용하고, 검증된 변경만 `main` 또는 `release/*` 로 통합한다.
+`feat/*`, `fix/*` 는 원격에 push 할 수 있지만 배포 기준은 아니다. PR, CI, 리뷰, 작업 공유를 위한 브랜치로 사용하고, 검증된 변경만 `main` 또는 `release/*` 로 통합한다.
 
 ## 작업 흐름
 
@@ -106,8 +104,6 @@ go install github.com/<owner>/mwosa/cmd/mwosa@v0.1.0
 - `feat/datago-client`
 - `feat/sqlite-dailybar-store`
 - `fix/provider-error-context`
-- `docs/git-branching-strategy`
-- `exp/momentum-screening-rules`
 
 피할 예:
 
@@ -140,10 +136,10 @@ GitHub 에서는 브랜치 이름 allowlist 를 ruleset 으로 강제한다.
 - Regex:
 
 ```regex
-^(main|release/v[0-9]+\.[0-9]+|(feat|fix|docs|exp)/[a-z0-9][a-z0-9._/-]*)\n?$
+^(main|release/v[0-9]+\.[0-9]+|(feat|fix)/[a-z0-9][a-z0-9._/-]*)\n?$
 ```
 
-이 ruleset 은 `main`, `release/v0.1`, `feat/datago-client`, `fix/provider-error-context`, `docs/git-branching-strategy`, `exp/momentum-screening-rules` 를 허용한다.
+이 ruleset 은 `main`, `release/v0.1`, `feat/datago-client`, `fix/provider-error-context` 를 허용한다.
 
 반대로 `codex/feat/datago-client`, `claude/fix/provider-error-context`, `worktree/test`, `phase1`, `dev`, `staging`, `prod` 는 허용하지 않는다.
 
