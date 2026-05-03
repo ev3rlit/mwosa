@@ -25,3 +25,24 @@
 
 - `storage/ent`는 직접 수정하지 않습니다.
 - Ent schema는 `storage/schema` 아래에서 변경한 뒤 생성 코드를 다시 만듭니다.
+
+## Git branch strategy
+
+`mwosa` 의 브랜치 운영 기준은 `docs/development/git-branching/README.md` 를 따릅니다. 이 결정의 ADR 은 `docs/adr/0001-cli-release-branching-strategy.md` 에 기록되어 있습니다.
+
+핵심 규칙:
+
+- `codex/*`, `claude/*`, `worktree/*` 같은 도구별 접두사는 리모트에 push 하지 않습니다.
+- 리모트에 push 할 수 있는 브랜치는 `main`, `release/*`, `feat/*`, `fix/*`, `docs/*`, `exp/*` 입니다.
+- 사용자가 설치하는 CLI 기준은 `vX.Y.Z` SemVer 태그입니다.
+- 배포 안정화는 `release/vX.Y` 브랜치에서 진행합니다.
+- 일반 기능, 수정, 문서, 실험 작업은 작은 `feat/*`, `fix/*`, `docs/*`, `exp/*` 브랜치에서 시작합니다.
+- GitHub ruleset 으로 허용된 브랜치 이름만 원격에 생성합니다.
+
+작업 전에 현재 브랜치와 원격 추적 상태를 확인합니다.
+
+```bash
+git status --short --branch
+```
+
+작업 브랜치에서 작업한 변경은 검증 후 PR 또는 명시적인 merge 절차로 `main` 또는 필요한 `release/*` 브랜치에 통합합니다.
