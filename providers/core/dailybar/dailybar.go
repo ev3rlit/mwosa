@@ -55,29 +55,29 @@ type FetchInput struct {
 }
 
 type Bar struct {
-	Provider     provider.ProviderID   `json:"provider"`
-	Group        provider.GroupID      `json:"provider_group"`
-	Operation    provider.OperationID  `json:"operation"`
-	Market       provider.Market       `json:"market"`
-	SecurityType provider.SecurityType `json:"security_type"`
+	Provider     provider.ProviderID   `json:"provider" csv:"-"`
+	Group        provider.GroupID      `json:"provider_group" csv:"-"`
+	Operation    provider.OperationID  `json:"operation" csv:"-"`
+	Market       provider.Market       `json:"market" csv:"-"`
+	SecurityType provider.SecurityType `json:"security_type" csv:"-"`
 
-	Symbol      string `json:"symbol"`
-	ISIN        string `json:"isin,omitempty"`
-	Name        string `json:"name,omitempty"`
-	TradingDate string `json:"trading_date"`
-	Currency    string `json:"currency"`
+	TradingDate string `json:"trading_date" csv:"date"`
+	Symbol      string `json:"symbol" csv:"symbol"`
+	ISIN        string `json:"isin,omitempty" csv:"-"`
+	Name        string `json:"name,omitempty" csv:"name"`
+	Currency    string `json:"currency" csv:"-"`
 
-	Open        string `json:"opening_price,omitempty"`
-	High        string `json:"highest_price,omitempty"`
-	Low         string `json:"lowest_price,omitempty"`
-	Close       string `json:"closing_price,omitempty"`
-	Change      string `json:"price_change_from_previous_close,omitempty"`
-	ChangeRate  string `json:"price_change_rate_from_previous_close,omitempty"`
-	Volume      string `json:"traded_volume,omitempty"`
-	TradedValue string `json:"traded_amount,omitempty"`
-	MarketCap   string `json:"market_capitalization,omitempty"`
+	Open        string `json:"opening_price,omitempty" csv:"open"`
+	High        string `json:"highest_price,omitempty" csv:"high"`
+	Low         string `json:"lowest_price,omitempty" csv:"low"`
+	Close       string `json:"closing_price,omitempty" csv:"close"`
+	Change      string `json:"price_change_from_previous_close,omitempty" csv:"change"`
+	ChangeRate  string `json:"price_change_rate_from_previous_close,omitempty" csv:"-"`
+	Volume      string `json:"traded_volume,omitempty" csv:"-"`
+	TradedValue string `json:"traded_amount,omitempty" csv:"-"`
+	MarketCap   string `json:"market_capitalization,omitempty" csv:"-"`
 
-	Extensions map[string]string `json:"extensions,omitempty"`
+	Extensions map[string]string `json:"extensions,omitempty" csv:"-"`
 }
 
 type FetchResult struct {

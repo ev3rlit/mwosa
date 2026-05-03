@@ -9,6 +9,7 @@ import (
 
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
+	"github.com/jszwec/csvutil"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
@@ -77,18 +78,12 @@ func (m OutputMode) Type() string {
 	return "output"
 }
 
-type RecordSet struct {
-	Columns []string
-	Rows    [][]string
-}
-
 func writeBars(w io.Writer, output OutputMode, bars []dailybar.Bar) error {
 	errb := oops.In("cli_output").With("format", output)
-	records := dailyBarsRecordSet(bars)
 
 	switch output {
 	case "", OutputModeTable:
-		return writeTable(w, records)
+		return writeDailyBarsTable(w, bars)
 	case OutputModeJSON:
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
@@ -102,7 +97,7 @@ func writeBars(w io.Writer, output OutputMode, bars []dailybar.Bar) error {
 		}
 		return nil
 	case OutputModeCSV:
-		return writeCSV(w, records)
+		return writeCSV(w, bars)
 	default:
 		return errb.Errorf("unsupported output format: %s", output)
 	}
@@ -111,11 +106,10 @@ func writeBars(w io.Writer, output OutputMode, bars []dailybar.Bar) error {
 func writeCollectResult(w io.Writer, output OutputMode, result daily.CollectResult) error {
 	errb := oops.In("cli_output").With("format", output)
 	resultErrb := errb.With("provider", result.ProviderID, "group", result.Group)
-	records := collectResultRecordSet(result)
 
 	switch output {
 	case "", OutputModeTable:
-		return writeTable(w, records)
+		return writeCollectResultTable(w, result)
 	case OutputModeJSON:
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
@@ -123,15 +117,14 @@ func writeCollectResult(w io.Writer, output OutputMode, result daily.CollectResu
 	case OutputModeNDJSON:
 		return resultErrb.Wrap(json.NewEncoder(w).Encode(result))
 	case OutputModeCSV:
-		return writeCSV(w, records)
+		return writeCSV(w, []daily.CollectResult{result})
 	default:
 		return errb.Errorf("unsupported output format: %s", output)
 	}
 }
 
-func writeTable(w io.Writer, records RecordSet) error {
-	errb := oops.In("cli_output").With("columns", len(records.Columns), "rows", len(records.Rows))
-
+func writeTable(w io.Writer, header []string, rows [][]string) error {
+	errb := oops.In("cli_output").With("columns", len(header), "rows", len(rows))
 	table := tablewriter.NewTable(w,
 		tablewriter.WithRenderer(renderer.NewBlueprint(tw.Rendition{
 			Borders: tw.BorderNone,
@@ -147,43 +140,35 @@ func writeTable(w io.Writer, records RecordSet) error {
 		tablewriter.WithRowAutoFormat(tw.Off),
 		tablewriter.WithPadding(tw.Padding{Right: "  ", Overwrite: true}),
 	)
-	table.Header(records.Columns)
-	if err := table.Bulk(records.Rows); err != nil {
+	table.Header(header)
+	if err := table.Bulk(rows); err != nil {
 		return errb.Wrapf(err, "write table rows")
 	}
 	return errb.Wrap(table.Render())
 }
 
-func writeCSV(w io.Writer, records RecordSet) error {
-	errb := oops.In("cli_output").With("columns", len(records.Columns), "rows", len(records.Rows))
+func writeCSV(w io.Writer, rows any) error {
 	writer := csv.NewWriter(w)
-	if err := writer.Write(records.Columns); err != nil {
-		return errb.Wrapf(err, "write csv header")
-	}
-	for _, row := range records.Rows {
-		if err := writer.Write(row); err != nil {
-			return errb.Wrapf(err, "write csv row")
-		}
+	encoder := csvutil.NewEncoder(writer)
+	if err := encoder.Encode(rows); err != nil {
+		return oops.In("cli_output").Wrapf(err, "write csv")
 	}
 	writer.Flush()
-	return errb.Wrap(writer.Error())
+	return oops.In("cli_output").Wrap(writer.Error())
 }
 
-func dailyBarsRecordSet(bars []dailybar.Bar) RecordSet {
+func writeDailyBarsTable(w io.Writer, bars []dailybar.Bar) error {
 	rows := make([][]string, 0, len(bars))
 	for _, bar := range bars {
 		rows = append(rows, []string{bar.TradingDate, bar.Symbol, bar.Name, bar.Open, bar.High, bar.Low, bar.Close, bar.Change})
 	}
-	return RecordSet{
-		Columns: []string{"date", "symbol", "name", "open", "high", "low", "close", "change"},
-		Rows:    rows,
-	}
+	return writeTable(w, []string{"date", "symbol", "name", "open", "high", "low", "close", "change"}, rows)
 }
 
-func collectResultRecordSet(result daily.CollectResult) RecordSet {
-	return RecordSet{
-		Columns: []string{"market", "security_type", "provider", "group", "dates", "fetched", "stored", "rows_affected"},
-		Rows: [][]string{{
+func writeCollectResultTable(w io.Writer, result daily.CollectResult) error {
+	return writeTable(w,
+		[]string{"market", "security_type", "provider", "group", "dates", "fetched", "stored", "rows_affected"},
+		[][]string{{
 			string(result.Market),
 			string(result.SecurityType),
 			string(result.ProviderID),
@@ -193,5 +178,5 @@ func collectResultRecordSet(result daily.CollectResult) RecordSet {
 			fmt.Sprint(result.BarsStored),
 			fmt.Sprint(result.RowsAffected),
 		}},
-	}
+	)
 }

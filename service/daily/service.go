@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -88,17 +89,23 @@ type BarsResult struct {
 	Bars []dailybar.Bar
 }
 
-type CollectResult struct {
-	Market       provider.Market       `json:"market"`
-	SecurityType provider.SecurityType `json:"security_type"`
-	ProviderID   provider.ProviderID   `json:"provider"`
-	Group        provider.GroupID      `json:"provider_group"`
-	Dates        []string              `json:"dates"`
-	BarsFetched  int                   `json:"bars_fetched"`
-	BarsStored   int                   `json:"bars_stored"`
-	RowsAffected int                   `json:"rows_affected"`
+type DateList []string
 
-	bars []dailybar.Bar
+func (d DateList) MarshalCSV() ([]byte, error) {
+	return []byte(strconv.Itoa(len(d))), nil
+}
+
+type CollectResult struct {
+	Market       provider.Market       `json:"market" csv:"market"`
+	SecurityType provider.SecurityType `json:"security_type" csv:"security_type"`
+	ProviderID   provider.ProviderID   `json:"provider" csv:"provider"`
+	Group        provider.GroupID      `json:"provider_group" csv:"group"`
+	Dates        DateList              `json:"dates" csv:"dates"`
+	BarsFetched  int                   `json:"bars_fetched" csv:"fetched"`
+	BarsStored   int                   `json:"bars_stored" csv:"stored"`
+	RowsAffected int                   `json:"rows_affected" csv:"rows_affected"`
+
+	bars []dailybar.Bar `csv:"-"`
 }
 
 func (s ReadService) Get(ctx context.Context, req Request) (BarsResult, error) {
@@ -303,7 +310,7 @@ func normalizeBackfillWorkers(workers int) (int, error) {
 	return workers, nil
 }
 
-func collectDatesFromBars(bars []dailybar.Bar) []string {
+func collectDatesFromBars(bars []dailybar.Bar) DateList {
 	seen := make(map[string]bool)
 	dates := make([]string, 0)
 	for _, bar := range bars {
@@ -314,7 +321,7 @@ func collectDatesFromBars(bars []dailybar.Bar) []string {
 		dates = append(dates, bar.TradingDate)
 	}
 	sort.Strings(dates)
-	return dates
+	return DateList(dates)
 }
 
 func queryFromRequest(req Request, dates []time.Time) Query {

@@ -7,6 +7,7 @@ import (
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/service/daily"
 )
 
 func TestWriteBarsTableShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
@@ -57,13 +58,33 @@ func TestWriteBarsCSVShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
 	}
 }
 
-func TestWriteTableRendersRecordSet(t *testing.T) {
+func TestWriteCollectResultCSVUsesServiceCSVContract(t *testing.T) {
 	var out bytes.Buffer
 
-	err := writeTable(&out, RecordSet{
-		Columns: []string{"kind", "name"},
-		Rows:    [][]string{{"etf", "한국 ETF"}},
+	err := writeCollectResult(&out, OutputModeCSV, daily.CollectResult{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeETF,
+		ProviderID:   provider.ProviderDataGo,
+		Group:        provider.GroupSecuritiesProductPrice,
+		Dates:        daily.DateList{"2026-04-24", "2026-04-27"},
+		BarsFetched:  10,
+		BarsStored:   8,
+		RowsAffected: 6,
 	})
+	if err != nil {
+		t.Fatalf("write collect result csv: %v", err)
+	}
+
+	want := "market,security_type,provider,group,dates,fetched,stored,rows_affected\nkrx,etf,datago,securitiesProductPrice,2,10,8,6\n"
+	if got := out.String(); got != want {
+		t.Fatalf("csv output = %q, want %q", got, want)
+	}
+}
+
+func TestWriteTableRendersAlignedColumns(t *testing.T) {
+	var out bytes.Buffer
+
+	err := writeTable(&out, []string{"kind", "name"}, [][]string{{"etf", "한국 ETF"}})
 	if err != nil {
 		t.Fatalf("write table: %v", err)
 	}

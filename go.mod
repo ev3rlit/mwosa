@@ -6,6 +6,7 @@ require (
 	entgo.io/ent v0.14.6
 	github.com/ev3rlit/mwosa/clients/datago-etp v0.0.0-20260503103611-57138e7267ca
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
+	github.com/jszwec/csvutil v1.10.0
 	github.com/olekukonko/tablewriter v1.1.4
 	github.com/samber/oops v1.21.0
 	github.com/spf13/cobra v1.10.2
