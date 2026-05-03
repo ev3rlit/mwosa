@@ -123,6 +123,7 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 	cmd.AddCommand(newVersionCommand(build))
 	cmd.AddCommand(newInspectCommand(&opts))
 	cmd.AddCommand(newConfigCommand(&opts))
+	cmd.AddCommand(newProviderCommand(&opts))
 	cmd.AddCommand(newGetCommand(&opts))
 	cmd.AddCommand(newEnsureCommand(&opts))
 	cmd.AddCommand(newSyncCommand(&opts))
@@ -159,10 +160,7 @@ func providerDefaults() []appconfig.ProviderDefault {
 	builders := builtin.Builders()
 	defaults := make([]appconfig.ProviderDefault, 0, len(builders))
 	for _, builder := range builders {
-		defaultProvider, ok := builder.(appconfig.ProviderDefault)
-		if ok {
-			defaults = append(defaults, defaultProvider)
-		}
+		defaults = append(defaults, builder)
 	}
 	return defaults
 }

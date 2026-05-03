@@ -41,6 +41,28 @@ func (Builder) DefaultConfig() provider.Config {
 	}
 }
 
+func (Builder) ConfigSpec() provider.ConfigSpec {
+	return provider.ConfigSpec{
+		ProviderID: provider.ProviderDataGo,
+		Fields: []provider.ConfigField{
+			{
+				Path:        "auth.service_key",
+				Flag:        "service-key",
+				Required:    true,
+				Secret:      true,
+				Description: "공공데이터포털 service key",
+				Env:         []string{serviceKeyEnv, serviceKeyFallbackEnv},
+			},
+			{
+				Path:        "base_url",
+				Flag:        "base-url",
+				Description: "override datago API base URL",
+				Env:         []string{baseURLEnv},
+			},
+		},
+	}
+}
+
 func (Builder) Decide(opts provider.RegisterOptions, config provider.Config) provider.RegistrationDecision {
 	if !enabledFromConfig(config) {
 		return provider.RegistrationDecision{

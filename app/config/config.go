@@ -117,7 +117,11 @@ func LoadOrCreate(opts Options) (Resolved, error) {
 }
 
 func SetValue(opts Options, settingPath string, rawValue string) (Resolved, error) {
-	errb := oops.In("app_config").With("setting", settingPath)
+	return SetValues(opts, map[string]string{settingPath: rawValue})
+}
+
+func SetValues(opts Options, values map[string]string) (Resolved, error) {
+	errb := oops.In("app_config")
 	configPath, _, err := resolveConfigPath(opts.ConfigPath)
 	if err != nil {
 		return Resolved{}, errb.Wrap(err)
@@ -131,8 +135,10 @@ func SetValue(opts Options, settingPath string, rawValue string) (Resolved, erro
 		return Resolved{}, errb.With("path", configPath).Wrap(err)
 	}
 	applyDefaults(&cfg, opts, defaultDatabasePath)
-	if err := setConfigValue(&cfg, settingPath, rawValue, opts.ProviderDefaults); err != nil {
-		return Resolved{}, errb.Wrap(err)
+	for settingPath, rawValue := range values {
+		if err := setConfigValue(&cfg, settingPath, rawValue, opts.ProviderDefaults); err != nil {
+			return Resolved{}, errb.With("setting", settingPath).Wrap(err)
+		}
 	}
 	if err := writeConfigFile(configPath, cfg); err != nil {
 		return Resolved{}, errb.With("path", configPath).Wrap(err)

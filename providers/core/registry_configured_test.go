@@ -92,6 +92,14 @@ func (b fakeBuilder) ID() provider.ProviderID {
 	return b.id
 }
 
+func (b fakeBuilder) DefaultConfig() provider.Config {
+	return provider.Config{"id": string(b.id)}
+}
+
+func (b fakeBuilder) ConfigSpec() provider.ConfigSpec {
+	return provider.ConfigSpec{ProviderID: b.id}
+}
+
 func (b fakeBuilder) Decide(provider.RegisterOptions, provider.Config) provider.RegistrationDecision {
 	return b.decision
 }

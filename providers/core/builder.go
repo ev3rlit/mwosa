@@ -12,6 +12,8 @@ type RegistrationDecision struct {
 
 type ProviderBuilder interface {
 	ID() ProviderID
+	DefaultConfig() Config
+	ConfigSpec() ConfigSpec
 	Decide(RegisterOptions, Config) RegistrationDecision
 	Build(Config) (IdentityProvider, error)
 }

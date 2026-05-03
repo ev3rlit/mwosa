@@ -8,6 +8,20 @@ import (
 
 type Config map[string]any
 
+type ConfigField struct {
+	Path        string
+	Flag        string
+	Required    bool
+	Secret      bool
+	Description string
+	Env         []string
+}
+
+type ConfigSpec struct {
+	ProviderID ProviderID
+	Fields     []ConfigField
+}
+
 func ConfigFromEnv() Config {
 	env := make(map[string]any)
 	for _, item := range os.Environ() {
