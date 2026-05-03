@@ -2,9 +2,9 @@
 
 ## 목적
 
-ETF 데이터를 먼저 외부 도구에서 다루기 쉬운 JSON 계층으로 제공하고, 그 위에 스크리닝 프리셋과 나중의 커스텀 DSL 을 얹는다.
+ETF 데이터를 먼저 외부 도구에서 다루기 쉬운 JSON 계층으로 제공하고, 그 위에 `jq` 기반 스크리닝 전략을 얹는다.
 
-초기 목표는 똑똑한 쿼리 언어를 바로 만드는 것이 아니라, `jq`, DuckDB, SQLite, Python, AI agent 가 같은 데이터를 쉽게 읽을 수 있게 하는 것이다.
+초기 목표는 별도 쿼리 언어나 커스텀 DSL 을 만드는 것이 아니라, `jq`, DuckDB, SQLite, Python, AI agent 가 같은 데이터를 쉽게 읽을 수 있게 하는 것이다.
 
 ## 배경
 
@@ -52,7 +52,7 @@ mwosa get daily --asset etf --output json \
   | jq 'map(select(.itmsNm | contains("미국채")))'
 ```
 
-나중에 필요하면 `--jq` 같은 편의 옵션을 검토할 수 있지만, 핵심은 자체 jq 방언을 만드는 것이 아니라 안정적인 JSON 데이터를 내보내는 것이다.
+나중에 필요하면 `--jq`, `--jq-file`, Unix pipeline, 저장된 strategy 실행 같은 편의 옵션을 제공한다. 핵심은 자체 jq 방언을 만드는 것이 아니라 안정적인 JSON 데이터를 내보내고 표준 `jq` 를 실행 경로로 지원하는 것이다.
 
 ### 4. 도메인 프리셋
 
@@ -66,23 +66,19 @@ mwosa screen etf low-drawdown --max-mdd -10
 
 프리셋은 내부적으로 명확한 계산식과 필터 조건을 가진다. 사용자는 `--explain` 으로 점수와 탈락 사유를 확인할 수 있어야 한다.
 
-### 5. 커스텀 DSL 은 나중에
+### 5. 커스텀 DSL 은 만들지 않는다
 
-커스텀 DSL 은 처음부터 만들지 않는다. JSON 출력과 프리셋 명령을 사용하면서 반복되는 패턴이 보이면 그때 작게 도입한다.
+커스텀 DSL 은 만들지 않는다. 반복되는 스크리닝 패턴은 표준 `jq` 쿼리와 strategy 리소스로 관리한다.
 
-가능한 방향은 MongoDB aggregation 과 비슷한 pipeline 형식이다.
+`mwosa` 는 AI 에이전트가 `jq` 쿼리를 만들 수 있도록 입력 schema, 샘플 데이터, metric catalog 를 제공한다. 사용자는 생성된 `jq` 를 검토한 뒤 전략으로 저장할 수 있다.
 
-```json
-[
-  { "match": { "assetType": "etf" } },
-  { "metric": { "return1yPct": { "return": ["clpr", "1y"] } } },
-  { "match": { "return1yPct": { "gt": 0 } } },
-  { "sort": { "score": "desc" } },
-  { "limit": 100 }
-]
+```bash
+mwosa inspect schema etf_daily_metrics --output json
+mwosa sample input etf_daily_metrics --limit 5 --output json
+mwosa screen etf --jq-file strategies/etf-low-vol-uptrend.jq
 ```
 
-이 DSL 은 범용 데이터베이스를 흉내 내기보다, ETF 리서치에서 반복되는 필터, 지표 계산, 정렬, 설명 출력을 안정적으로 표현하는 정도로 제한한다.
+상세 방향은 [jq Screening Strategies](../jq-screening-strategies/README.md) 를 기준으로 삼는다.
 
 ## 초기 범위
 
@@ -97,6 +93,7 @@ mwosa screen etf low-drawdown --max-mdd -10
 - 자동매매
 - 종목 매수 추천
 - jq 문법 직접 구현
+- mwosa 전용 커스텀 DSL 설계
 - 범용 MongoDB aggregation 엔진 구현
 - 운용보수, 분배금, holdings, 섹터/국가 비중의 완전 자동 수집
 
@@ -106,4 +103,4 @@ mwosa screen etf low-drawdown --max-mdd -10
 - raw JSON 은 장기 보관할 것인가, SQLite 반영 후 검증용으로만 둘 것인가?
 - `screen` 결과의 점수 계산식은 전략별로 버전 관리할 것인가?
 - watchlist 종목은 필터 탈락 여부와 함께 별도 섹션으로 보여줄 것인가?
-- DSL 을 도입한다면 JSON pipeline 파일만 받을 것인가, 짧은 inline expression 도 지원할 것인가?
+- 저장된 `jq` strategy 로 만든 `ScreenRun` 기록은 어떤 보존 정책을 가질 것인가?
