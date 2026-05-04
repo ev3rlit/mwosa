@@ -25,8 +25,8 @@
 - 새 error를 만들 때 `fmt.Errorf`, `errors.New`, `errors.Join`을
   사용하지 않습니다. error 판별을 위한 `errors.Is`, `errors.As`는
   사용할 수 있습니다.
-- `storage/ent` 같은 생성 코드는 이 규칙에서 제외합니다. 생성 코드는
-  다시 생성될 수 있으므로 직접 수정하지 않습니다.
+- 생성 코드는 이 규칙에서 제외합니다. 생성 코드는 다시 생성될 수 있으므로
+  직접 수정하지 않습니다.
 - 새 error는 `oops.New` 또는 `oops.Errorf`를 사용합니다. 하위 레이어
   error를 원인으로 보존해야 할 때는 `Wrap` 또는 `Wrapf`를 사용합니다.
   cleanup 과정에서 여러 error를 보존해야 할 때는 `oops.Join`을
@@ -64,8 +64,8 @@ if err != nil {
 ## Storage
 
 - 로컬 canonical storage 방향은 SQLite입니다.
-- Ent schema는 `storage/schema` 아래에 둡니다. 생성된 Ent 코드는
-  `storage/ent` 아래에 있으며 직접 수정하지 않습니다.
+- SQLite 접근은 Bun 기반으로 관리합니다. schema와 index는 Bun model과
+  schema 생성 코드에서 관리합니다.
 - database runtime 접근은 lazy하게 처리합니다. storage handle 생성만으로
   SQLite를 열지 않고, 실제 첫 사용 시점에 열 수 있습니다. cleanup은
   command 단위에서 닫습니다.

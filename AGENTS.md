@@ -21,10 +21,11 @@
 - provider client 모듈을 변경했다면 해당 모듈 안에서도 `go test ./...`와
   `go mod verify`를 실행합니다.
 
-## 생성 코드
+## Storage schema
 
-- `storage/ent`는 직접 수정하지 않습니다.
-- Ent schema는 `storage/schema` 아래에서 변경한 뒤 생성 코드를 다시 만듭니다.
+- storage schema와 index는 Bun model과 schema 생성 코드로 관리합니다.
+- storage 구현을 바꿀 때는 service layer repository 계약이 바뀌지 않게
+  유지합니다.
 
 ## Git branch strategy
 

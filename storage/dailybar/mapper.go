@@ -6,7 +6,7 @@ import (
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
-	"github.com/ev3rlit/mwosa/storage/ent"
+	"github.com/ev3rlit/mwosa/storage"
 	"github.com/samber/oops"
 )
 
@@ -46,7 +46,7 @@ func decodeExtensions(raw string) (map[string]string, error) {
 	return extensions, nil
 }
 
-func entDailyBarToCanonical(row *ent.DailyBar) (coredailybar.Bar, error) {
+func dailyBarRowToCanonical(row *storage.DailyBarRow) (coredailybar.Bar, error) {
 	if row == nil {
 		return coredailybar.Bar{}, oops.In("dailybar_repository").New("daily bar sqlite row is nil")
 	}
@@ -68,7 +68,7 @@ func entDailyBarToCanonical(row *ent.DailyBar) (coredailybar.Bar, error) {
 		Market:       provider.Market(row.Market),
 		SecurityType: provider.SecurityType(row.SecurityType),
 		Symbol:       row.Symbol,
-		ISIN:         row.Isin,
+		ISIN:         row.ISIN,
 		Name:         row.Name,
 		TradingDate:  row.TradingDate,
 		Currency:     row.Currency,

@@ -102,35 +102,32 @@
 적용 범위:
 
 - `storage`
-- `storage/schema`
-- `storage/ent`
 - `storage/<resource>`
 - `testing/experiments/sqlite_capacity_runtime`
 
 ### Database access
 
-- `Ent`
+- `Bun`
 - `modernc.org/sqlite`
 
 결정:
 
-- schema source of truth 는 `.sql` 파일이 아니라 Go type 으로 둔다.
-- Ent schema type 은 `storage/schema` 아래에서 관리한다.
-- Ent generated code 는 `storage/ent` 아래에 두고, 직접 수정하지 않는다.
+- schema source of truth 는 `.sql` 파일이 아니라 Bun model 과 schema 생성 코드로 둔다.
+- `storage.Database` 는 lazy하게 `*bun.DB` 를 열고, SQLite 설정과 schema/index 생성을 적용한다.
 - resource 별 repository 는 `storage/<resource>` 아래에 둔다.
-- service layer 는 Ent client 나 generated entity 를 직접 알지 않는다.
+- service layer 는 Bun DB 나 storage row type 을 직접 알지 않는다.
 - persistence layer 는 `ReadRepository` 와 `WriteRepository` interface 를 분리해서 구현한다.
 - embedded SQLite 는 네트워크 왕복 비용이 없으므로, 작은 CLI 조회 경로에서는 전통적인 N+1 회피를 우선 설계 목표로 두지 않는다.
-- 전체 ETF, 장기간 일봉, 백테스트, 지표 재계산처럼 반복 범위가 큰 작업은 Ent query 를 우선하되, 필요하면 persistence layer 안에서만 명시 SQL helper 를 보조적으로 사용할 수 있다.
+- 전체 ETF, 장기간 일봉, 백테스트, 지표 재계산처럼 반복 범위가 큰 작업은 Bun query 를 우선하되, 필요하면 persistence layer 안에서만 명시 SQL helper 를 보조적으로 사용할 수 있다.
 
 ### Database migration
 
-- `Ent type-managed schema`
+- `Bun model-managed schema`
 
 결정:
 
-- schema 변경은 Ent schema type 변경과 generated code 갱신으로 관리한다.
-- CLI command 가 SQLite 저장소에 실제로 접근할 때 Ent schema create/migration 을 실행한다.
+- schema 변경은 Bun model 과 schema/index 생성 코드 변경으로 관리한다.
+- CLI command 가 SQLite 저장소에 실제로 접근할 때 Bun 기반 table/index 생성을 실행한다.
 - 현재 단계에서는 별도 `.sql` migration 파일을 source of truth 로 만들지 않는다.
 - destructive schema 변경은 자동으로 숨기지 않고 별도 결정과 테스트를 거친다.
 
