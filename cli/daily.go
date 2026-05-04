@@ -16,40 +16,11 @@ type dailyFlags struct {
 	Workers      int
 }
 
-func newGetCommand(opts *Options) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get",
-		Short: "Read source-like data from local storage",
-	}
-	cmd.AddCommand(newGetDailyCommand(opts))
-	return cmd
-}
-
-func newEnsureCommand(opts *Options) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "ensure",
-		Short: "Fetch missing data and store it locally",
-	}
-	cmd.AddCommand(newEnsureDailyCommand(opts))
-	return cmd
-}
-
-func newSyncCommand(opts *Options) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "sync",
-		Short: "Refresh provider-backed data batches",
-	}
-	cmd.AddCommand(newSyncDailyCommand(opts))
-	return cmd
-}
-
-func newBackfillCommand(opts *Options) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "backfill",
-		Short: "Collect historical data ranges",
-	}
-	cmd.AddCommand(newBackfillDailyCommand(opts))
-	return cmd
+func registerDailyCommands(roots commandRoots, opts *Options) {
+	roots.Get.AddCommand(newGetDailyCommand(opts))
+	roots.Ensure.AddCommand(newEnsureDailyCommand(opts))
+	roots.Sync.AddCommand(newSyncDailyCommand(opts))
+	roots.Backfill.AddCommand(newBackfillDailyCommand(opts))
 }
 
 func newGetDailyCommand(opts *Options) *cobra.Command {

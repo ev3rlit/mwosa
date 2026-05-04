@@ -11,17 +11,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type providerAddResult struct {
-	ConfigFile string                   `json:"config_file"`
-	Provider   string                   `json:"provider"`
-	Enabled    bool                     `json:"enabled"`
-	Fields     []providerAddFieldResult `json:"fields"`
+type providerLoginResult struct {
+	ConfigFile string                     `json:"config_file"`
+	Provider   string                     `json:"provider"`
+	Enabled    bool                       `json:"enabled"`
+	Fields     []providerLoginFieldResult `json:"fields"`
 }
 
-type providerAddFieldResult struct {
+type providerLoginFieldResult struct {
 	Path       string `json:"path"`
 	Configured bool   `json:"configured"`
 	Secret     bool   `json:"secret"`
+}
+
+type providerActionResult struct {
+	ConfigFile string `json:"config_file"`
+	Provider   string `json:"provider"`
+	Action     string `json:"action"`
+	Enabled    *bool  `json:"enabled,omitempty"`
+	Preferred  bool   `json:"preferred,omitempty"`
 }
 
 type providerDoctorResult struct {
@@ -51,39 +59,80 @@ type providerDoctorIssue struct {
 	Message  string `json:"message"`
 }
 
-func newProviderCommand(opts *Options) *cobra.Command {
+func registerProviderCommands(roots commandRoots, opts *Options) {
+	roots.List.AddCommand(newListProvidersCommand(opts))
+	roots.Inspect.AddCommand(newInspectProviderCommand(opts))
+	roots.Login.AddCommand(newLoginProviderCommand(opts))
+	roots.Logout.AddCommand(newLogoutProviderCommand(opts))
+	roots.Validate.AddCommand(newValidateProviderCommand(opts))
+	roots.Test.AddCommand(newTestProviderCommand(opts))
+	roots.Enable.AddCommand(newEnableProviderCommand(opts))
+	roots.Disable.AddCommand(newDisableProviderCommand(opts))
+	roots.Prefer.AddCommand(newPreferProviderCommand(opts))
+}
+
+func newListProvidersCommand(opts *Options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "providers",
+		Short: "List configured and available providers",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := loadConfig(opts); err != nil {
+				return err
+			}
+			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+				ConfigFile: opts.ConfigState.ConfigPath,
+				Providers:  doctorProviders(builtin.Builders(), opts.ProviderConfig),
+			})
+		},
+	}
+}
+
+func newInspectProviderCommand(opts *Options) *cobra.Command {
+	return &cobra.Command{
+		Use:               "provider <name>",
+		Short:             "Inspect provider configuration and readiness",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeProviderIDs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := loadConfig(opts); err != nil {
+				return err
+			}
+			builder, err := providerBuilder(provider.ProviderID(args[0]))
+			if err != nil {
+				return err
+			}
+			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+				ConfigFile: opts.ConfigState.ConfigPath,
+				Providers:  []providerDoctorProvider{doctorProvider(builder, opts.ProviderConfig)},
+			})
+		},
+	}
+}
+
+func newLoginProviderCommand(opts *Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "provider",
-		Short: "Manage provider config and diagnostics",
-	}
-	cmd.AddCommand(newProviderAddCommand(opts))
-	cmd.AddCommand(newProviderDoctorCommand(opts))
-	return cmd
-}
-
-func newProviderAddCommand(opts *Options) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Add or update a provider config",
+		Short: "Register provider credentials",
 	}
 	for _, builder := range builtin.Builders() {
-		cmd.AddCommand(newProviderAddProviderCommand(opts, builder))
+		cmd.AddCommand(newLoginProviderIDCommand(opts, builder))
 	}
 	return cmd
 }
 
-func newProviderAddProviderCommand(opts *Options, builder provider.ProviderBuilder) *cobra.Command {
+func newLoginProviderIDCommand(opts *Options, builder provider.ProviderBuilder) *cobra.Command {
 	spec := builder.ConfigSpec()
 	values := make(map[string]*string, len(spec.Fields))
 	cmd := &cobra.Command{
 		Use:   string(builder.ID()),
-		Short: fmt.Sprintf("Add or update %s provider config", builder.ID()),
+		Short: fmt.Sprintf("Register %s provider credentials", builder.ID()),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			updates := map[string]string{
 				providerSettingPath(builder.ID(), "enabled"): "true",
 			}
-			fields := make([]providerAddFieldResult, 0, len(spec.Fields))
+			fields := make([]providerLoginFieldResult, 0, len(spec.Fields))
 			for _, field := range spec.Fields {
 				rawValue := strings.TrimSpace(*values[field.Path])
 				flagChanged := cmd.Flags().Changed(field.Flag)
@@ -95,7 +144,7 @@ func newProviderAddProviderCommand(opts *Options, builder provider.ProviderBuild
 				if rawValue != "" || flagChanged {
 					updates[providerSettingPath(builder.ID(), field.Path)] = rawValue
 				}
-				fields = append(fields, providerAddFieldResult{
+				fields = append(fields, providerLoginFieldResult{
 					Path:       field.Path,
 					Configured: rawValue != "",
 					Secret:     field.Secret,
@@ -107,14 +156,10 @@ func newProviderAddProviderCommand(opts *Options, builder provider.ProviderBuild
 				ProviderDefaults: providerDefaults(),
 			}, updates)
 			if err != nil {
-				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "add provider config")
+				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "login provider")
 			}
-			opts.Config = resolved.ConfigPath
-			opts.Database = resolved.DatabasePath
-			opts.ProviderConfig = resolved.ProviderConfig
-			opts.ConfigState = resolved
-			opts.configLoaded = true
-			return writeConfigOutput(cmd.OutOrStdout(), providerAddResult{
+			applyResolvedConfig(opts, resolved)
+			return writeConfigOutput(cmd.OutOrStdout(), providerLoginResult{
 				ConfigFile: resolved.ConfigPath,
 				Provider:   string(builder.ID()),
 				Enabled:    true,
@@ -130,42 +175,181 @@ func newProviderAddProviderCommand(opts *Options, builder provider.ProviderBuild
 	return cmd
 }
 
-func newProviderDoctorCommand(opts *Options) *cobra.Command {
+func newLogoutProviderCommand(opts *Options) *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor [provider]",
-		Short: "Diagnose provider config",
-		Args:  cobra.MaximumNArgs(1),
+		Use:               "provider <name>",
+		Short:             "Remove provider credentials",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeProviderIDs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			builder, err := providerBuilder(provider.ProviderID(args[0]))
+			if err != nil {
+				return err
+			}
+			updates := map[string]string{}
+			for _, field := range builder.ConfigSpec().Fields {
+				if field.Secret || strings.HasPrefix(field.Path, "auth.") {
+					updates[providerSettingPath(builder.ID(), field.Path)] = ""
+				}
+			}
+			resolved, err := appconfig.SetValues(appconfig.Options{
+				ConfigPath:       opts.Config,
+				Market:           opts.Market,
+				ProviderDefaults: providerDefaults(),
+			}, updates)
+			if err != nil {
+				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "logout provider")
+			}
+			applyResolvedConfig(opts, resolved)
+			return writeConfigOutput(cmd.OutOrStdout(), providerActionResult{
+				ConfigFile: resolved.ConfigPath,
+				Provider:   string(builder.ID()),
+				Action:     "logout",
+			})
+		},
+	}
+}
+
+func newValidateProviderCommand(opts *Options) *cobra.Command {
+	return &cobra.Command{
+		Use:               "provider [name]",
+		Short:             "Validate provider configuration",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeProviderIDs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := loadConfig(opts); err != nil {
 				return err
 			}
 			builders := builtin.Builders()
 			if len(args) == 1 {
-				var ok bool
-				builders, ok = selectProviderBuilder(builders, provider.ProviderID(args[0]))
-				if !ok {
-					return oops.In("cli").With("provider", args[0]).Errorf("unknown provider: %s", args[0])
+				builder, err := providerBuilder(provider.ProviderID(args[0]))
+				if err != nil {
+					return err
 				}
+				builders = []provider.ProviderBuilder{builder}
 			}
-			result := providerDoctorResult{
+			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
 				ConfigFile: opts.ConfigState.ConfigPath,
-				Providers:  make([]providerDoctorProvider, 0, len(builders)),
-			}
-			for _, builder := range builders {
-				result.Providers = append(result.Providers, doctorProvider(builder, opts.ProviderConfig))
-			}
-			return writeConfigOutput(cmd.OutOrStdout(), result)
+				Providers:  doctorProviders(builders, opts.ProviderConfig),
+			})
 		},
 	}
 }
 
-func selectProviderBuilder(builders []provider.ProviderBuilder, id provider.ProviderID) ([]provider.ProviderBuilder, bool) {
-	for _, builder := range builders {
+func newTestProviderCommand(opts *Options) *cobra.Command {
+	return &cobra.Command{
+		Use:               "provider <name>",
+		Short:             "Test provider configuration and client construction",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeProviderIDs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := loadConfig(opts); err != nil {
+				return err
+			}
+			builder, err := providerBuilder(provider.ProviderID(args[0]))
+			if err != nil {
+				return err
+			}
+			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+				ConfigFile: opts.ConfigState.ConfigPath,
+				Providers:  []providerDoctorProvider{doctorProvider(builder, opts.ProviderConfig)},
+			})
+		},
+	}
+}
+
+func newEnableProviderCommand(opts *Options) *cobra.Command {
+	return newProviderEnabledCommand(opts, "enable", "Enable a provider", true)
+}
+
+func newDisableProviderCommand(opts *Options) *cobra.Command {
+	return newProviderEnabledCommand(opts, "disable", "Disable a provider", false)
+}
+
+func newProviderEnabledCommand(opts *Options, action string, short string, enabled bool) *cobra.Command {
+	return &cobra.Command{
+		Use:               "provider <name>",
+		Short:             short,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeProviderIDs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			builder, err := providerBuilder(provider.ProviderID(args[0]))
+			if err != nil {
+				return err
+			}
+			resolved, err := appconfig.SetValue(appconfig.Options{
+				ConfigPath:       opts.Config,
+				Market:           opts.Market,
+				ProviderDefaults: providerDefaults(),
+			}, providerSettingPath(builder.ID(), "enabled"), fmt.Sprint(enabled))
+			if err != nil {
+				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "%s provider", action)
+			}
+			applyResolvedConfig(opts, resolved)
+			return writeConfigOutput(cmd.OutOrStdout(), providerActionResult{
+				ConfigFile: resolved.ConfigPath,
+				Provider:   string(builder.ID()),
+				Action:     action,
+				Enabled:    &enabled,
+			})
+		},
+	}
+}
+
+func newPreferProviderCommand(opts *Options) *cobra.Command {
+	return &cobra.Command{
+		Use:               "provider <name>",
+		Short:             "Prefer a provider when multiple providers match",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeProviderIDs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			builder, err := providerBuilder(provider.ProviderID(args[0]))
+			if err != nil {
+				return err
+			}
+			resolved, err := appconfig.SetValue(appconfig.Options{
+				ConfigPath:       opts.Config,
+				Market:           opts.Market,
+				ProviderDefaults: providerDefaults(),
+			}, "app.preferred_provider", string(builder.ID()))
+			if err != nil {
+				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "prefer provider")
+			}
+			applyResolvedConfig(opts, resolved)
+			return writeConfigOutput(cmd.OutOrStdout(), providerActionResult{
+				ConfigFile: resolved.ConfigPath,
+				Provider:   string(builder.ID()),
+				Action:     "prefer",
+				Preferred:  true,
+			})
+		},
+	}
+}
+
+func applyResolvedConfig(opts *Options, resolved appconfig.Resolved) {
+	opts.Config = resolved.ConfigPath
+	opts.Database = resolved.DatabasePath
+	opts.ProviderConfig = resolved.ProviderConfig
+	opts.ConfigState = resolved
+	opts.PreferProvider = resolved.File.App.PreferredProvider
+	opts.configLoaded = true
+}
+
+func providerBuilder(id provider.ProviderID) (provider.ProviderBuilder, error) {
+	for _, builder := range builtin.Builders() {
 		if builder.ID() == id {
-			return []provider.ProviderBuilder{builder}, true
+			return builder, nil
 		}
 	}
-	return nil, false
+	return nil, oops.In("cli").With("provider", id).Errorf("unknown provider: %s", id)
+}
+
+func doctorProviders(builders []provider.ProviderBuilder, config provider.Config) []providerDoctorProvider {
+	result := make([]providerDoctorProvider, 0, len(builders))
+	for _, builder := range builders {
+		result = append(result, doctorProvider(builder, config))
+	}
+	return result
 }
 
 func doctorProvider(builder provider.ProviderBuilder, config provider.Config) providerDoctorProvider {
@@ -200,7 +384,7 @@ func doctorProvider(builder provider.ProviderBuilder, config provider.Config) pr
 			result.Issues = append(result.Issues, providerDoctorIssue{
 				Severity: "error",
 				Path:     providerSettingPath(builder.ID(), field.Path),
-				Message:  fmt.Sprintf("required provider config is missing; run `mwosa provider add %s --%s VALUE`", builder.ID(), field.Flag),
+				Message:  fmt.Sprintf("required provider config is missing; run `mwosa login provider %s --%s VALUE`", builder.ID(), field.Flag),
 			})
 		}
 	}

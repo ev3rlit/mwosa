@@ -124,21 +124,70 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 	)
 	registerRootCompletions(cmd)
 
+	inspectCommand := newInspectCommand()
+	listCommand := newListCommand()
+	createCommand := newCreateCommand()
+	updateCommand := newUpdateCommand()
+	deleteCommand := newDeleteCommand()
+	screenCommand := newScreenCommand()
+	historyCommand := newHistoryCommand()
+	getCommand := newGetCommand()
+	ensureCommand := newEnsureCommand()
+	syncCommand := newSyncCommand()
+	backfillCommand := newBackfillCommand()
+	loginCommand := newLoginCommand()
+	logoutCommand := newLogoutCommand()
+	validateCommand := newValidateCommand()
+	testCommand := newTestCommand()
+	enableCommand := newEnableCommand()
+	disableCommand := newDisableCommand()
+	preferCommand := newPreferCommand()
+	roots := commandRoots{
+		Inspect:  inspectCommand,
+		List:     listCommand,
+		Create:   createCommand,
+		Update:   updateCommand,
+		Delete:   deleteCommand,
+		Screen:   screenCommand,
+		History:  historyCommand,
+		Get:      getCommand,
+		Ensure:   ensureCommand,
+		Sync:     syncCommand,
+		Backfill: backfillCommand,
+		Login:    loginCommand,
+		Logout:   logoutCommand,
+		Validate: validateCommand,
+		Test:     testCommand,
+		Enable:   enableCommand,
+		Disable:  disableCommand,
+		Prefer:   preferCommand,
+	}
+	registerConfigCommands(roots, &opts)
+	registerDailyCommands(roots, &opts)
+	registerStrategyCommands(roots, &opts)
+	registerProviderCommands(roots, &opts)
+
 	cmd.AddCommand(newCompletionCommand())
 	cmd.AddCommand(newVersionCommand(build))
-	cmd.AddCommand(newInspectCommand(&opts))
+	cmd.AddCommand(inspectCommand)
 	cmd.AddCommand(newConfigCommand(&opts))
-	cmd.AddCommand(newProviderCommand(&opts))
-	cmd.AddCommand(newCreateCommand(&opts))
-	cmd.AddCommand(newListCommand(&opts))
-	cmd.AddCommand(newUpdateCommand(&opts))
-	cmd.AddCommand(newDeleteCommand(&opts))
-	cmd.AddCommand(newScreenCommand(&opts))
-	cmd.AddCommand(newHistoryCommand(&opts))
-	cmd.AddCommand(newGetCommand(&opts))
-	cmd.AddCommand(newEnsureCommand(&opts))
-	cmd.AddCommand(newSyncCommand(&opts))
-	cmd.AddCommand(newBackfillCommand(&opts))
+	cmd.AddCommand(createCommand)
+	cmd.AddCommand(listCommand)
+	cmd.AddCommand(updateCommand)
+	cmd.AddCommand(deleteCommand)
+	cmd.AddCommand(screenCommand)
+	cmd.AddCommand(historyCommand)
+	cmd.AddCommand(loginCommand)
+	cmd.AddCommand(logoutCommand)
+	cmd.AddCommand(validateCommand)
+	cmd.AddCommand(testCommand)
+	cmd.AddCommand(enableCommand)
+	cmd.AddCommand(disableCommand)
+	cmd.AddCommand(preferCommand)
+	cmd.AddCommand(getCommand)
+	cmd.AddCommand(ensureCommand)
+	cmd.AddCommand(syncCommand)
+	cmd.AddCommand(backfillCommand)
 
 	return cmd
 }
@@ -161,6 +210,9 @@ func loadConfig(opts *Options) error {
 	}
 	opts.Config = resolved.ConfigPath
 	opts.Database = resolved.DatabasePath
+	if opts.PreferProvider == "" {
+		opts.PreferProvider = resolved.File.App.PreferredProvider
+	}
 	opts.ProviderConfig = resolved.ProviderConfig
 	opts.ConfigState = resolved
 	opts.configLoaded = true

@@ -231,7 +231,7 @@ func TestConfigSetUpdatesProviderConfigAndMasksSecretOutput(t *testing.T) {
 	}
 }
 
-func TestProviderAddDataGoWritesProviderConfigAndMasksOutput(t *testing.T) {
+func TestLoginProviderDataGoWritesProviderConfigAndMasksOutput(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	cmd := NewRootCommand(BuildInfo{})
 	var out bytes.Buffer
@@ -239,21 +239,21 @@ func TestProviderAddDataGoWritesProviderConfigAndMasksOutput(t *testing.T) {
 	cmd.SetErr(&out)
 	cmd.SetArgs([]string{
 		"--config", configPath,
-		"provider", "add", "datago", "--service-key", "secret-key",
+		"login", "provider", "datago", "--service-key", "secret-key",
 	})
 
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute provider add datago: %v\n%s", err, out.String())
+		t.Fatalf("execute login provider datago: %v\n%s", err, out.String())
 	}
 	if strings.Contains(out.String(), "secret-key") {
-		t.Fatalf("provider add output should not include secret:\n%s", out.String())
+		t.Fatalf("login provider output should not include secret:\n%s", out.String())
 	}
 	var result map[string]any
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatalf("provider add output should be json: %v\n%s", err, out.String())
+		t.Fatalf("login provider output should be json: %v\n%s", err, out.String())
 	}
 	if got := result["provider"]; got != "datago" {
-		t.Fatalf("provider add provider = %v, want datago", got)
+		t.Fatalf("login provider provider = %v, want datago", got)
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -274,7 +274,7 @@ func TestProviderAddDataGoWritesProviderConfigAndMasksOutput(t *testing.T) {
 	}
 }
 
-func TestProviderDoctorReportsMissingDataGoServiceKey(t *testing.T) {
+func TestValidateProviderReportsMissingDataGoServiceKey(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	cmd := NewRootCommand(BuildInfo{})
 	var out bytes.Buffer
@@ -282,52 +282,52 @@ func TestProviderDoctorReportsMissingDataGoServiceKey(t *testing.T) {
 	cmd.SetErr(&out)
 	cmd.SetArgs([]string{
 		"--config", configPath,
-		"provider", "doctor", "datago",
+		"validate", "provider", "datago",
 	})
 
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute provider doctor datago: %v\n%s", err, out.String())
+		t.Fatalf("execute validate provider datago: %v\n%s", err, out.String())
 	}
 	got := out.String()
-	for _, want := range []string{`"status": "error"`, "providers.datago.auth.service_key", "mwosa provider add datago --service-key"} {
+	for _, want := range []string{`"status": "error"`, "providers.datago.auth.service_key", "mwosa login provider datago --service-key"} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("provider doctor output missing %q in:\n%s", want, got)
+			t.Fatalf("validate provider output missing %q in:\n%s", want, got)
 		}
 	}
 }
 
-func TestProviderDoctorReportsConfiguredDataGo(t *testing.T) {
+func TestValidateProviderReportsConfiguredDataGo(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	addCmd := NewRootCommand(BuildInfo{})
 	addCmd.SetOut(&bytes.Buffer{})
 	addCmd.SetErr(&bytes.Buffer{})
 	addCmd.SetArgs([]string{
 		"--config", configPath,
-		"provider", "add", "datago", "--service-key", "secret-key",
+		"login", "provider", "datago", "--service-key", "secret-key",
 	})
 	if err := addCmd.Execute(); err != nil {
-		t.Fatalf("execute provider add datago: %v", err)
+		t.Fatalf("execute login provider datago: %v", err)
 	}
 
-	doctorCmd := NewRootCommand(BuildInfo{})
+	validateCmd := NewRootCommand(BuildInfo{})
 	var out bytes.Buffer
-	doctorCmd.SetOut(&out)
-	doctorCmd.SetErr(&out)
-	doctorCmd.SetArgs([]string{
+	validateCmd.SetOut(&out)
+	validateCmd.SetErr(&out)
+	validateCmd.SetArgs([]string{
 		"--config", configPath,
-		"provider", "doctor", "datago",
+		"validate", "provider", "datago",
 	})
-	if err := doctorCmd.Execute(); err != nil {
-		t.Fatalf("execute provider doctor datago: %v\n%s", err, out.String())
+	if err := validateCmd.Execute(); err != nil {
+		t.Fatalf("execute validate provider datago: %v\n%s", err, out.String())
 	}
 	got := out.String()
 	for _, want := range []string{`"status": "ok"`, `"configured": true`, `"source": "config_file"`, `"issues": []`} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("provider doctor output missing %q in:\n%s", want, got)
+			t.Fatalf("validate provider output missing %q in:\n%s", want, got)
 		}
 	}
 	if strings.Contains(got, "secret-key") {
-		t.Fatalf("provider doctor output should not include secret:\n%s", got)
+		t.Fatalf("validate provider output should not include secret:\n%s", got)
 	}
 }
 

@@ -37,7 +37,8 @@ type dataDirectoryInspect struct {
 }
 
 type appConfigInspect struct {
-	Market string `json:"market"`
+	Market            string `json:"market"`
+	PreferredProvider string `json:"preferred_provider,omitempty"`
 }
 
 type providerInspectItem struct {
@@ -65,6 +66,10 @@ func newConfigCommand(opts *Options) *cobra.Command {
 	}
 	cmd.AddCommand(newConfigSetCommand(opts))
 	return cmd
+}
+
+func registerConfigCommands(roots commandRoots, opts *Options) {
+	roots.Inspect.AddCommand(newInspectConfigCommand(opts))
 }
 
 func newConfigSetCommand(opts *Options) *cobra.Command {
@@ -95,6 +100,20 @@ func newConfigSetCommand(opts *Options) *cobra.Command {
 	}
 }
 
+func newInspectConfigCommand(opts *Options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "config",
+		Short: "Inspect resolved config and data paths",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := loadConfig(opts); err != nil {
+				return err
+			}
+			return writeConfigOutput(cmd.OutOrStdout(), configInspectFromResolved(opts.ConfigState))
+		},
+	}
+}
+
 func configInspectFromResolved(resolved appconfig.Resolved) configInspectResult {
 	result := configInspectResult{
 		ConfigFile: configFileInspect{
@@ -112,7 +131,8 @@ func configInspectFromResolved(resolved appconfig.Resolved) configInspectResult 
 			Exists: resolved.DataDirectoryExists,
 		},
 		App: appConfigInspect{
-			Market: resolved.File.App.Market,
+			Market:            resolved.File.App.Market,
+			PreferredProvider: resolved.File.App.PreferredProvider,
 		},
 	}
 	for _, item := range resolved.File.Providers {

@@ -53,8 +53,9 @@ type File struct {
 }
 
 type AppConfig struct {
-	Market   string         `json:"market"`
-	Database DatabaseConfig `json:"database"`
+	Market            string         `json:"market"`
+	PreferredProvider string         `json:"preferred_provider,omitempty"`
+	Database          DatabaseConfig `json:"database"`
 }
 
 type DatabaseConfig struct {
@@ -185,6 +186,8 @@ func setAppConfigValue(cfg *File, parts []string, rawValue string) error {
 	switch strings.Join(parts, ".") {
 	case "market":
 		cfg.App.Market = strings.TrimSpace(rawValue)
+	case "preferred_provider":
+		cfg.App.PreferredProvider = strings.TrimSpace(rawValue)
 	case "database.path":
 		cfg.App.Database.Path = strings.TrimSpace(rawValue)
 	default:
