@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
+	"github.com/spf13/cobra"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -54,6 +55,92 @@ func TestRootHelpHasOutputFlag(t *testing.T) {
 	for _, want := range []string{"--config", "--output"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("help output should include %s flag:\n%s", want, got)
+		}
+	}
+}
+
+func TestCompletionBashGeneratesScriptWithoutConfigLoad(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--config", configPath, "completion", "bash"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute completion bash: %v\n%s", err, out.String())
+	}
+	got := out.String()
+	for _, want := range []string{"__start_mwosa", "complete -o default"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("bash completion output missing %q in:\n%s", want, got)
+		}
+	}
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		t.Fatalf("completion should not create config file, stat error = %v", err)
+	}
+}
+
+func TestCompletionRejectsUnsupportedShell(t *testing.T) {
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"completion", "xonsh"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("execute completion xonsh error = nil, want unsupported shell error")
+	}
+	if !strings.Contains(err.Error(), "unsupported completion shell: xonsh") {
+		t.Fatalf("unsupported shell error = %q", err.Error())
+	}
+}
+
+func TestCompletionProtocolSuggestsSupportedShells(t *testing.T) {
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{cobra.ShellCompRequestCmd, "completion", ""})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute completion protocol: %v\n%s", err, out.String())
+	}
+	got := out.String()
+	for _, want := range []string{
+		"bash\tGenerate Bash completion script",
+		"zsh\tGenerate Zsh completion script",
+		"fish\tGenerate Fish completion script",
+		"powershell\tGenerate PowerShell completion script",
+		":4",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("completion protocol output missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestCompletionProtocolCompletesOutputFlagValues(t *testing.T) {
+	cmd := NewRootCommand(BuildInfo{})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{cobra.ShellCompRequestCmd, "version", "--output", ""})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute output flag completion: %v\n%s", err, out.String())
+	}
+	got := out.String()
+	for _, want := range []string{
+		"table\tHuman-readable table",
+		"json\tMachine-readable JSON",
+		"ndjson\tNewline-delimited JSON",
+		"csv\tComma-separated values",
+		":4",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output flag completion missing %q in:\n%s", want, got)
 		}
 	}
 }

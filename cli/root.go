@@ -79,6 +79,9 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if skipConfigLoadForCompletion(cmd) {
+				return nil
+			}
 			return loadConfig(&opts)
 		},
 	}
@@ -119,7 +122,9 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		opts.Database,
 		"local SQLite database path",
 	)
+	registerRootCompletions(cmd)
 
+	cmd.AddCommand(newCompletionCommand())
 	cmd.AddCommand(newVersionCommand(build))
 	cmd.AddCommand(newInspectCommand(&opts))
 	cmd.AddCommand(newConfigCommand(&opts))

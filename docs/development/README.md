@@ -71,5 +71,6 @@ core contract 에 영향을 주는 선택은 `docs/architectures/layers/README.m
 
 ## 관련 문서
 
+- `docs/development/cobra-completion/README.md`
 - `docs/development/git-branching/README.md`
 - `docs/development/release/README.md`

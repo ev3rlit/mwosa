@@ -191,6 +191,7 @@ func addDailyRangeFlags(cmd *cobra.Command, flags *dailyFlags) {
 
 func addSecurityTypeFlag(cmd *cobra.Command, flags *dailyFlags) {
 	cmd.Flags().StringVar(&flags.SecurityType, "security-type", flags.SecurityType, "security type: etf, etn, elw")
+	mustRegisterFlagCompletion(cmd, "security-type", completeSecurityTypes)
 }
 
 func newAppRuntime(opts *Options, activateProviders bool) (*app.Runtime, error) {
