@@ -17,7 +17,7 @@ type commandRoots struct {
 	Login    *cobra.Command
 	Logout   *cobra.Command
 	Validate *cobra.Command
-	Test     *cobra.Command
+	Doctor   *cobra.Command
 	Enable   *cobra.Command
 	Disable  *cobra.Command
 	Prefer   *cobra.Command
@@ -121,10 +121,10 @@ func newValidateCommand() *cobra.Command {
 	}
 }
 
-func newTestCommand() *cobra.Command {
+func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "test",
-		Short: "Test resource connectivity and readiness",
+		Use:   "doctor",
+		Short: "Diagnose local configuration and resources",
 	}
 }
 

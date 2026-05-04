@@ -65,7 +65,7 @@ func registerProviderCommands(roots commandRoots, opts *Options) {
 	roots.Login.AddCommand(newLoginProviderCommand(opts))
 	roots.Logout.AddCommand(newLogoutProviderCommand(opts))
 	roots.Validate.AddCommand(newValidateProviderCommand(opts))
-	roots.Test.AddCommand(newTestProviderCommand(opts))
+	roots.Doctor.AddCommand(newDoctorProviderCommand(opts))
 	roots.Enable.AddCommand(newEnableProviderCommand(opts))
 	roots.Disable.AddCommand(newDisableProviderCommand(opts))
 	roots.Prefer.AddCommand(newPreferProviderCommand(opts))
@@ -236,10 +236,10 @@ func newValidateProviderCommand(opts *Options) *cobra.Command {
 	}
 }
 
-func newTestProviderCommand(opts *Options) *cobra.Command {
+func newDoctorProviderCommand(opts *Options) *cobra.Command {
 	return &cobra.Command{
 		Use:               "provider <name>",
-		Short:             "Test provider configuration and client construction",
+		Short:             "Diagnose provider configuration and client construction",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeProviderIDs,
 		RunE: func(cmd *cobra.Command, args []string) error {

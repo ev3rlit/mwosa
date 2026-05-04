@@ -138,7 +138,7 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 	loginCommand := newLoginCommand()
 	logoutCommand := newLogoutCommand()
 	validateCommand := newValidateCommand()
-	testCommand := newTestCommand()
+	doctorCommand := newDoctorCommand()
 	enableCommand := newEnableCommand()
 	disableCommand := newDisableCommand()
 	preferCommand := newPreferCommand()
@@ -157,7 +157,7 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 		Login:    loginCommand,
 		Logout:   logoutCommand,
 		Validate: validateCommand,
-		Test:     testCommand,
+		Doctor:   doctorCommand,
 		Enable:   enableCommand,
 		Disable:  disableCommand,
 		Prefer:   preferCommand,
@@ -180,7 +180,7 @@ func NewRootCommand(build BuildInfo) *cobra.Command {
 	cmd.AddCommand(loginCommand)
 	cmd.AddCommand(logoutCommand)
 	cmd.AddCommand(validateCommand)
-	cmd.AddCommand(testCommand)
+	cmd.AddCommand(doctorCommand)
 	cmd.AddCommand(enableCommand)
 	cmd.AddCommand(disableCommand)
 	cmd.AddCommand(preferCommand)

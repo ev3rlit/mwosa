@@ -227,7 +227,7 @@ mwosa backfill daily --security-type etf --from 20240502 --to 20260502 --workers
 
 | 명령어                          | 설명                                               |
 | ------------------------------- | -------------------------------------------------- |
-| `mwosa test provider <name>`    | provider 인증과 기본 API 호출이 정상인지 확인한다. |
+| `mwosa doctor provider <name>`  | provider 설정, 인증, client 구성 가능성을 진단한다. |
 | `mwosa enable provider <name>`  | provider 를 기본 후보에 포함한다.                  |
 | `mwosa disable provider <name>` | provider 를 기본 후보에서 제외한다.                |
 | `mwosa prefer provider <name>`  | provider 우선순위를 조정한다.                      |
