@@ -21,6 +21,54 @@ func (f DailyBarFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DailyBarMutation", m)
 }
 
+// The ScreenRunFunc type is an adapter to allow the use of ordinary
+// function as ScreenRun mutator.
+type ScreenRunFunc func(context.Context, *ent.ScreenRunMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ScreenRunFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ScreenRunMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ScreenRunMutation", m)
+}
+
+// The ScreenRunItemFunc type is an adapter to allow the use of ordinary
+// function as ScreenRunItem mutator.
+type ScreenRunItemFunc func(context.Context, *ent.ScreenRunItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ScreenRunItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ScreenRunItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ScreenRunItemMutation", m)
+}
+
+// The StrategyFunc type is an adapter to allow the use of ordinary
+// function as Strategy mutator.
+type StrategyFunc func(context.Context, *ent.StrategyMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f StrategyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.StrategyMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.StrategyMutation", m)
+}
+
+// The StrategyVersionFunc type is an adapter to allow the use of ordinary
+// function as StrategyVersion mutator.
+type StrategyVersionFunc func(context.Context, *ent.StrategyVersionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f StrategyVersionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.StrategyVersionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.StrategyVersionMutation", m)
+}
+
 // Condition is a hook condition function.
 type Condition func(context.Context, ent.Mutation) bool
 

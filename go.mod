@@ -6,6 +6,8 @@ require (
 	entgo.io/ent v0.14.6
 	github.com/ev3rlit/mwosa/clients/datago-etp v0.0.0-20260503103611-57138e7267ca
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
+	github.com/google/uuid v1.6.0
+	github.com/itchyny/gojq v0.12.19
 	github.com/jszwec/csvutil v1.10.0
 	github.com/olekukonko/tablewriter v1.1.4
 	github.com/samber/oops v1.21.0
@@ -24,10 +26,10 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/go-openapi/inflect v0.19.0 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hashicorp/hcl/v2 v2.18.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/itchyny/timefmt-go v0.1.8 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect

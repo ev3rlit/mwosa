@@ -8,13 +8,16 @@ import (
 	"github.com/ev3rlit/mwosa/providers/core/quote"
 	"github.com/ev3rlit/mwosa/service/daily"
 	providerservice "github.com/ev3rlit/mwosa/service/providers"
+	strategyservice "github.com/ev3rlit/mwosa/service/strategy"
 	"github.com/ev3rlit/mwosa/storage"
 	dailybarstorage "github.com/ev3rlit/mwosa/storage/dailybar"
+	strategystorage "github.com/ev3rlit/mwosa/storage/strategy"
 	"github.com/samber/oops"
 )
 
 type Options struct {
 	Database          string
+	Market            provider.Market
 	ProviderID        provider.ProviderID
 	PreferProvider    provider.ProviderID
 	ProviderConfig    provider.Config
@@ -28,8 +31,9 @@ type Runtime struct {
 }
 
 type StorageRuntime struct {
-	Database  *storage.Database
-	DailyBars DailyBarStorage
+	Database   *storage.Database
+	DailyBars  DailyBarStorage
+	Strategies strategyservice.Repository
 }
 
 type DailyBarStorage struct {
@@ -48,6 +52,7 @@ type ProviderRuntime struct {
 type ServiceRuntime struct {
 	Daily     DailyServices
 	Providers providerservice.Service
+	Strategy  strategyservice.Service
 }
 
 type DailyServices struct {
@@ -66,6 +71,10 @@ func NewRuntimeWithProviderBuilders(opts Options, builders ...provider.ProviderB
 	reader, writer, err := dailybarstorage.NewRepositories(database)
 	if err != nil {
 		return nil, errb.Wrapf(err, "create daily bar repositories")
+	}
+	strategyRepository, err := strategystorage.NewRepository(database)
+	if err != nil {
+		return nil, errb.Wrapf(err, "create strategy repository")
 	}
 
 	registry := provider.NewRegistry()
@@ -115,6 +124,20 @@ func NewRuntimeWithProviderBuilders(opts Options, builders ...provider.ProviderB
 			database.Close(),
 		)
 	}
+	datasetReader, err := strategyservice.NewDailyBarDatasetReader(reader, opts.Market)
+	if err != nil {
+		return nil, oops.Join(
+			errb.Wrapf(err, "create strategy dataset reader"),
+			database.Close(),
+		)
+	}
+	strategyService, err := strategyservice.NewService(strategyRepository, datasetReader)
+	if err != nil {
+		return nil, oops.Join(
+			errb.Wrapf(err, "create strategy service"),
+			database.Close(),
+		)
+	}
 
 	return &Runtime{
 		Storage: StorageRuntime{
@@ -123,6 +146,7 @@ func NewRuntimeWithProviderBuilders(opts Options, builders ...provider.ProviderB
 				Reader: reader,
 				Writer: writer,
 			},
+			Strategies: strategyRepository,
 		},
 		Providers: providerRuntime,
 		Services: ServiceRuntime{
@@ -131,6 +155,7 @@ func NewRuntimeWithProviderBuilders(opts Options, builders ...provider.ProviderB
 				Collector: dailyCollector,
 			},
 			Providers: providersService,
+			Strategy:  strategyService,
 		},
 	}, nil
 }

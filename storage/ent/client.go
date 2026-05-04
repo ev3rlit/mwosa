@@ -15,6 +15,10 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrun"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrunitem"
+	"github.com/ev3rlit/mwosa/storage/ent/strategy"
+	"github.com/ev3rlit/mwosa/storage/ent/strategyversion"
 )
 
 // Client is the client that holds all ent builders.
@@ -24,6 +28,14 @@ type Client struct {
 	Schema *migrate.Schema
 	// DailyBar is the client for interacting with the DailyBar builders.
 	DailyBar *DailyBarClient
+	// ScreenRun is the client for interacting with the ScreenRun builders.
+	ScreenRun *ScreenRunClient
+	// ScreenRunItem is the client for interacting with the ScreenRunItem builders.
+	ScreenRunItem *ScreenRunItemClient
+	// Strategy is the client for interacting with the Strategy builders.
+	Strategy *StrategyClient
+	// StrategyVersion is the client for interacting with the StrategyVersion builders.
+	StrategyVersion *StrategyVersionClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -36,6 +48,10 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.DailyBar = NewDailyBarClient(c.config)
+	c.ScreenRun = NewScreenRunClient(c.config)
+	c.ScreenRunItem = NewScreenRunItemClient(c.config)
+	c.Strategy = NewStrategyClient(c.config)
+	c.StrategyVersion = NewStrategyVersionClient(c.config)
 }
 
 type (
@@ -126,9 +142,13 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:      ctx,
-		config:   cfg,
-		DailyBar: NewDailyBarClient(cfg),
+		ctx:             ctx,
+		config:          cfg,
+		DailyBar:        NewDailyBarClient(cfg),
+		ScreenRun:       NewScreenRunClient(cfg),
+		ScreenRunItem:   NewScreenRunItemClient(cfg),
+		Strategy:        NewStrategyClient(cfg),
+		StrategyVersion: NewStrategyVersionClient(cfg),
 	}, nil
 }
 
@@ -146,9 +166,13 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:      ctx,
-		config:   cfg,
-		DailyBar: NewDailyBarClient(cfg),
+		ctx:             ctx,
+		config:          cfg,
+		DailyBar:        NewDailyBarClient(cfg),
+		ScreenRun:       NewScreenRunClient(cfg),
+		ScreenRunItem:   NewScreenRunItemClient(cfg),
+		Strategy:        NewStrategyClient(cfg),
+		StrategyVersion: NewStrategyVersionClient(cfg),
 	}, nil
 }
 
@@ -178,12 +202,20 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	c.DailyBar.Use(hooks...)
+	c.ScreenRun.Use(hooks...)
+	c.ScreenRunItem.Use(hooks...)
+	c.Strategy.Use(hooks...)
+	c.StrategyVersion.Use(hooks...)
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	c.DailyBar.Intercept(interceptors...)
+	c.ScreenRun.Intercept(interceptors...)
+	c.ScreenRunItem.Intercept(interceptors...)
+	c.Strategy.Intercept(interceptors...)
+	c.StrategyVersion.Intercept(interceptors...)
 }
 
 // Mutate implements the ent.Mutator interface.
@@ -191,6 +223,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *DailyBarMutation:
 		return c.DailyBar.mutate(ctx, m)
+	case *ScreenRunMutation:
+		return c.ScreenRun.mutate(ctx, m)
+	case *ScreenRunItemMutation:
+		return c.ScreenRunItem.mutate(ctx, m)
+	case *StrategyMutation:
+		return c.Strategy.mutate(ctx, m)
+	case *StrategyVersionMutation:
+		return c.StrategyVersion.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -329,12 +369,544 @@ func (c *DailyBarClient) mutate(ctx context.Context, m *DailyBarMutation) (Value
 	}
 }
 
+// ScreenRunClient is a client for the ScreenRun schema.
+type ScreenRunClient struct {
+	config
+}
+
+// NewScreenRunClient returns a client for the ScreenRun from the given config.
+func NewScreenRunClient(c config) *ScreenRunClient {
+	return &ScreenRunClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `screenrun.Hooks(f(g(h())))`.
+func (c *ScreenRunClient) Use(hooks ...Hook) {
+	c.hooks.ScreenRun = append(c.hooks.ScreenRun, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `screenrun.Intercept(f(g(h())))`.
+func (c *ScreenRunClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ScreenRun = append(c.inters.ScreenRun, interceptors...)
+}
+
+// Create returns a builder for creating a ScreenRun entity.
+func (c *ScreenRunClient) Create() *ScreenRunCreate {
+	mutation := newScreenRunMutation(c.config, OpCreate)
+	return &ScreenRunCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ScreenRun entities.
+func (c *ScreenRunClient) CreateBulk(builders ...*ScreenRunCreate) *ScreenRunCreateBulk {
+	return &ScreenRunCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ScreenRunClient) MapCreateBulk(slice any, setFunc func(*ScreenRunCreate, int)) *ScreenRunCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ScreenRunCreateBulk{err: fmt.Errorf("calling to ScreenRunClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ScreenRunCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ScreenRunCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ScreenRun.
+func (c *ScreenRunClient) Update() *ScreenRunUpdate {
+	mutation := newScreenRunMutation(c.config, OpUpdate)
+	return &ScreenRunUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ScreenRunClient) UpdateOne(_m *ScreenRun) *ScreenRunUpdateOne {
+	mutation := newScreenRunMutation(c.config, OpUpdateOne, withScreenRun(_m))
+	return &ScreenRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ScreenRunClient) UpdateOneID(id string) *ScreenRunUpdateOne {
+	mutation := newScreenRunMutation(c.config, OpUpdateOne, withScreenRunID(id))
+	return &ScreenRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ScreenRun.
+func (c *ScreenRunClient) Delete() *ScreenRunDelete {
+	mutation := newScreenRunMutation(c.config, OpDelete)
+	return &ScreenRunDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ScreenRunClient) DeleteOne(_m *ScreenRun) *ScreenRunDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ScreenRunClient) DeleteOneID(id string) *ScreenRunDeleteOne {
+	builder := c.Delete().Where(screenrun.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ScreenRunDeleteOne{builder}
+}
+
+// Query returns a query builder for ScreenRun.
+func (c *ScreenRunClient) Query() *ScreenRunQuery {
+	return &ScreenRunQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeScreenRun},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ScreenRun entity by its id.
+func (c *ScreenRunClient) Get(ctx context.Context, id string) (*ScreenRun, error) {
+	return c.Query().Where(screenrun.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ScreenRunClient) GetX(ctx context.Context, id string) *ScreenRun {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ScreenRunClient) Hooks() []Hook {
+	return c.hooks.ScreenRun
+}
+
+// Interceptors returns the client interceptors.
+func (c *ScreenRunClient) Interceptors() []Interceptor {
+	return c.inters.ScreenRun
+}
+
+func (c *ScreenRunClient) mutate(ctx context.Context, m *ScreenRunMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ScreenRunCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ScreenRunUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ScreenRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ScreenRunDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ScreenRun mutation op: %q", m.Op())
+	}
+}
+
+// ScreenRunItemClient is a client for the ScreenRunItem schema.
+type ScreenRunItemClient struct {
+	config
+}
+
+// NewScreenRunItemClient returns a client for the ScreenRunItem from the given config.
+func NewScreenRunItemClient(c config) *ScreenRunItemClient {
+	return &ScreenRunItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `screenrunitem.Hooks(f(g(h())))`.
+func (c *ScreenRunItemClient) Use(hooks ...Hook) {
+	c.hooks.ScreenRunItem = append(c.hooks.ScreenRunItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `screenrunitem.Intercept(f(g(h())))`.
+func (c *ScreenRunItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ScreenRunItem = append(c.inters.ScreenRunItem, interceptors...)
+}
+
+// Create returns a builder for creating a ScreenRunItem entity.
+func (c *ScreenRunItemClient) Create() *ScreenRunItemCreate {
+	mutation := newScreenRunItemMutation(c.config, OpCreate)
+	return &ScreenRunItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ScreenRunItem entities.
+func (c *ScreenRunItemClient) CreateBulk(builders ...*ScreenRunItemCreate) *ScreenRunItemCreateBulk {
+	return &ScreenRunItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ScreenRunItemClient) MapCreateBulk(slice any, setFunc func(*ScreenRunItemCreate, int)) *ScreenRunItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ScreenRunItemCreateBulk{err: fmt.Errorf("calling to ScreenRunItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ScreenRunItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ScreenRunItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ScreenRunItem.
+func (c *ScreenRunItemClient) Update() *ScreenRunItemUpdate {
+	mutation := newScreenRunItemMutation(c.config, OpUpdate)
+	return &ScreenRunItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ScreenRunItemClient) UpdateOne(_m *ScreenRunItem) *ScreenRunItemUpdateOne {
+	mutation := newScreenRunItemMutation(c.config, OpUpdateOne, withScreenRunItem(_m))
+	return &ScreenRunItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ScreenRunItemClient) UpdateOneID(id string) *ScreenRunItemUpdateOne {
+	mutation := newScreenRunItemMutation(c.config, OpUpdateOne, withScreenRunItemID(id))
+	return &ScreenRunItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ScreenRunItem.
+func (c *ScreenRunItemClient) Delete() *ScreenRunItemDelete {
+	mutation := newScreenRunItemMutation(c.config, OpDelete)
+	return &ScreenRunItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ScreenRunItemClient) DeleteOne(_m *ScreenRunItem) *ScreenRunItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ScreenRunItemClient) DeleteOneID(id string) *ScreenRunItemDeleteOne {
+	builder := c.Delete().Where(screenrunitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ScreenRunItemDeleteOne{builder}
+}
+
+// Query returns a query builder for ScreenRunItem.
+func (c *ScreenRunItemClient) Query() *ScreenRunItemQuery {
+	return &ScreenRunItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeScreenRunItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ScreenRunItem entity by its id.
+func (c *ScreenRunItemClient) Get(ctx context.Context, id string) (*ScreenRunItem, error) {
+	return c.Query().Where(screenrunitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ScreenRunItemClient) GetX(ctx context.Context, id string) *ScreenRunItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ScreenRunItemClient) Hooks() []Hook {
+	return c.hooks.ScreenRunItem
+}
+
+// Interceptors returns the client interceptors.
+func (c *ScreenRunItemClient) Interceptors() []Interceptor {
+	return c.inters.ScreenRunItem
+}
+
+func (c *ScreenRunItemClient) mutate(ctx context.Context, m *ScreenRunItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ScreenRunItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ScreenRunItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ScreenRunItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ScreenRunItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ScreenRunItem mutation op: %q", m.Op())
+	}
+}
+
+// StrategyClient is a client for the Strategy schema.
+type StrategyClient struct {
+	config
+}
+
+// NewStrategyClient returns a client for the Strategy from the given config.
+func NewStrategyClient(c config) *StrategyClient {
+	return &StrategyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `strategy.Hooks(f(g(h())))`.
+func (c *StrategyClient) Use(hooks ...Hook) {
+	c.hooks.Strategy = append(c.hooks.Strategy, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `strategy.Intercept(f(g(h())))`.
+func (c *StrategyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Strategy = append(c.inters.Strategy, interceptors...)
+}
+
+// Create returns a builder for creating a Strategy entity.
+func (c *StrategyClient) Create() *StrategyCreate {
+	mutation := newStrategyMutation(c.config, OpCreate)
+	return &StrategyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Strategy entities.
+func (c *StrategyClient) CreateBulk(builders ...*StrategyCreate) *StrategyCreateBulk {
+	return &StrategyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *StrategyClient) MapCreateBulk(slice any, setFunc func(*StrategyCreate, int)) *StrategyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &StrategyCreateBulk{err: fmt.Errorf("calling to StrategyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*StrategyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &StrategyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Strategy.
+func (c *StrategyClient) Update() *StrategyUpdate {
+	mutation := newStrategyMutation(c.config, OpUpdate)
+	return &StrategyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *StrategyClient) UpdateOne(_m *Strategy) *StrategyUpdateOne {
+	mutation := newStrategyMutation(c.config, OpUpdateOne, withStrategy(_m))
+	return &StrategyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *StrategyClient) UpdateOneID(id string) *StrategyUpdateOne {
+	mutation := newStrategyMutation(c.config, OpUpdateOne, withStrategyID(id))
+	return &StrategyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Strategy.
+func (c *StrategyClient) Delete() *StrategyDelete {
+	mutation := newStrategyMutation(c.config, OpDelete)
+	return &StrategyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *StrategyClient) DeleteOne(_m *Strategy) *StrategyDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *StrategyClient) DeleteOneID(id string) *StrategyDeleteOne {
+	builder := c.Delete().Where(strategy.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &StrategyDeleteOne{builder}
+}
+
+// Query returns a query builder for Strategy.
+func (c *StrategyClient) Query() *StrategyQuery {
+	return &StrategyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeStrategy},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Strategy entity by its id.
+func (c *StrategyClient) Get(ctx context.Context, id string) (*Strategy, error) {
+	return c.Query().Where(strategy.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *StrategyClient) GetX(ctx context.Context, id string) *Strategy {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *StrategyClient) Hooks() []Hook {
+	return c.hooks.Strategy
+}
+
+// Interceptors returns the client interceptors.
+func (c *StrategyClient) Interceptors() []Interceptor {
+	return c.inters.Strategy
+}
+
+func (c *StrategyClient) mutate(ctx context.Context, m *StrategyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&StrategyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&StrategyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&StrategyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&StrategyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Strategy mutation op: %q", m.Op())
+	}
+}
+
+// StrategyVersionClient is a client for the StrategyVersion schema.
+type StrategyVersionClient struct {
+	config
+}
+
+// NewStrategyVersionClient returns a client for the StrategyVersion from the given config.
+func NewStrategyVersionClient(c config) *StrategyVersionClient {
+	return &StrategyVersionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `strategyversion.Hooks(f(g(h())))`.
+func (c *StrategyVersionClient) Use(hooks ...Hook) {
+	c.hooks.StrategyVersion = append(c.hooks.StrategyVersion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `strategyversion.Intercept(f(g(h())))`.
+func (c *StrategyVersionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.StrategyVersion = append(c.inters.StrategyVersion, interceptors...)
+}
+
+// Create returns a builder for creating a StrategyVersion entity.
+func (c *StrategyVersionClient) Create() *StrategyVersionCreate {
+	mutation := newStrategyVersionMutation(c.config, OpCreate)
+	return &StrategyVersionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of StrategyVersion entities.
+func (c *StrategyVersionClient) CreateBulk(builders ...*StrategyVersionCreate) *StrategyVersionCreateBulk {
+	return &StrategyVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *StrategyVersionClient) MapCreateBulk(slice any, setFunc func(*StrategyVersionCreate, int)) *StrategyVersionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &StrategyVersionCreateBulk{err: fmt.Errorf("calling to StrategyVersionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*StrategyVersionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &StrategyVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for StrategyVersion.
+func (c *StrategyVersionClient) Update() *StrategyVersionUpdate {
+	mutation := newStrategyVersionMutation(c.config, OpUpdate)
+	return &StrategyVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *StrategyVersionClient) UpdateOne(_m *StrategyVersion) *StrategyVersionUpdateOne {
+	mutation := newStrategyVersionMutation(c.config, OpUpdateOne, withStrategyVersion(_m))
+	return &StrategyVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *StrategyVersionClient) UpdateOneID(id string) *StrategyVersionUpdateOne {
+	mutation := newStrategyVersionMutation(c.config, OpUpdateOne, withStrategyVersionID(id))
+	return &StrategyVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for StrategyVersion.
+func (c *StrategyVersionClient) Delete() *StrategyVersionDelete {
+	mutation := newStrategyVersionMutation(c.config, OpDelete)
+	return &StrategyVersionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *StrategyVersionClient) DeleteOne(_m *StrategyVersion) *StrategyVersionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *StrategyVersionClient) DeleteOneID(id string) *StrategyVersionDeleteOne {
+	builder := c.Delete().Where(strategyversion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &StrategyVersionDeleteOne{builder}
+}
+
+// Query returns a query builder for StrategyVersion.
+func (c *StrategyVersionClient) Query() *StrategyVersionQuery {
+	return &StrategyVersionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeStrategyVersion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a StrategyVersion entity by its id.
+func (c *StrategyVersionClient) Get(ctx context.Context, id string) (*StrategyVersion, error) {
+	return c.Query().Where(strategyversion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *StrategyVersionClient) GetX(ctx context.Context, id string) *StrategyVersion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *StrategyVersionClient) Hooks() []Hook {
+	return c.hooks.StrategyVersion
+}
+
+// Interceptors returns the client interceptors.
+func (c *StrategyVersionClient) Interceptors() []Interceptor {
+	return c.inters.StrategyVersion
+}
+
+func (c *StrategyVersionClient) mutate(ctx context.Context, m *StrategyVersionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&StrategyVersionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&StrategyVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&StrategyVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&StrategyVersionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown StrategyVersion mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DailyBar []ent.Hook
+		DailyBar, ScreenRun, ScreenRunItem, Strategy, StrategyVersion []ent.Hook
 	}
 	inters struct {
-		DailyBar []ent.Interceptor
+		DailyBar, ScreenRun, ScreenRunItem, Strategy, StrategyVersion []ent.Interceptor
 	}
 )

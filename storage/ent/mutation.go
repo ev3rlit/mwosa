@@ -13,6 +13,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
 	"github.com/ev3rlit/mwosa/storage/ent/predicate"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrun"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrunitem"
+	"github.com/ev3rlit/mwosa/storage/ent/strategy"
+	"github.com/ev3rlit/mwosa/storage/ent/strategyversion"
 )
 
 const (
@@ -24,7 +28,11 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeDailyBar = "DailyBar"
+	TypeDailyBar        = "DailyBar"
+	TypeScreenRun       = "ScreenRun"
+	TypeScreenRunItem   = "ScreenRunItem"
+	TypeStrategy        = "Strategy"
+	TypeStrategyVersion = "StrategyVersion"
 )
 
 // DailyBarMutation represents an operation that mutates the DailyBar nodes in the graph.
@@ -1485,4 +1493,3444 @@ func (m *DailyBarMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *DailyBarMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown DailyBar edge %s", name)
+}
+
+// ScreenRunMutation represents an operation that mutates the ScreenRun nodes in the graph.
+type ScreenRunMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *string
+	alias                   *string
+	strategy_id             *string
+	strategy_version_id     *string
+	query_hash              *string
+	input_dataset           *string
+	input_schema_version    *int
+	addinput_schema_version *int
+	params_json             *[]byte
+	data_from               *string
+	data_to                 *string
+	data_as_of              *string
+	started_at              *time.Time
+	finished_at             *time.Time
+	status                  *string
+	result_count            *int
+	addresult_count         *int
+	result_hash             *string
+	result_size_bytes       *int64
+	addresult_size_bytes    *int64
+	summary_json            *[]byte
+	error_message           *string
+	clearedFields           map[string]struct{}
+	done                    bool
+	oldValue                func(context.Context) (*ScreenRun, error)
+	predicates              []predicate.ScreenRun
+}
+
+var _ ent.Mutation = (*ScreenRunMutation)(nil)
+
+// screenrunOption allows management of the mutation configuration using functional options.
+type screenrunOption func(*ScreenRunMutation)
+
+// newScreenRunMutation creates new mutation for the ScreenRun entity.
+func newScreenRunMutation(c config, op Op, opts ...screenrunOption) *ScreenRunMutation {
+	m := &ScreenRunMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeScreenRun,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withScreenRunID sets the ID field of the mutation.
+func withScreenRunID(id string) screenrunOption {
+	return func(m *ScreenRunMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ScreenRun
+		)
+		m.oldValue = func(ctx context.Context) (*ScreenRun, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ScreenRun.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withScreenRun sets the old ScreenRun of the mutation.
+func withScreenRun(node *ScreenRun) screenrunOption {
+	return func(m *ScreenRunMutation) {
+		m.oldValue = func(context.Context) (*ScreenRun, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ScreenRunMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ScreenRunMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of ScreenRun entities.
+func (m *ScreenRunMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ScreenRunMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ScreenRunMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ScreenRun.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetAlias sets the "alias" field.
+func (m *ScreenRunMutation) SetAlias(s string) {
+	m.alias = &s
+}
+
+// Alias returns the value of the "alias" field in the mutation.
+func (m *ScreenRunMutation) Alias() (r string, exists bool) {
+	v := m.alias
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAlias returns the old "alias" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldAlias(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAlias is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAlias requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAlias: %w", err)
+	}
+	return oldValue.Alias, nil
+}
+
+// ClearAlias clears the value of the "alias" field.
+func (m *ScreenRunMutation) ClearAlias() {
+	m.alias = nil
+	m.clearedFields[screenrun.FieldAlias] = struct{}{}
+}
+
+// AliasCleared returns if the "alias" field was cleared in this mutation.
+func (m *ScreenRunMutation) AliasCleared() bool {
+	_, ok := m.clearedFields[screenrun.FieldAlias]
+	return ok
+}
+
+// ResetAlias resets all changes to the "alias" field.
+func (m *ScreenRunMutation) ResetAlias() {
+	m.alias = nil
+	delete(m.clearedFields, screenrun.FieldAlias)
+}
+
+// SetStrategyID sets the "strategy_id" field.
+func (m *ScreenRunMutation) SetStrategyID(s string) {
+	m.strategy_id = &s
+}
+
+// StrategyID returns the value of the "strategy_id" field in the mutation.
+func (m *ScreenRunMutation) StrategyID() (r string, exists bool) {
+	v := m.strategy_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategyID returns the old "strategy_id" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldStrategyID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategyID: %w", err)
+	}
+	return oldValue.StrategyID, nil
+}
+
+// ResetStrategyID resets all changes to the "strategy_id" field.
+func (m *ScreenRunMutation) ResetStrategyID() {
+	m.strategy_id = nil
+}
+
+// SetStrategyVersionID sets the "strategy_version_id" field.
+func (m *ScreenRunMutation) SetStrategyVersionID(s string) {
+	m.strategy_version_id = &s
+}
+
+// StrategyVersionID returns the value of the "strategy_version_id" field in the mutation.
+func (m *ScreenRunMutation) StrategyVersionID() (r string, exists bool) {
+	v := m.strategy_version_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategyVersionID returns the old "strategy_version_id" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldStrategyVersionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategyVersionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategyVersionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategyVersionID: %w", err)
+	}
+	return oldValue.StrategyVersionID, nil
+}
+
+// ResetStrategyVersionID resets all changes to the "strategy_version_id" field.
+func (m *ScreenRunMutation) ResetStrategyVersionID() {
+	m.strategy_version_id = nil
+}
+
+// SetQueryHash sets the "query_hash" field.
+func (m *ScreenRunMutation) SetQueryHash(s string) {
+	m.query_hash = &s
+}
+
+// QueryHash returns the value of the "query_hash" field in the mutation.
+func (m *ScreenRunMutation) QueryHash() (r string, exists bool) {
+	v := m.query_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQueryHash returns the old "query_hash" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldQueryHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQueryHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQueryHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQueryHash: %w", err)
+	}
+	return oldValue.QueryHash, nil
+}
+
+// ResetQueryHash resets all changes to the "query_hash" field.
+func (m *ScreenRunMutation) ResetQueryHash() {
+	m.query_hash = nil
+}
+
+// SetInputDataset sets the "input_dataset" field.
+func (m *ScreenRunMutation) SetInputDataset(s string) {
+	m.input_dataset = &s
+}
+
+// InputDataset returns the value of the "input_dataset" field in the mutation.
+func (m *ScreenRunMutation) InputDataset() (r string, exists bool) {
+	v := m.input_dataset
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputDataset returns the old "input_dataset" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldInputDataset(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputDataset is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputDataset requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputDataset: %w", err)
+	}
+	return oldValue.InputDataset, nil
+}
+
+// ResetInputDataset resets all changes to the "input_dataset" field.
+func (m *ScreenRunMutation) ResetInputDataset() {
+	m.input_dataset = nil
+}
+
+// SetInputSchemaVersion sets the "input_schema_version" field.
+func (m *ScreenRunMutation) SetInputSchemaVersion(i int) {
+	m.input_schema_version = &i
+	m.addinput_schema_version = nil
+}
+
+// InputSchemaVersion returns the value of the "input_schema_version" field in the mutation.
+func (m *ScreenRunMutation) InputSchemaVersion() (r int, exists bool) {
+	v := m.input_schema_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputSchemaVersion returns the old "input_schema_version" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldInputSchemaVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputSchemaVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputSchemaVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputSchemaVersion: %w", err)
+	}
+	return oldValue.InputSchemaVersion, nil
+}
+
+// AddInputSchemaVersion adds i to the "input_schema_version" field.
+func (m *ScreenRunMutation) AddInputSchemaVersion(i int) {
+	if m.addinput_schema_version != nil {
+		*m.addinput_schema_version += i
+	} else {
+		m.addinput_schema_version = &i
+	}
+}
+
+// AddedInputSchemaVersion returns the value that was added to the "input_schema_version" field in this mutation.
+func (m *ScreenRunMutation) AddedInputSchemaVersion() (r int, exists bool) {
+	v := m.addinput_schema_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInputSchemaVersion resets all changes to the "input_schema_version" field.
+func (m *ScreenRunMutation) ResetInputSchemaVersion() {
+	m.input_schema_version = nil
+	m.addinput_schema_version = nil
+}
+
+// SetParamsJSON sets the "params_json" field.
+func (m *ScreenRunMutation) SetParamsJSON(b []byte) {
+	m.params_json = &b
+}
+
+// ParamsJSON returns the value of the "params_json" field in the mutation.
+func (m *ScreenRunMutation) ParamsJSON() (r []byte, exists bool) {
+	v := m.params_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParamsJSON returns the old "params_json" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldParamsJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParamsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParamsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParamsJSON: %w", err)
+	}
+	return oldValue.ParamsJSON, nil
+}
+
+// ClearParamsJSON clears the value of the "params_json" field.
+func (m *ScreenRunMutation) ClearParamsJSON() {
+	m.params_json = nil
+	m.clearedFields[screenrun.FieldParamsJSON] = struct{}{}
+}
+
+// ParamsJSONCleared returns if the "params_json" field was cleared in this mutation.
+func (m *ScreenRunMutation) ParamsJSONCleared() bool {
+	_, ok := m.clearedFields[screenrun.FieldParamsJSON]
+	return ok
+}
+
+// ResetParamsJSON resets all changes to the "params_json" field.
+func (m *ScreenRunMutation) ResetParamsJSON() {
+	m.params_json = nil
+	delete(m.clearedFields, screenrun.FieldParamsJSON)
+}
+
+// SetDataFrom sets the "data_from" field.
+func (m *ScreenRunMutation) SetDataFrom(s string) {
+	m.data_from = &s
+}
+
+// DataFrom returns the value of the "data_from" field in the mutation.
+func (m *ScreenRunMutation) DataFrom() (r string, exists bool) {
+	v := m.data_from
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDataFrom returns the old "data_from" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldDataFrom(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDataFrom is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDataFrom requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDataFrom: %w", err)
+	}
+	return oldValue.DataFrom, nil
+}
+
+// ResetDataFrom resets all changes to the "data_from" field.
+func (m *ScreenRunMutation) ResetDataFrom() {
+	m.data_from = nil
+}
+
+// SetDataTo sets the "data_to" field.
+func (m *ScreenRunMutation) SetDataTo(s string) {
+	m.data_to = &s
+}
+
+// DataTo returns the value of the "data_to" field in the mutation.
+func (m *ScreenRunMutation) DataTo() (r string, exists bool) {
+	v := m.data_to
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDataTo returns the old "data_to" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldDataTo(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDataTo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDataTo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDataTo: %w", err)
+	}
+	return oldValue.DataTo, nil
+}
+
+// ResetDataTo resets all changes to the "data_to" field.
+func (m *ScreenRunMutation) ResetDataTo() {
+	m.data_to = nil
+}
+
+// SetDataAsOf sets the "data_as_of" field.
+func (m *ScreenRunMutation) SetDataAsOf(s string) {
+	m.data_as_of = &s
+}
+
+// DataAsOf returns the value of the "data_as_of" field in the mutation.
+func (m *ScreenRunMutation) DataAsOf() (r string, exists bool) {
+	v := m.data_as_of
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDataAsOf returns the old "data_as_of" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldDataAsOf(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDataAsOf is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDataAsOf requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDataAsOf: %w", err)
+	}
+	return oldValue.DataAsOf, nil
+}
+
+// ResetDataAsOf resets all changes to the "data_as_of" field.
+func (m *ScreenRunMutation) ResetDataAsOf() {
+	m.data_as_of = nil
+}
+
+// SetStartedAt sets the "started_at" field.
+func (m *ScreenRunMutation) SetStartedAt(t time.Time) {
+	m.started_at = &t
+}
+
+// StartedAt returns the value of the "started_at" field in the mutation.
+func (m *ScreenRunMutation) StartedAt() (r time.Time, exists bool) {
+	v := m.started_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartedAt returns the old "started_at" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldStartedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartedAt: %w", err)
+	}
+	return oldValue.StartedAt, nil
+}
+
+// ResetStartedAt resets all changes to the "started_at" field.
+func (m *ScreenRunMutation) ResetStartedAt() {
+	m.started_at = nil
+}
+
+// SetFinishedAt sets the "finished_at" field.
+func (m *ScreenRunMutation) SetFinishedAt(t time.Time) {
+	m.finished_at = &t
+}
+
+// FinishedAt returns the value of the "finished_at" field in the mutation.
+func (m *ScreenRunMutation) FinishedAt() (r time.Time, exists bool) {
+	v := m.finished_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinishedAt returns the old "finished_at" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldFinishedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinishedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinishedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinishedAt: %w", err)
+	}
+	return oldValue.FinishedAt, nil
+}
+
+// ClearFinishedAt clears the value of the "finished_at" field.
+func (m *ScreenRunMutation) ClearFinishedAt() {
+	m.finished_at = nil
+	m.clearedFields[screenrun.FieldFinishedAt] = struct{}{}
+}
+
+// FinishedAtCleared returns if the "finished_at" field was cleared in this mutation.
+func (m *ScreenRunMutation) FinishedAtCleared() bool {
+	_, ok := m.clearedFields[screenrun.FieldFinishedAt]
+	return ok
+}
+
+// ResetFinishedAt resets all changes to the "finished_at" field.
+func (m *ScreenRunMutation) ResetFinishedAt() {
+	m.finished_at = nil
+	delete(m.clearedFields, screenrun.FieldFinishedAt)
+}
+
+// SetStatus sets the "status" field.
+func (m *ScreenRunMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ScreenRunMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ScreenRunMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetResultCount sets the "result_count" field.
+func (m *ScreenRunMutation) SetResultCount(i int) {
+	m.result_count = &i
+	m.addresult_count = nil
+}
+
+// ResultCount returns the value of the "result_count" field in the mutation.
+func (m *ScreenRunMutation) ResultCount() (r int, exists bool) {
+	v := m.result_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResultCount returns the old "result_count" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldResultCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResultCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResultCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResultCount: %w", err)
+	}
+	return oldValue.ResultCount, nil
+}
+
+// AddResultCount adds i to the "result_count" field.
+func (m *ScreenRunMutation) AddResultCount(i int) {
+	if m.addresult_count != nil {
+		*m.addresult_count += i
+	} else {
+		m.addresult_count = &i
+	}
+}
+
+// AddedResultCount returns the value that was added to the "result_count" field in this mutation.
+func (m *ScreenRunMutation) AddedResultCount() (r int, exists bool) {
+	v := m.addresult_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetResultCount resets all changes to the "result_count" field.
+func (m *ScreenRunMutation) ResetResultCount() {
+	m.result_count = nil
+	m.addresult_count = nil
+}
+
+// SetResultHash sets the "result_hash" field.
+func (m *ScreenRunMutation) SetResultHash(s string) {
+	m.result_hash = &s
+}
+
+// ResultHash returns the value of the "result_hash" field in the mutation.
+func (m *ScreenRunMutation) ResultHash() (r string, exists bool) {
+	v := m.result_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResultHash returns the old "result_hash" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldResultHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResultHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResultHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResultHash: %w", err)
+	}
+	return oldValue.ResultHash, nil
+}
+
+// ResetResultHash resets all changes to the "result_hash" field.
+func (m *ScreenRunMutation) ResetResultHash() {
+	m.result_hash = nil
+}
+
+// SetResultSizeBytes sets the "result_size_bytes" field.
+func (m *ScreenRunMutation) SetResultSizeBytes(i int64) {
+	m.result_size_bytes = &i
+	m.addresult_size_bytes = nil
+}
+
+// ResultSizeBytes returns the value of the "result_size_bytes" field in the mutation.
+func (m *ScreenRunMutation) ResultSizeBytes() (r int64, exists bool) {
+	v := m.result_size_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResultSizeBytes returns the old "result_size_bytes" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldResultSizeBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResultSizeBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResultSizeBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResultSizeBytes: %w", err)
+	}
+	return oldValue.ResultSizeBytes, nil
+}
+
+// AddResultSizeBytes adds i to the "result_size_bytes" field.
+func (m *ScreenRunMutation) AddResultSizeBytes(i int64) {
+	if m.addresult_size_bytes != nil {
+		*m.addresult_size_bytes += i
+	} else {
+		m.addresult_size_bytes = &i
+	}
+}
+
+// AddedResultSizeBytes returns the value that was added to the "result_size_bytes" field in this mutation.
+func (m *ScreenRunMutation) AddedResultSizeBytes() (r int64, exists bool) {
+	v := m.addresult_size_bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetResultSizeBytes resets all changes to the "result_size_bytes" field.
+func (m *ScreenRunMutation) ResetResultSizeBytes() {
+	m.result_size_bytes = nil
+	m.addresult_size_bytes = nil
+}
+
+// SetSummaryJSON sets the "summary_json" field.
+func (m *ScreenRunMutation) SetSummaryJSON(b []byte) {
+	m.summary_json = &b
+}
+
+// SummaryJSON returns the value of the "summary_json" field in the mutation.
+func (m *ScreenRunMutation) SummaryJSON() (r []byte, exists bool) {
+	v := m.summary_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSummaryJSON returns the old "summary_json" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldSummaryJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSummaryJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSummaryJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSummaryJSON: %w", err)
+	}
+	return oldValue.SummaryJSON, nil
+}
+
+// ClearSummaryJSON clears the value of the "summary_json" field.
+func (m *ScreenRunMutation) ClearSummaryJSON() {
+	m.summary_json = nil
+	m.clearedFields[screenrun.FieldSummaryJSON] = struct{}{}
+}
+
+// SummaryJSONCleared returns if the "summary_json" field was cleared in this mutation.
+func (m *ScreenRunMutation) SummaryJSONCleared() bool {
+	_, ok := m.clearedFields[screenrun.FieldSummaryJSON]
+	return ok
+}
+
+// ResetSummaryJSON resets all changes to the "summary_json" field.
+func (m *ScreenRunMutation) ResetSummaryJSON() {
+	m.summary_json = nil
+	delete(m.clearedFields, screenrun.FieldSummaryJSON)
+}
+
+// SetErrorMessage sets the "error_message" field.
+func (m *ScreenRunMutation) SetErrorMessage(s string) {
+	m.error_message = &s
+}
+
+// ErrorMessage returns the value of the "error_message" field in the mutation.
+func (m *ScreenRunMutation) ErrorMessage() (r string, exists bool) {
+	v := m.error_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldErrorMessage returns the old "error_message" field's value of the ScreenRun entity.
+// If the ScreenRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunMutation) OldErrorMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldErrorMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldErrorMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldErrorMessage: %w", err)
+	}
+	return oldValue.ErrorMessage, nil
+}
+
+// ResetErrorMessage resets all changes to the "error_message" field.
+func (m *ScreenRunMutation) ResetErrorMessage() {
+	m.error_message = nil
+}
+
+// Where appends a list predicates to the ScreenRunMutation builder.
+func (m *ScreenRunMutation) Where(ps ...predicate.ScreenRun) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ScreenRunMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ScreenRunMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ScreenRun, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ScreenRunMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ScreenRunMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ScreenRun).
+func (m *ScreenRunMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ScreenRunMutation) Fields() []string {
+	fields := make([]string, 0, 18)
+	if m.alias != nil {
+		fields = append(fields, screenrun.FieldAlias)
+	}
+	if m.strategy_id != nil {
+		fields = append(fields, screenrun.FieldStrategyID)
+	}
+	if m.strategy_version_id != nil {
+		fields = append(fields, screenrun.FieldStrategyVersionID)
+	}
+	if m.query_hash != nil {
+		fields = append(fields, screenrun.FieldQueryHash)
+	}
+	if m.input_dataset != nil {
+		fields = append(fields, screenrun.FieldInputDataset)
+	}
+	if m.input_schema_version != nil {
+		fields = append(fields, screenrun.FieldInputSchemaVersion)
+	}
+	if m.params_json != nil {
+		fields = append(fields, screenrun.FieldParamsJSON)
+	}
+	if m.data_from != nil {
+		fields = append(fields, screenrun.FieldDataFrom)
+	}
+	if m.data_to != nil {
+		fields = append(fields, screenrun.FieldDataTo)
+	}
+	if m.data_as_of != nil {
+		fields = append(fields, screenrun.FieldDataAsOf)
+	}
+	if m.started_at != nil {
+		fields = append(fields, screenrun.FieldStartedAt)
+	}
+	if m.finished_at != nil {
+		fields = append(fields, screenrun.FieldFinishedAt)
+	}
+	if m.status != nil {
+		fields = append(fields, screenrun.FieldStatus)
+	}
+	if m.result_count != nil {
+		fields = append(fields, screenrun.FieldResultCount)
+	}
+	if m.result_hash != nil {
+		fields = append(fields, screenrun.FieldResultHash)
+	}
+	if m.result_size_bytes != nil {
+		fields = append(fields, screenrun.FieldResultSizeBytes)
+	}
+	if m.summary_json != nil {
+		fields = append(fields, screenrun.FieldSummaryJSON)
+	}
+	if m.error_message != nil {
+		fields = append(fields, screenrun.FieldErrorMessage)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ScreenRunMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case screenrun.FieldAlias:
+		return m.Alias()
+	case screenrun.FieldStrategyID:
+		return m.StrategyID()
+	case screenrun.FieldStrategyVersionID:
+		return m.StrategyVersionID()
+	case screenrun.FieldQueryHash:
+		return m.QueryHash()
+	case screenrun.FieldInputDataset:
+		return m.InputDataset()
+	case screenrun.FieldInputSchemaVersion:
+		return m.InputSchemaVersion()
+	case screenrun.FieldParamsJSON:
+		return m.ParamsJSON()
+	case screenrun.FieldDataFrom:
+		return m.DataFrom()
+	case screenrun.FieldDataTo:
+		return m.DataTo()
+	case screenrun.FieldDataAsOf:
+		return m.DataAsOf()
+	case screenrun.FieldStartedAt:
+		return m.StartedAt()
+	case screenrun.FieldFinishedAt:
+		return m.FinishedAt()
+	case screenrun.FieldStatus:
+		return m.Status()
+	case screenrun.FieldResultCount:
+		return m.ResultCount()
+	case screenrun.FieldResultHash:
+		return m.ResultHash()
+	case screenrun.FieldResultSizeBytes:
+		return m.ResultSizeBytes()
+	case screenrun.FieldSummaryJSON:
+		return m.SummaryJSON()
+	case screenrun.FieldErrorMessage:
+		return m.ErrorMessage()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ScreenRunMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case screenrun.FieldAlias:
+		return m.OldAlias(ctx)
+	case screenrun.FieldStrategyID:
+		return m.OldStrategyID(ctx)
+	case screenrun.FieldStrategyVersionID:
+		return m.OldStrategyVersionID(ctx)
+	case screenrun.FieldQueryHash:
+		return m.OldQueryHash(ctx)
+	case screenrun.FieldInputDataset:
+		return m.OldInputDataset(ctx)
+	case screenrun.FieldInputSchemaVersion:
+		return m.OldInputSchemaVersion(ctx)
+	case screenrun.FieldParamsJSON:
+		return m.OldParamsJSON(ctx)
+	case screenrun.FieldDataFrom:
+		return m.OldDataFrom(ctx)
+	case screenrun.FieldDataTo:
+		return m.OldDataTo(ctx)
+	case screenrun.FieldDataAsOf:
+		return m.OldDataAsOf(ctx)
+	case screenrun.FieldStartedAt:
+		return m.OldStartedAt(ctx)
+	case screenrun.FieldFinishedAt:
+		return m.OldFinishedAt(ctx)
+	case screenrun.FieldStatus:
+		return m.OldStatus(ctx)
+	case screenrun.FieldResultCount:
+		return m.OldResultCount(ctx)
+	case screenrun.FieldResultHash:
+		return m.OldResultHash(ctx)
+	case screenrun.FieldResultSizeBytes:
+		return m.OldResultSizeBytes(ctx)
+	case screenrun.FieldSummaryJSON:
+		return m.OldSummaryJSON(ctx)
+	case screenrun.FieldErrorMessage:
+		return m.OldErrorMessage(ctx)
+	}
+	return nil, fmt.Errorf("unknown ScreenRun field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ScreenRunMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case screenrun.FieldAlias:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAlias(v)
+		return nil
+	case screenrun.FieldStrategyID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategyID(v)
+		return nil
+	case screenrun.FieldStrategyVersionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategyVersionID(v)
+		return nil
+	case screenrun.FieldQueryHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQueryHash(v)
+		return nil
+	case screenrun.FieldInputDataset:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputDataset(v)
+		return nil
+	case screenrun.FieldInputSchemaVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputSchemaVersion(v)
+		return nil
+	case screenrun.FieldParamsJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParamsJSON(v)
+		return nil
+	case screenrun.FieldDataFrom:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDataFrom(v)
+		return nil
+	case screenrun.FieldDataTo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDataTo(v)
+		return nil
+	case screenrun.FieldDataAsOf:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDataAsOf(v)
+		return nil
+	case screenrun.FieldStartedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartedAt(v)
+		return nil
+	case screenrun.FieldFinishedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinishedAt(v)
+		return nil
+	case screenrun.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case screenrun.FieldResultCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResultCount(v)
+		return nil
+	case screenrun.FieldResultHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResultHash(v)
+		return nil
+	case screenrun.FieldResultSizeBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResultSizeBytes(v)
+		return nil
+	case screenrun.FieldSummaryJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSummaryJSON(v)
+		return nil
+	case screenrun.FieldErrorMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetErrorMessage(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRun field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ScreenRunMutation) AddedFields() []string {
+	var fields []string
+	if m.addinput_schema_version != nil {
+		fields = append(fields, screenrun.FieldInputSchemaVersion)
+	}
+	if m.addresult_count != nil {
+		fields = append(fields, screenrun.FieldResultCount)
+	}
+	if m.addresult_size_bytes != nil {
+		fields = append(fields, screenrun.FieldResultSizeBytes)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ScreenRunMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case screenrun.FieldInputSchemaVersion:
+		return m.AddedInputSchemaVersion()
+	case screenrun.FieldResultCount:
+		return m.AddedResultCount()
+	case screenrun.FieldResultSizeBytes:
+		return m.AddedResultSizeBytes()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ScreenRunMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case screenrun.FieldInputSchemaVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInputSchemaVersion(v)
+		return nil
+	case screenrun.FieldResultCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddResultCount(v)
+		return nil
+	case screenrun.FieldResultSizeBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddResultSizeBytes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRun numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ScreenRunMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(screenrun.FieldAlias) {
+		fields = append(fields, screenrun.FieldAlias)
+	}
+	if m.FieldCleared(screenrun.FieldParamsJSON) {
+		fields = append(fields, screenrun.FieldParamsJSON)
+	}
+	if m.FieldCleared(screenrun.FieldFinishedAt) {
+		fields = append(fields, screenrun.FieldFinishedAt)
+	}
+	if m.FieldCleared(screenrun.FieldSummaryJSON) {
+		fields = append(fields, screenrun.FieldSummaryJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ScreenRunMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ScreenRunMutation) ClearField(name string) error {
+	switch name {
+	case screenrun.FieldAlias:
+		m.ClearAlias()
+		return nil
+	case screenrun.FieldParamsJSON:
+		m.ClearParamsJSON()
+		return nil
+	case screenrun.FieldFinishedAt:
+		m.ClearFinishedAt()
+		return nil
+	case screenrun.FieldSummaryJSON:
+		m.ClearSummaryJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRun nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ScreenRunMutation) ResetField(name string) error {
+	switch name {
+	case screenrun.FieldAlias:
+		m.ResetAlias()
+		return nil
+	case screenrun.FieldStrategyID:
+		m.ResetStrategyID()
+		return nil
+	case screenrun.FieldStrategyVersionID:
+		m.ResetStrategyVersionID()
+		return nil
+	case screenrun.FieldQueryHash:
+		m.ResetQueryHash()
+		return nil
+	case screenrun.FieldInputDataset:
+		m.ResetInputDataset()
+		return nil
+	case screenrun.FieldInputSchemaVersion:
+		m.ResetInputSchemaVersion()
+		return nil
+	case screenrun.FieldParamsJSON:
+		m.ResetParamsJSON()
+		return nil
+	case screenrun.FieldDataFrom:
+		m.ResetDataFrom()
+		return nil
+	case screenrun.FieldDataTo:
+		m.ResetDataTo()
+		return nil
+	case screenrun.FieldDataAsOf:
+		m.ResetDataAsOf()
+		return nil
+	case screenrun.FieldStartedAt:
+		m.ResetStartedAt()
+		return nil
+	case screenrun.FieldFinishedAt:
+		m.ResetFinishedAt()
+		return nil
+	case screenrun.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case screenrun.FieldResultCount:
+		m.ResetResultCount()
+		return nil
+	case screenrun.FieldResultHash:
+		m.ResetResultHash()
+		return nil
+	case screenrun.FieldResultSizeBytes:
+		m.ResetResultSizeBytes()
+		return nil
+	case screenrun.FieldSummaryJSON:
+		m.ResetSummaryJSON()
+		return nil
+	case screenrun.FieldErrorMessage:
+		m.ResetErrorMessage()
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRun field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ScreenRunMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ScreenRunMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ScreenRunMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ScreenRunMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ScreenRunMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ScreenRunMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ScreenRunMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ScreenRun unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ScreenRunMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ScreenRun edge %s", name)
+}
+
+// ScreenRunItemMutation represents an operation that mutates the ScreenRunItem nodes in the graph.
+type ScreenRunItemMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	screen_run_id *string
+	ordinal       *int
+	addordinal    *int
+	symbol        *string
+	payload_json  *[]byte
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*ScreenRunItem, error)
+	predicates    []predicate.ScreenRunItem
+}
+
+var _ ent.Mutation = (*ScreenRunItemMutation)(nil)
+
+// screenrunitemOption allows management of the mutation configuration using functional options.
+type screenrunitemOption func(*ScreenRunItemMutation)
+
+// newScreenRunItemMutation creates new mutation for the ScreenRunItem entity.
+func newScreenRunItemMutation(c config, op Op, opts ...screenrunitemOption) *ScreenRunItemMutation {
+	m := &ScreenRunItemMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeScreenRunItem,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withScreenRunItemID sets the ID field of the mutation.
+func withScreenRunItemID(id string) screenrunitemOption {
+	return func(m *ScreenRunItemMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ScreenRunItem
+		)
+		m.oldValue = func(ctx context.Context) (*ScreenRunItem, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ScreenRunItem.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withScreenRunItem sets the old ScreenRunItem of the mutation.
+func withScreenRunItem(node *ScreenRunItem) screenrunitemOption {
+	return func(m *ScreenRunItemMutation) {
+		m.oldValue = func(context.Context) (*ScreenRunItem, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ScreenRunItemMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ScreenRunItemMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of ScreenRunItem entities.
+func (m *ScreenRunItemMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ScreenRunItemMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ScreenRunItemMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ScreenRunItem.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetScreenRunID sets the "screen_run_id" field.
+func (m *ScreenRunItemMutation) SetScreenRunID(s string) {
+	m.screen_run_id = &s
+}
+
+// ScreenRunID returns the value of the "screen_run_id" field in the mutation.
+func (m *ScreenRunItemMutation) ScreenRunID() (r string, exists bool) {
+	v := m.screen_run_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScreenRunID returns the old "screen_run_id" field's value of the ScreenRunItem entity.
+// If the ScreenRunItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunItemMutation) OldScreenRunID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScreenRunID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScreenRunID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScreenRunID: %w", err)
+	}
+	return oldValue.ScreenRunID, nil
+}
+
+// ResetScreenRunID resets all changes to the "screen_run_id" field.
+func (m *ScreenRunItemMutation) ResetScreenRunID() {
+	m.screen_run_id = nil
+}
+
+// SetOrdinal sets the "ordinal" field.
+func (m *ScreenRunItemMutation) SetOrdinal(i int) {
+	m.ordinal = &i
+	m.addordinal = nil
+}
+
+// Ordinal returns the value of the "ordinal" field in the mutation.
+func (m *ScreenRunItemMutation) Ordinal() (r int, exists bool) {
+	v := m.ordinal
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrdinal returns the old "ordinal" field's value of the ScreenRunItem entity.
+// If the ScreenRunItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunItemMutation) OldOrdinal(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrdinal is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrdinal requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrdinal: %w", err)
+	}
+	return oldValue.Ordinal, nil
+}
+
+// AddOrdinal adds i to the "ordinal" field.
+func (m *ScreenRunItemMutation) AddOrdinal(i int) {
+	if m.addordinal != nil {
+		*m.addordinal += i
+	} else {
+		m.addordinal = &i
+	}
+}
+
+// AddedOrdinal returns the value that was added to the "ordinal" field in this mutation.
+func (m *ScreenRunItemMutation) AddedOrdinal() (r int, exists bool) {
+	v := m.addordinal
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOrdinal resets all changes to the "ordinal" field.
+func (m *ScreenRunItemMutation) ResetOrdinal() {
+	m.ordinal = nil
+	m.addordinal = nil
+}
+
+// SetSymbol sets the "symbol" field.
+func (m *ScreenRunItemMutation) SetSymbol(s string) {
+	m.symbol = &s
+}
+
+// Symbol returns the value of the "symbol" field in the mutation.
+func (m *ScreenRunItemMutation) Symbol() (r string, exists bool) {
+	v := m.symbol
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSymbol returns the old "symbol" field's value of the ScreenRunItem entity.
+// If the ScreenRunItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunItemMutation) OldSymbol(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSymbol is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSymbol requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSymbol: %w", err)
+	}
+	return oldValue.Symbol, nil
+}
+
+// ResetSymbol resets all changes to the "symbol" field.
+func (m *ScreenRunItemMutation) ResetSymbol() {
+	m.symbol = nil
+}
+
+// SetPayloadJSON sets the "payload_json" field.
+func (m *ScreenRunItemMutation) SetPayloadJSON(b []byte) {
+	m.payload_json = &b
+}
+
+// PayloadJSON returns the value of the "payload_json" field in the mutation.
+func (m *ScreenRunItemMutation) PayloadJSON() (r []byte, exists bool) {
+	v := m.payload_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPayloadJSON returns the old "payload_json" field's value of the ScreenRunItem entity.
+// If the ScreenRunItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScreenRunItemMutation) OldPayloadJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPayloadJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPayloadJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPayloadJSON: %w", err)
+	}
+	return oldValue.PayloadJSON, nil
+}
+
+// ResetPayloadJSON resets all changes to the "payload_json" field.
+func (m *ScreenRunItemMutation) ResetPayloadJSON() {
+	m.payload_json = nil
+}
+
+// Where appends a list predicates to the ScreenRunItemMutation builder.
+func (m *ScreenRunItemMutation) Where(ps ...predicate.ScreenRunItem) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ScreenRunItemMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ScreenRunItemMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ScreenRunItem, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ScreenRunItemMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ScreenRunItemMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ScreenRunItem).
+func (m *ScreenRunItemMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ScreenRunItemMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.screen_run_id != nil {
+		fields = append(fields, screenrunitem.FieldScreenRunID)
+	}
+	if m.ordinal != nil {
+		fields = append(fields, screenrunitem.FieldOrdinal)
+	}
+	if m.symbol != nil {
+		fields = append(fields, screenrunitem.FieldSymbol)
+	}
+	if m.payload_json != nil {
+		fields = append(fields, screenrunitem.FieldPayloadJSON)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ScreenRunItemMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case screenrunitem.FieldScreenRunID:
+		return m.ScreenRunID()
+	case screenrunitem.FieldOrdinal:
+		return m.Ordinal()
+	case screenrunitem.FieldSymbol:
+		return m.Symbol()
+	case screenrunitem.FieldPayloadJSON:
+		return m.PayloadJSON()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ScreenRunItemMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case screenrunitem.FieldScreenRunID:
+		return m.OldScreenRunID(ctx)
+	case screenrunitem.FieldOrdinal:
+		return m.OldOrdinal(ctx)
+	case screenrunitem.FieldSymbol:
+		return m.OldSymbol(ctx)
+	case screenrunitem.FieldPayloadJSON:
+		return m.OldPayloadJSON(ctx)
+	}
+	return nil, fmt.Errorf("unknown ScreenRunItem field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ScreenRunItemMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case screenrunitem.FieldScreenRunID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScreenRunID(v)
+		return nil
+	case screenrunitem.FieldOrdinal:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrdinal(v)
+		return nil
+	case screenrunitem.FieldSymbol:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSymbol(v)
+		return nil
+	case screenrunitem.FieldPayloadJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPayloadJSON(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRunItem field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ScreenRunItemMutation) AddedFields() []string {
+	var fields []string
+	if m.addordinal != nil {
+		fields = append(fields, screenrunitem.FieldOrdinal)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ScreenRunItemMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case screenrunitem.FieldOrdinal:
+		return m.AddedOrdinal()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ScreenRunItemMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case screenrunitem.FieldOrdinal:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOrdinal(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRunItem numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ScreenRunItemMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ScreenRunItemMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ScreenRunItemMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ScreenRunItem nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ScreenRunItemMutation) ResetField(name string) error {
+	switch name {
+	case screenrunitem.FieldScreenRunID:
+		m.ResetScreenRunID()
+		return nil
+	case screenrunitem.FieldOrdinal:
+		m.ResetOrdinal()
+		return nil
+	case screenrunitem.FieldSymbol:
+		m.ResetSymbol()
+		return nil
+	case screenrunitem.FieldPayloadJSON:
+		m.ResetPayloadJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown ScreenRunItem field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ScreenRunItemMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ScreenRunItemMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ScreenRunItemMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ScreenRunItemMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ScreenRunItemMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ScreenRunItemMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ScreenRunItemMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ScreenRunItem unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ScreenRunItemMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ScreenRunItem edge %s", name)
+}
+
+// StrategyMutation represents an operation that mutates the Strategy nodes in the graph.
+type StrategyMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *string
+	name              *string
+	engine            *string
+	active_version_id *string
+	created_at        *time.Time
+	updated_at        *time.Time
+	archived_at       *time.Time
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*Strategy, error)
+	predicates        []predicate.Strategy
+}
+
+var _ ent.Mutation = (*StrategyMutation)(nil)
+
+// strategyOption allows management of the mutation configuration using functional options.
+type strategyOption func(*StrategyMutation)
+
+// newStrategyMutation creates new mutation for the Strategy entity.
+func newStrategyMutation(c config, op Op, opts ...strategyOption) *StrategyMutation {
+	m := &StrategyMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeStrategy,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withStrategyID sets the ID field of the mutation.
+func withStrategyID(id string) strategyOption {
+	return func(m *StrategyMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Strategy
+		)
+		m.oldValue = func(ctx context.Context) (*Strategy, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Strategy.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withStrategy sets the old Strategy of the mutation.
+func withStrategy(node *Strategy) strategyOption {
+	return func(m *StrategyMutation) {
+		m.oldValue = func(context.Context) (*Strategy, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m StrategyMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m StrategyMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Strategy entities.
+func (m *StrategyMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *StrategyMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *StrategyMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Strategy.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *StrategyMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *StrategyMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Strategy entity.
+// If the Strategy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *StrategyMutation) ResetName() {
+	m.name = nil
+}
+
+// SetEngine sets the "engine" field.
+func (m *StrategyMutation) SetEngine(s string) {
+	m.engine = &s
+}
+
+// Engine returns the value of the "engine" field in the mutation.
+func (m *StrategyMutation) Engine() (r string, exists bool) {
+	v := m.engine
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEngine returns the old "engine" field's value of the Strategy entity.
+// If the Strategy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyMutation) OldEngine(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEngine is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEngine requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEngine: %w", err)
+	}
+	return oldValue.Engine, nil
+}
+
+// ResetEngine resets all changes to the "engine" field.
+func (m *StrategyMutation) ResetEngine() {
+	m.engine = nil
+}
+
+// SetActiveVersionID sets the "active_version_id" field.
+func (m *StrategyMutation) SetActiveVersionID(s string) {
+	m.active_version_id = &s
+}
+
+// ActiveVersionID returns the value of the "active_version_id" field in the mutation.
+func (m *StrategyMutation) ActiveVersionID() (r string, exists bool) {
+	v := m.active_version_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActiveVersionID returns the old "active_version_id" field's value of the Strategy entity.
+// If the Strategy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyMutation) OldActiveVersionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActiveVersionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActiveVersionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActiveVersionID: %w", err)
+	}
+	return oldValue.ActiveVersionID, nil
+}
+
+// ResetActiveVersionID resets all changes to the "active_version_id" field.
+func (m *StrategyMutation) ResetActiveVersionID() {
+	m.active_version_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *StrategyMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *StrategyMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Strategy entity.
+// If the Strategy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *StrategyMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *StrategyMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *StrategyMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Strategy entity.
+// If the Strategy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *StrategyMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetArchivedAt sets the "archived_at" field.
+func (m *StrategyMutation) SetArchivedAt(t time.Time) {
+	m.archived_at = &t
+}
+
+// ArchivedAt returns the value of the "archived_at" field in the mutation.
+func (m *StrategyMutation) ArchivedAt() (r time.Time, exists bool) {
+	v := m.archived_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldArchivedAt returns the old "archived_at" field's value of the Strategy entity.
+// If the Strategy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyMutation) OldArchivedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldArchivedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldArchivedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldArchivedAt: %w", err)
+	}
+	return oldValue.ArchivedAt, nil
+}
+
+// ClearArchivedAt clears the value of the "archived_at" field.
+func (m *StrategyMutation) ClearArchivedAt() {
+	m.archived_at = nil
+	m.clearedFields[strategy.FieldArchivedAt] = struct{}{}
+}
+
+// ArchivedAtCleared returns if the "archived_at" field was cleared in this mutation.
+func (m *StrategyMutation) ArchivedAtCleared() bool {
+	_, ok := m.clearedFields[strategy.FieldArchivedAt]
+	return ok
+}
+
+// ResetArchivedAt resets all changes to the "archived_at" field.
+func (m *StrategyMutation) ResetArchivedAt() {
+	m.archived_at = nil
+	delete(m.clearedFields, strategy.FieldArchivedAt)
+}
+
+// Where appends a list predicates to the StrategyMutation builder.
+func (m *StrategyMutation) Where(ps ...predicate.Strategy) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the StrategyMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *StrategyMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Strategy, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *StrategyMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *StrategyMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Strategy).
+func (m *StrategyMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *StrategyMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.name != nil {
+		fields = append(fields, strategy.FieldName)
+	}
+	if m.engine != nil {
+		fields = append(fields, strategy.FieldEngine)
+	}
+	if m.active_version_id != nil {
+		fields = append(fields, strategy.FieldActiveVersionID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, strategy.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, strategy.FieldUpdatedAt)
+	}
+	if m.archived_at != nil {
+		fields = append(fields, strategy.FieldArchivedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *StrategyMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case strategy.FieldName:
+		return m.Name()
+	case strategy.FieldEngine:
+		return m.Engine()
+	case strategy.FieldActiveVersionID:
+		return m.ActiveVersionID()
+	case strategy.FieldCreatedAt:
+		return m.CreatedAt()
+	case strategy.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case strategy.FieldArchivedAt:
+		return m.ArchivedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *StrategyMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case strategy.FieldName:
+		return m.OldName(ctx)
+	case strategy.FieldEngine:
+		return m.OldEngine(ctx)
+	case strategy.FieldActiveVersionID:
+		return m.OldActiveVersionID(ctx)
+	case strategy.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case strategy.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case strategy.FieldArchivedAt:
+		return m.OldArchivedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown Strategy field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *StrategyMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case strategy.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case strategy.FieldEngine:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEngine(v)
+		return nil
+	case strategy.FieldActiveVersionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActiveVersionID(v)
+		return nil
+	case strategy.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case strategy.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case strategy.FieldArchivedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetArchivedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Strategy field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *StrategyMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *StrategyMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *StrategyMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Strategy numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *StrategyMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(strategy.FieldArchivedAt) {
+		fields = append(fields, strategy.FieldArchivedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *StrategyMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *StrategyMutation) ClearField(name string) error {
+	switch name {
+	case strategy.FieldArchivedAt:
+		m.ClearArchivedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Strategy nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *StrategyMutation) ResetField(name string) error {
+	switch name {
+	case strategy.FieldName:
+		m.ResetName()
+		return nil
+	case strategy.FieldEngine:
+		m.ResetEngine()
+		return nil
+	case strategy.FieldActiveVersionID:
+		m.ResetActiveVersionID()
+		return nil
+	case strategy.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case strategy.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case strategy.FieldArchivedAt:
+		m.ResetArchivedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Strategy field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *StrategyMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *StrategyMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *StrategyMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *StrategyMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *StrategyMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *StrategyMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *StrategyMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown Strategy unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *StrategyMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown Strategy edge %s", name)
+}
+
+// StrategyVersionMutation represents an operation that mutates the StrategyVersion nodes in the graph.
+type StrategyVersionMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *string
+	strategy_id             *string
+	version                 *int
+	addversion              *int
+	query_text              *string
+	query_hash              *string
+	input_dataset           *string
+	input_schema_version    *int
+	addinput_schema_version *int
+	params_json             *[]byte
+	created_at              *time.Time
+	note                    *string
+	clearedFields           map[string]struct{}
+	done                    bool
+	oldValue                func(context.Context) (*StrategyVersion, error)
+	predicates              []predicate.StrategyVersion
+}
+
+var _ ent.Mutation = (*StrategyVersionMutation)(nil)
+
+// strategyversionOption allows management of the mutation configuration using functional options.
+type strategyversionOption func(*StrategyVersionMutation)
+
+// newStrategyVersionMutation creates new mutation for the StrategyVersion entity.
+func newStrategyVersionMutation(c config, op Op, opts ...strategyversionOption) *StrategyVersionMutation {
+	m := &StrategyVersionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeStrategyVersion,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withStrategyVersionID sets the ID field of the mutation.
+func withStrategyVersionID(id string) strategyversionOption {
+	return func(m *StrategyVersionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *StrategyVersion
+		)
+		m.oldValue = func(ctx context.Context) (*StrategyVersion, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().StrategyVersion.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withStrategyVersion sets the old StrategyVersion of the mutation.
+func withStrategyVersion(node *StrategyVersion) strategyversionOption {
+	return func(m *StrategyVersionMutation) {
+		m.oldValue = func(context.Context) (*StrategyVersion, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m StrategyVersionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m StrategyVersionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of StrategyVersion entities.
+func (m *StrategyVersionMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *StrategyVersionMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *StrategyVersionMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().StrategyVersion.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetStrategyID sets the "strategy_id" field.
+func (m *StrategyVersionMutation) SetStrategyID(s string) {
+	m.strategy_id = &s
+}
+
+// StrategyID returns the value of the "strategy_id" field in the mutation.
+func (m *StrategyVersionMutation) StrategyID() (r string, exists bool) {
+	v := m.strategy_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategyID returns the old "strategy_id" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldStrategyID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategyID: %w", err)
+	}
+	return oldValue.StrategyID, nil
+}
+
+// ResetStrategyID resets all changes to the "strategy_id" field.
+func (m *StrategyVersionMutation) ResetStrategyID() {
+	m.strategy_id = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *StrategyVersionMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *StrategyVersionMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *StrategyVersionMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *StrategyVersionMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *StrategyVersionMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetQueryText sets the "query_text" field.
+func (m *StrategyVersionMutation) SetQueryText(s string) {
+	m.query_text = &s
+}
+
+// QueryText returns the value of the "query_text" field in the mutation.
+func (m *StrategyVersionMutation) QueryText() (r string, exists bool) {
+	v := m.query_text
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQueryText returns the old "query_text" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldQueryText(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQueryText is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQueryText requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQueryText: %w", err)
+	}
+	return oldValue.QueryText, nil
+}
+
+// ResetQueryText resets all changes to the "query_text" field.
+func (m *StrategyVersionMutation) ResetQueryText() {
+	m.query_text = nil
+}
+
+// SetQueryHash sets the "query_hash" field.
+func (m *StrategyVersionMutation) SetQueryHash(s string) {
+	m.query_hash = &s
+}
+
+// QueryHash returns the value of the "query_hash" field in the mutation.
+func (m *StrategyVersionMutation) QueryHash() (r string, exists bool) {
+	v := m.query_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQueryHash returns the old "query_hash" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldQueryHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQueryHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQueryHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQueryHash: %w", err)
+	}
+	return oldValue.QueryHash, nil
+}
+
+// ResetQueryHash resets all changes to the "query_hash" field.
+func (m *StrategyVersionMutation) ResetQueryHash() {
+	m.query_hash = nil
+}
+
+// SetInputDataset sets the "input_dataset" field.
+func (m *StrategyVersionMutation) SetInputDataset(s string) {
+	m.input_dataset = &s
+}
+
+// InputDataset returns the value of the "input_dataset" field in the mutation.
+func (m *StrategyVersionMutation) InputDataset() (r string, exists bool) {
+	v := m.input_dataset
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputDataset returns the old "input_dataset" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldInputDataset(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputDataset is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputDataset requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputDataset: %w", err)
+	}
+	return oldValue.InputDataset, nil
+}
+
+// ResetInputDataset resets all changes to the "input_dataset" field.
+func (m *StrategyVersionMutation) ResetInputDataset() {
+	m.input_dataset = nil
+}
+
+// SetInputSchemaVersion sets the "input_schema_version" field.
+func (m *StrategyVersionMutation) SetInputSchemaVersion(i int) {
+	m.input_schema_version = &i
+	m.addinput_schema_version = nil
+}
+
+// InputSchemaVersion returns the value of the "input_schema_version" field in the mutation.
+func (m *StrategyVersionMutation) InputSchemaVersion() (r int, exists bool) {
+	v := m.input_schema_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInputSchemaVersion returns the old "input_schema_version" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldInputSchemaVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInputSchemaVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInputSchemaVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInputSchemaVersion: %w", err)
+	}
+	return oldValue.InputSchemaVersion, nil
+}
+
+// AddInputSchemaVersion adds i to the "input_schema_version" field.
+func (m *StrategyVersionMutation) AddInputSchemaVersion(i int) {
+	if m.addinput_schema_version != nil {
+		*m.addinput_schema_version += i
+	} else {
+		m.addinput_schema_version = &i
+	}
+}
+
+// AddedInputSchemaVersion returns the value that was added to the "input_schema_version" field in this mutation.
+func (m *StrategyVersionMutation) AddedInputSchemaVersion() (r int, exists bool) {
+	v := m.addinput_schema_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInputSchemaVersion resets all changes to the "input_schema_version" field.
+func (m *StrategyVersionMutation) ResetInputSchemaVersion() {
+	m.input_schema_version = nil
+	m.addinput_schema_version = nil
+}
+
+// SetParamsJSON sets the "params_json" field.
+func (m *StrategyVersionMutation) SetParamsJSON(b []byte) {
+	m.params_json = &b
+}
+
+// ParamsJSON returns the value of the "params_json" field in the mutation.
+func (m *StrategyVersionMutation) ParamsJSON() (r []byte, exists bool) {
+	v := m.params_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParamsJSON returns the old "params_json" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldParamsJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParamsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParamsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParamsJSON: %w", err)
+	}
+	return oldValue.ParamsJSON, nil
+}
+
+// ClearParamsJSON clears the value of the "params_json" field.
+func (m *StrategyVersionMutation) ClearParamsJSON() {
+	m.params_json = nil
+	m.clearedFields[strategyversion.FieldParamsJSON] = struct{}{}
+}
+
+// ParamsJSONCleared returns if the "params_json" field was cleared in this mutation.
+func (m *StrategyVersionMutation) ParamsJSONCleared() bool {
+	_, ok := m.clearedFields[strategyversion.FieldParamsJSON]
+	return ok
+}
+
+// ResetParamsJSON resets all changes to the "params_json" field.
+func (m *StrategyVersionMutation) ResetParamsJSON() {
+	m.params_json = nil
+	delete(m.clearedFields, strategyversion.FieldParamsJSON)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *StrategyVersionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *StrategyVersionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *StrategyVersionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetNote sets the "note" field.
+func (m *StrategyVersionMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *StrategyVersionMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the StrategyVersion entity.
+// If the StrategyVersion object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StrategyVersionMutation) OldNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *StrategyVersionMutation) ResetNote() {
+	m.note = nil
+}
+
+// Where appends a list predicates to the StrategyVersionMutation builder.
+func (m *StrategyVersionMutation) Where(ps ...predicate.StrategyVersion) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the StrategyVersionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *StrategyVersionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.StrategyVersion, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *StrategyVersionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *StrategyVersionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (StrategyVersion).
+func (m *StrategyVersionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *StrategyVersionMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.strategy_id != nil {
+		fields = append(fields, strategyversion.FieldStrategyID)
+	}
+	if m.version != nil {
+		fields = append(fields, strategyversion.FieldVersion)
+	}
+	if m.query_text != nil {
+		fields = append(fields, strategyversion.FieldQueryText)
+	}
+	if m.query_hash != nil {
+		fields = append(fields, strategyversion.FieldQueryHash)
+	}
+	if m.input_dataset != nil {
+		fields = append(fields, strategyversion.FieldInputDataset)
+	}
+	if m.input_schema_version != nil {
+		fields = append(fields, strategyversion.FieldInputSchemaVersion)
+	}
+	if m.params_json != nil {
+		fields = append(fields, strategyversion.FieldParamsJSON)
+	}
+	if m.created_at != nil {
+		fields = append(fields, strategyversion.FieldCreatedAt)
+	}
+	if m.note != nil {
+		fields = append(fields, strategyversion.FieldNote)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *StrategyVersionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case strategyversion.FieldStrategyID:
+		return m.StrategyID()
+	case strategyversion.FieldVersion:
+		return m.Version()
+	case strategyversion.FieldQueryText:
+		return m.QueryText()
+	case strategyversion.FieldQueryHash:
+		return m.QueryHash()
+	case strategyversion.FieldInputDataset:
+		return m.InputDataset()
+	case strategyversion.FieldInputSchemaVersion:
+		return m.InputSchemaVersion()
+	case strategyversion.FieldParamsJSON:
+		return m.ParamsJSON()
+	case strategyversion.FieldCreatedAt:
+		return m.CreatedAt()
+	case strategyversion.FieldNote:
+		return m.Note()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *StrategyVersionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case strategyversion.FieldStrategyID:
+		return m.OldStrategyID(ctx)
+	case strategyversion.FieldVersion:
+		return m.OldVersion(ctx)
+	case strategyversion.FieldQueryText:
+		return m.OldQueryText(ctx)
+	case strategyversion.FieldQueryHash:
+		return m.OldQueryHash(ctx)
+	case strategyversion.FieldInputDataset:
+		return m.OldInputDataset(ctx)
+	case strategyversion.FieldInputSchemaVersion:
+		return m.OldInputSchemaVersion(ctx)
+	case strategyversion.FieldParamsJSON:
+		return m.OldParamsJSON(ctx)
+	case strategyversion.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case strategyversion.FieldNote:
+		return m.OldNote(ctx)
+	}
+	return nil, fmt.Errorf("unknown StrategyVersion field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *StrategyVersionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case strategyversion.FieldStrategyID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategyID(v)
+		return nil
+	case strategyversion.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case strategyversion.FieldQueryText:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQueryText(v)
+		return nil
+	case strategyversion.FieldQueryHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQueryHash(v)
+		return nil
+	case strategyversion.FieldInputDataset:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputDataset(v)
+		return nil
+	case strategyversion.FieldInputSchemaVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInputSchemaVersion(v)
+		return nil
+	case strategyversion.FieldParamsJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParamsJSON(v)
+		return nil
+	case strategyversion.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case strategyversion.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	}
+	return fmt.Errorf("unknown StrategyVersion field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *StrategyVersionMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, strategyversion.FieldVersion)
+	}
+	if m.addinput_schema_version != nil {
+		fields = append(fields, strategyversion.FieldInputSchemaVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *StrategyVersionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case strategyversion.FieldVersion:
+		return m.AddedVersion()
+	case strategyversion.FieldInputSchemaVersion:
+		return m.AddedInputSchemaVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *StrategyVersionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case strategyversion.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	case strategyversion.FieldInputSchemaVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInputSchemaVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown StrategyVersion numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *StrategyVersionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(strategyversion.FieldParamsJSON) {
+		fields = append(fields, strategyversion.FieldParamsJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *StrategyVersionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *StrategyVersionMutation) ClearField(name string) error {
+	switch name {
+	case strategyversion.FieldParamsJSON:
+		m.ClearParamsJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown StrategyVersion nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *StrategyVersionMutation) ResetField(name string) error {
+	switch name {
+	case strategyversion.FieldStrategyID:
+		m.ResetStrategyID()
+		return nil
+	case strategyversion.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case strategyversion.FieldQueryText:
+		m.ResetQueryText()
+		return nil
+	case strategyversion.FieldQueryHash:
+		m.ResetQueryHash()
+		return nil
+	case strategyversion.FieldInputDataset:
+		m.ResetInputDataset()
+		return nil
+	case strategyversion.FieldInputSchemaVersion:
+		m.ResetInputSchemaVersion()
+		return nil
+	case strategyversion.FieldParamsJSON:
+		m.ResetParamsJSON()
+		return nil
+	case strategyversion.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case strategyversion.FieldNote:
+		m.ResetNote()
+		return nil
+	}
+	return fmt.Errorf("unknown StrategyVersion field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *StrategyVersionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *StrategyVersionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *StrategyVersionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *StrategyVersionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *StrategyVersionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *StrategyVersionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *StrategyVersionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown StrategyVersion unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *StrategyVersionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown StrategyVersion edge %s", name)
 }

@@ -14,6 +14,14 @@ type Tx struct {
 	config
 	// DailyBar is the client for interacting with the DailyBar builders.
 	DailyBar *DailyBarClient
+	// ScreenRun is the client for interacting with the ScreenRun builders.
+	ScreenRun *ScreenRunClient
+	// ScreenRunItem is the client for interacting with the ScreenRunItem builders.
+	ScreenRunItem *ScreenRunItemClient
+	// Strategy is the client for interacting with the Strategy builders.
+	Strategy *StrategyClient
+	// StrategyVersion is the client for interacting with the StrategyVersion builders.
+	StrategyVersion *StrategyVersionClient
 
 	// lazily loaded.
 	client     *Client
@@ -146,6 +154,10 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.DailyBar = NewDailyBarClient(tx.config)
+	tx.ScreenRun = NewScreenRunClient(tx.config)
+	tx.ScreenRunItem = NewScreenRunItemClient(tx.config)
+	tx.Strategy = NewStrategyClient(tx.config)
+	tx.StrategyVersion = NewStrategyVersionClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

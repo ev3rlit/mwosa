@@ -58,14 +58,150 @@ var (
 			},
 		},
 	}
+	// ScreenRunsColumns holds the columns for the "screen_runs" table.
+	ScreenRunsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "alias", Type: field.TypeString, Unique: true, Nullable: true},
+		{Name: "strategy_id", Type: field.TypeString},
+		{Name: "strategy_version_id", Type: field.TypeString},
+		{Name: "query_hash", Type: field.TypeString},
+		{Name: "input_dataset", Type: field.TypeString},
+		{Name: "input_schema_version", Type: field.TypeInt},
+		{Name: "params_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "data_from", Type: field.TypeString, Default: ""},
+		{Name: "data_to", Type: field.TypeString, Default: ""},
+		{Name: "data_as_of", Type: field.TypeString, Default: ""},
+		{Name: "started_at", Type: field.TypeTime},
+		{Name: "finished_at", Type: field.TypeTime, Nullable: true},
+		{Name: "status", Type: field.TypeString},
+		{Name: "result_count", Type: field.TypeInt},
+		{Name: "result_hash", Type: field.TypeString, Default: ""},
+		{Name: "result_size_bytes", Type: field.TypeInt64},
+		{Name: "summary_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "error_message", Type: field.TypeString, Default: ""},
+	}
+	// ScreenRunsTable holds the schema information for the "screen_runs" table.
+	ScreenRunsTable = &schema.Table{
+		Name:       "screen_runs",
+		Columns:    ScreenRunsColumns,
+		PrimaryKey: []*schema.Column{ScreenRunsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_screen_runs_started_at",
+				Unique:  false,
+				Columns: []*schema.Column{ScreenRunsColumns[11]},
+			},
+			{
+				Name:    "idx_screen_runs_strategy_started",
+				Unique:  false,
+				Columns: []*schema.Column{ScreenRunsColumns[2], ScreenRunsColumns[11]},
+			},
+		},
+	}
+	// ScreenRunItemsColumns holds the columns for the "screen_run_items" table.
+	ScreenRunItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "screen_run_id", Type: field.TypeString},
+		{Name: "ordinal", Type: field.TypeInt},
+		{Name: "symbol", Type: field.TypeString, Default: ""},
+		{Name: "payload_json", Type: field.TypeBytes},
+	}
+	// ScreenRunItemsTable holds the schema information for the "screen_run_items" table.
+	ScreenRunItemsTable = &schema.Table{
+		Name:       "screen_run_items",
+		Columns:    ScreenRunItemsColumns,
+		PrimaryKey: []*schema.Column{ScreenRunItemsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "screen_run_items_run_ordinal_unique",
+				Unique:  true,
+				Columns: []*schema.Column{ScreenRunItemsColumns[1], ScreenRunItemsColumns[2]},
+			},
+			{
+				Name:    "idx_screen_run_items_symbol",
+				Unique:  false,
+				Columns: []*schema.Column{ScreenRunItemsColumns[3]},
+			},
+		},
+	}
+	// StrategiesColumns holds the columns for the "strategies" table.
+	StrategiesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "engine", Type: field.TypeString},
+		{Name: "active_version_id", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "archived_at", Type: field.TypeTime, Nullable: true},
+	}
+	// StrategiesTable holds the schema information for the "strategies" table.
+	StrategiesTable = &schema.Table{
+		Name:       "strategies",
+		Columns:    StrategiesColumns,
+		PrimaryKey: []*schema.Column{StrategiesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_strategies_archived_at",
+				Unique:  false,
+				Columns: []*schema.Column{StrategiesColumns[6]},
+			},
+		},
+	}
+	// StrategyVersionsColumns holds the columns for the "strategy_versions" table.
+	StrategyVersionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "strategy_id", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt},
+		{Name: "query_text", Type: field.TypeString},
+		{Name: "query_hash", Type: field.TypeString},
+		{Name: "input_dataset", Type: field.TypeString},
+		{Name: "input_schema_version", Type: field.TypeInt},
+		{Name: "params_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "note", Type: field.TypeString, Default: ""},
+	}
+	// StrategyVersionsTable holds the schema information for the "strategy_versions" table.
+	StrategyVersionsTable = &schema.Table{
+		Name:       "strategy_versions",
+		Columns:    StrategyVersionsColumns,
+		PrimaryKey: []*schema.Column{StrategyVersionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "strategy_versions_strategy_version_unique",
+				Unique:  true,
+				Columns: []*schema.Column{StrategyVersionsColumns[1], StrategyVersionsColumns[2]},
+			},
+			{
+				Name:    "idx_strategy_versions_query_hash",
+				Unique:  false,
+				Columns: []*schema.Column{StrategyVersionsColumns[4]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		DailyBarTable,
+		ScreenRunsTable,
+		ScreenRunItemsTable,
+		StrategiesTable,
+		StrategyVersionsTable,
 	}
 )
 
 func init() {
 	DailyBarTable.Annotation = &entsql.Annotation{
 		Table: "daily_bar",
+	}
+	ScreenRunsTable.Annotation = &entsql.Annotation{
+		Table: "screen_runs",
+	}
+	ScreenRunItemsTable.Annotation = &entsql.Annotation{
+		Table: "screen_run_items",
+	}
+	StrategiesTable.Annotation = &entsql.Annotation{
+		Table: "strategies",
+	}
+	StrategyVersionsTable.Annotation = &entsql.Annotation{
+		Table: "strategy_versions",
 	}
 }

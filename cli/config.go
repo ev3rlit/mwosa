@@ -58,29 +58,6 @@ type configSetResult struct {
 	Value      string `json:"value"`
 }
 
-func newInspectCommand(opts *Options) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "inspect",
-		Short: "Inspect mwosa resources and local state",
-	}
-	cmd.AddCommand(newInspectConfigCommand(opts))
-	return cmd
-}
-
-func newInspectConfigCommand(opts *Options) *cobra.Command {
-	return &cobra.Command{
-		Use:   "config",
-		Short: "Inspect resolved config and data paths",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := loadConfig(opts); err != nil {
-				return err
-			}
-			return writeConfigOutput(cmd.OutOrStdout(), configInspectFromResolved(opts.ConfigState))
-		},
-	}
-}
-
 func newConfigCommand(opts *Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",

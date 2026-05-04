@@ -13,6 +13,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrun"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrunitem"
+	"github.com/ev3rlit/mwosa/storage/ent/strategy"
+	"github.com/ev3rlit/mwosa/storage/ent/strategyversion"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -73,7 +77,11 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			dailybar.Table: dailybar.ValidColumn,
+			dailybar.Table:        dailybar.ValidColumn,
+			screenrun.Table:       screenrun.ValidColumn,
+			screenrunitem.Table:   screenrunitem.ValidColumn,
+			strategy.Table:        strategy.ValidColumn,
+			strategyversion.Table: strategyversion.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

@@ -8,3 +8,15 @@ import (
 
 // DailyBar is the predicate function for dailybar builders.
 type DailyBar func(*sql.Selector)
+
+// ScreenRun is the predicate function for screenrun builders.
+type ScreenRun func(*sql.Selector)
+
+// ScreenRunItem is the predicate function for screenrunitem builders.
+type ScreenRunItem func(*sql.Selector)
+
+// Strategy is the predicate function for strategy builders.
+type Strategy func(*sql.Selector)
+
+// StrategyVersion is the predicate function for strategyversion builders.
+type StrategyVersion func(*sql.Selector)

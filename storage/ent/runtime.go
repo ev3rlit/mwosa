@@ -6,6 +6,10 @@ import (
 	"time"
 
 	"github.com/ev3rlit/mwosa/storage/ent/dailybar"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrun"
+	"github.com/ev3rlit/mwosa/storage/ent/screenrunitem"
+	"github.com/ev3rlit/mwosa/storage/ent/strategy"
+	"github.com/ev3rlit/mwosa/storage/ent/strategyversion"
 	"github.com/ev3rlit/mwosa/storage/schema"
 )
 
@@ -105,4 +109,154 @@ func init() {
 	dailybar.DefaultUpdatedAt = dailybarDescUpdatedAt.Default.(func() time.Time)
 	// dailybar.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	dailybar.UpdateDefaultUpdatedAt = dailybarDescUpdatedAt.UpdateDefault.(func() time.Time)
+	screenrunFields := schema.ScreenRun{}.Fields()
+	_ = screenrunFields
+	// screenrunDescStrategyID is the schema descriptor for strategy_id field.
+	screenrunDescStrategyID := screenrunFields[2].Descriptor()
+	// screenrun.StrategyIDValidator is a validator for the "strategy_id" field. It is called by the builders before save.
+	screenrun.StrategyIDValidator = screenrunDescStrategyID.Validators[0].(func(string) error)
+	// screenrunDescStrategyVersionID is the schema descriptor for strategy_version_id field.
+	screenrunDescStrategyVersionID := screenrunFields[3].Descriptor()
+	// screenrun.StrategyVersionIDValidator is a validator for the "strategy_version_id" field. It is called by the builders before save.
+	screenrun.StrategyVersionIDValidator = screenrunDescStrategyVersionID.Validators[0].(func(string) error)
+	// screenrunDescQueryHash is the schema descriptor for query_hash field.
+	screenrunDescQueryHash := screenrunFields[4].Descriptor()
+	// screenrun.QueryHashValidator is a validator for the "query_hash" field. It is called by the builders before save.
+	screenrun.QueryHashValidator = screenrunDescQueryHash.Validators[0].(func(string) error)
+	// screenrunDescInputDataset is the schema descriptor for input_dataset field.
+	screenrunDescInputDataset := screenrunFields[5].Descriptor()
+	// screenrun.InputDatasetValidator is a validator for the "input_dataset" field. It is called by the builders before save.
+	screenrun.InputDatasetValidator = screenrunDescInputDataset.Validators[0].(func(string) error)
+	// screenrunDescInputSchemaVersion is the schema descriptor for input_schema_version field.
+	screenrunDescInputSchemaVersion := screenrunFields[6].Descriptor()
+	// screenrun.InputSchemaVersionValidator is a validator for the "input_schema_version" field. It is called by the builders before save.
+	screenrun.InputSchemaVersionValidator = screenrunDescInputSchemaVersion.Validators[0].(func(int) error)
+	// screenrunDescDataFrom is the schema descriptor for data_from field.
+	screenrunDescDataFrom := screenrunFields[8].Descriptor()
+	// screenrun.DefaultDataFrom holds the default value on creation for the data_from field.
+	screenrun.DefaultDataFrom = screenrunDescDataFrom.Default.(string)
+	// screenrunDescDataTo is the schema descriptor for data_to field.
+	screenrunDescDataTo := screenrunFields[9].Descriptor()
+	// screenrun.DefaultDataTo holds the default value on creation for the data_to field.
+	screenrun.DefaultDataTo = screenrunDescDataTo.Default.(string)
+	// screenrunDescDataAsOf is the schema descriptor for data_as_of field.
+	screenrunDescDataAsOf := screenrunFields[10].Descriptor()
+	// screenrun.DefaultDataAsOf holds the default value on creation for the data_as_of field.
+	screenrun.DefaultDataAsOf = screenrunDescDataAsOf.Default.(string)
+	// screenrunDescStartedAt is the schema descriptor for started_at field.
+	screenrunDescStartedAt := screenrunFields[11].Descriptor()
+	// screenrun.DefaultStartedAt holds the default value on creation for the started_at field.
+	screenrun.DefaultStartedAt = screenrunDescStartedAt.Default.(func() time.Time)
+	// screenrunDescStatus is the schema descriptor for status field.
+	screenrunDescStatus := screenrunFields[13].Descriptor()
+	// screenrun.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	screenrun.StatusValidator = screenrunDescStatus.Validators[0].(func(string) error)
+	// screenrunDescResultCount is the schema descriptor for result_count field.
+	screenrunDescResultCount := screenrunFields[14].Descriptor()
+	// screenrun.ResultCountValidator is a validator for the "result_count" field. It is called by the builders before save.
+	screenrun.ResultCountValidator = screenrunDescResultCount.Validators[0].(func(int) error)
+	// screenrunDescResultHash is the schema descriptor for result_hash field.
+	screenrunDescResultHash := screenrunFields[15].Descriptor()
+	// screenrun.DefaultResultHash holds the default value on creation for the result_hash field.
+	screenrun.DefaultResultHash = screenrunDescResultHash.Default.(string)
+	// screenrunDescResultSizeBytes is the schema descriptor for result_size_bytes field.
+	screenrunDescResultSizeBytes := screenrunFields[16].Descriptor()
+	// screenrun.ResultSizeBytesValidator is a validator for the "result_size_bytes" field. It is called by the builders before save.
+	screenrun.ResultSizeBytesValidator = screenrunDescResultSizeBytes.Validators[0].(func(int64) error)
+	// screenrunDescErrorMessage is the schema descriptor for error_message field.
+	screenrunDescErrorMessage := screenrunFields[18].Descriptor()
+	// screenrun.DefaultErrorMessage holds the default value on creation for the error_message field.
+	screenrun.DefaultErrorMessage = screenrunDescErrorMessage.Default.(string)
+	// screenrunDescID is the schema descriptor for id field.
+	screenrunDescID := screenrunFields[0].Descriptor()
+	// screenrun.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	screenrun.IDValidator = screenrunDescID.Validators[0].(func(string) error)
+	screenrunitemFields := schema.ScreenRunItem{}.Fields()
+	_ = screenrunitemFields
+	// screenrunitemDescScreenRunID is the schema descriptor for screen_run_id field.
+	screenrunitemDescScreenRunID := screenrunitemFields[1].Descriptor()
+	// screenrunitem.ScreenRunIDValidator is a validator for the "screen_run_id" field. It is called by the builders before save.
+	screenrunitem.ScreenRunIDValidator = screenrunitemDescScreenRunID.Validators[0].(func(string) error)
+	// screenrunitemDescOrdinal is the schema descriptor for ordinal field.
+	screenrunitemDescOrdinal := screenrunitemFields[2].Descriptor()
+	// screenrunitem.OrdinalValidator is a validator for the "ordinal" field. It is called by the builders before save.
+	screenrunitem.OrdinalValidator = screenrunitemDescOrdinal.Validators[0].(func(int) error)
+	// screenrunitemDescSymbol is the schema descriptor for symbol field.
+	screenrunitemDescSymbol := screenrunitemFields[3].Descriptor()
+	// screenrunitem.DefaultSymbol holds the default value on creation for the symbol field.
+	screenrunitem.DefaultSymbol = screenrunitemDescSymbol.Default.(string)
+	// screenrunitemDescPayloadJSON is the schema descriptor for payload_json field.
+	screenrunitemDescPayloadJSON := screenrunitemFields[4].Descriptor()
+	// screenrunitem.PayloadJSONValidator is a validator for the "payload_json" field. It is called by the builders before save.
+	screenrunitem.PayloadJSONValidator = screenrunitemDescPayloadJSON.Validators[0].(func([]byte) error)
+	// screenrunitemDescID is the schema descriptor for id field.
+	screenrunitemDescID := screenrunitemFields[0].Descriptor()
+	// screenrunitem.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	screenrunitem.IDValidator = screenrunitemDescID.Validators[0].(func(string) error)
+	strategyFields := schema.Strategy{}.Fields()
+	_ = strategyFields
+	// strategyDescName is the schema descriptor for name field.
+	strategyDescName := strategyFields[1].Descriptor()
+	// strategy.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	strategy.NameValidator = strategyDescName.Validators[0].(func(string) error)
+	// strategyDescEngine is the schema descriptor for engine field.
+	strategyDescEngine := strategyFields[2].Descriptor()
+	// strategy.EngineValidator is a validator for the "engine" field. It is called by the builders before save.
+	strategy.EngineValidator = strategyDescEngine.Validators[0].(func(string) error)
+	// strategyDescActiveVersionID is the schema descriptor for active_version_id field.
+	strategyDescActiveVersionID := strategyFields[3].Descriptor()
+	// strategy.ActiveVersionIDValidator is a validator for the "active_version_id" field. It is called by the builders before save.
+	strategy.ActiveVersionIDValidator = strategyDescActiveVersionID.Validators[0].(func(string) error)
+	// strategyDescCreatedAt is the schema descriptor for created_at field.
+	strategyDescCreatedAt := strategyFields[4].Descriptor()
+	// strategy.DefaultCreatedAt holds the default value on creation for the created_at field.
+	strategy.DefaultCreatedAt = strategyDescCreatedAt.Default.(func() time.Time)
+	// strategyDescUpdatedAt is the schema descriptor for updated_at field.
+	strategyDescUpdatedAt := strategyFields[5].Descriptor()
+	// strategy.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	strategy.DefaultUpdatedAt = strategyDescUpdatedAt.Default.(func() time.Time)
+	// strategy.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	strategy.UpdateDefaultUpdatedAt = strategyDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// strategyDescID is the schema descriptor for id field.
+	strategyDescID := strategyFields[0].Descriptor()
+	// strategy.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	strategy.IDValidator = strategyDescID.Validators[0].(func(string) error)
+	strategyversionFields := schema.StrategyVersion{}.Fields()
+	_ = strategyversionFields
+	// strategyversionDescStrategyID is the schema descriptor for strategy_id field.
+	strategyversionDescStrategyID := strategyversionFields[1].Descriptor()
+	// strategyversion.StrategyIDValidator is a validator for the "strategy_id" field. It is called by the builders before save.
+	strategyversion.StrategyIDValidator = strategyversionDescStrategyID.Validators[0].(func(string) error)
+	// strategyversionDescVersion is the schema descriptor for version field.
+	strategyversionDescVersion := strategyversionFields[2].Descriptor()
+	// strategyversion.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	strategyversion.VersionValidator = strategyversionDescVersion.Validators[0].(func(int) error)
+	// strategyversionDescQueryText is the schema descriptor for query_text field.
+	strategyversionDescQueryText := strategyversionFields[3].Descriptor()
+	// strategyversion.QueryTextValidator is a validator for the "query_text" field. It is called by the builders before save.
+	strategyversion.QueryTextValidator = strategyversionDescQueryText.Validators[0].(func(string) error)
+	// strategyversionDescQueryHash is the schema descriptor for query_hash field.
+	strategyversionDescQueryHash := strategyversionFields[4].Descriptor()
+	// strategyversion.QueryHashValidator is a validator for the "query_hash" field. It is called by the builders before save.
+	strategyversion.QueryHashValidator = strategyversionDescQueryHash.Validators[0].(func(string) error)
+	// strategyversionDescInputDataset is the schema descriptor for input_dataset field.
+	strategyversionDescInputDataset := strategyversionFields[5].Descriptor()
+	// strategyversion.InputDatasetValidator is a validator for the "input_dataset" field. It is called by the builders before save.
+	strategyversion.InputDatasetValidator = strategyversionDescInputDataset.Validators[0].(func(string) error)
+	// strategyversionDescInputSchemaVersion is the schema descriptor for input_schema_version field.
+	strategyversionDescInputSchemaVersion := strategyversionFields[6].Descriptor()
+	// strategyversion.InputSchemaVersionValidator is a validator for the "input_schema_version" field. It is called by the builders before save.
+	strategyversion.InputSchemaVersionValidator = strategyversionDescInputSchemaVersion.Validators[0].(func(int) error)
+	// strategyversionDescCreatedAt is the schema descriptor for created_at field.
+	strategyversionDescCreatedAt := strategyversionFields[8].Descriptor()
+	// strategyversion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	strategyversion.DefaultCreatedAt = strategyversionDescCreatedAt.Default.(func() time.Time)
+	// strategyversionDescNote is the schema descriptor for note field.
+	strategyversionDescNote := strategyversionFields[9].Descriptor()
+	// strategyversion.DefaultNote holds the default value on creation for the note field.
+	strategyversion.DefaultNote = strategyversionDescNote.Default.(string)
+	// strategyversionDescID is the schema descriptor for id field.
+	strategyversionDescID := strategyversionFields[0].Descriptor()
+	// strategyversion.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	strategyversion.IDValidator = strategyversionDescID.Validators[0].(func(string) error)
 }
