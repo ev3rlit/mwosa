@@ -7,8 +7,6 @@ import (
 	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
 	"github.com/ev3rlit/mwosa/storage"
-	entdb "github.com/ev3rlit/mwosa/storage/ent"
-	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
 	"github.com/samber/oops"
 )
 
@@ -51,38 +49,40 @@ func (r *readRepository) QueryDailyBars(ctx context.Context, query daily.Query) 
 		market = provider.MarketKRX
 	}
 
-	builder := client.DailyBar.Query().
-		Where(dailybarent.MarketEQ(string(market))).
+	builder := client.NewSelect().
+		Model((*storage.DailyBarRow)(nil)).
+		Where("market = ?", string(market)).
 		Order(
-			entdb.Asc(dailybarent.FieldTradingDate),
-			entdb.Asc(dailybarent.FieldSymbol),
-			entdb.Asc(dailybarent.FieldProvider),
-			entdb.Asc(dailybarent.FieldProviderGroup),
+			"trading_date ASC",
+			"symbol ASC",
+			"provider ASC",
+			"provider_group ASC",
 		)
 
 	if query.SecurityType != "" {
-		builder.Where(dailybarent.SecurityTypeEQ(string(query.SecurityType)))
+		builder.Where("security_type = ?", string(query.SecurityType))
 	}
 	if query.Symbol != "" {
-		builder.Where(dailybarent.SymbolEQ(query.Symbol))
+		builder.Where("symbol = ?", query.Symbol)
 	}
 	if query.From != "" {
-		builder.Where(dailybarent.TradingDateGTE(query.From))
+		builder.Where("trading_date >= ?", query.From)
 	}
 	if query.To != "" {
-		builder.Where(dailybarent.TradingDateLTE(query.To))
+		builder.Where("trading_date <= ?", query.To)
 	}
 
-	rows, err := builder.All(ctx)
+	var rows []storage.DailyBarRow
+	err = builder.Scan(ctx, &rows)
 	if err != nil {
 		return nil, errb.Wrapf(err, "query daily bars sqlite")
 	}
 
 	bars := make([]coredailybar.Bar, 0, len(rows))
-	for _, row := range rows {
-		bar, err := entDailyBarToCanonical(row)
+	for i := range rows {
+		bar, err := dailyBarRowToCanonical(&rows[i])
 		if err != nil {
-			return nil, errb.With("row_id", row.ID).Wrap(err)
+			return nil, errb.With("row_id", rows[i].ID).Wrap(err)
 		}
 		bars = append(bars, bar)
 	}

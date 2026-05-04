@@ -8,24 +8,27 @@ import (
 	"strings"
 	"sync"
 
-	"entgo.io/ent/dialect"
-	entsql "entgo.io/ent/dialect/sql"
-	"github.com/ev3rlit/mwosa/storage/ent"
 	"github.com/samber/oops"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
 	_ "modernc.org/sqlite"
 )
 
 type Database struct {
 	path   string
 	mu     sync.Mutex
-	client *ent.Client
+	client *bun.DB
 }
 
 func NewDatabase(path string) *Database {
 	return &Database{path: path}
 }
 
-func (db *Database) Client(ctx context.Context) (*ent.Client, error) {
+func (db *Database) Client(ctx context.Context) (*bun.DB, error) {
+	return db.DB(ctx)
+}
+
+func (db *Database) DB(ctx context.Context) (*bun.DB, error) {
 	if db == nil || strings.TrimSpace(db.path) == "" {
 		return nil, oops.In("storage_database").New("sqlite database path is empty")
 	}
@@ -53,10 +56,10 @@ func (db *Database) Client(ctx context.Context) (*ent.Client, error) {
 		return nil, errb.Wrap(err)
 	}
 
-	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.SQLite, rawDB)))
-	if err := client.Schema.Create(ctx); err != nil {
+	client := bun.NewDB(rawDB, sqlitedialect.New())
+	if err := setupSchema(ctx, client); err != nil {
 		return nil, oops.Join(
-			errb.Wrapf(err, "apply sqlite ent schema"),
+			errb.Wrapf(err, "apply sqlite bun schema"),
 			errb.Wrap(client.Close()),
 		)
 	}
@@ -92,6 +95,109 @@ func setupDatabase(ctx context.Context, db *stdsql.DB) error {
 	} {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
 			return errb.With("statement", statement).Wrapf(err, "configure sqlite database")
+		}
+	}
+	return nil
+}
+
+func setupSchema(ctx context.Context, db *bun.DB) error {
+	errb := oops.In("storage_database")
+	tables := []struct {
+		name  string
+		model any
+	}{
+		{name: "daily_bar", model: (*DailyBarRow)(nil)},
+		{name: "strategies", model: (*StrategyRow)(nil)},
+		{name: "strategy_versions", model: (*StrategyVersionRow)(nil)},
+		{name: "screen_runs", model: (*ScreenRunRow)(nil)},
+		{name: "screen_run_items", model: (*ScreenRunItemRow)(nil)},
+	}
+	for _, table := range tables {
+		if _, err := db.NewCreateTable().
+			Model(table.model).
+			IfNotExists().
+			Exec(ctx); err != nil {
+			return errb.With("table", table.name).Wrapf(err, "create sqlite table")
+		}
+	}
+
+	indexes := []struct {
+		name    string
+		model   any
+		columns []string
+		unique  bool
+	}{
+		{
+			name:    "daily_bar_natural_key",
+			model:   (*DailyBarRow)(nil),
+			columns: []string{"market", "security_type", "trading_date", "symbol", "provider", "provider_group"},
+			unique:  true,
+		},
+		{
+			name:    "idx_daily_bar_date",
+			model:   (*DailyBarRow)(nil),
+			columns: []string{"market", "security_type", "trading_date"},
+		},
+		{
+			name:    "idx_daily_bar_symbol_date",
+			model:   (*DailyBarRow)(nil),
+			columns: []string{"market", "security_type", "symbol", "trading_date"},
+		},
+		{
+			name:    "idx_strategies_archived_at",
+			model:   (*StrategyRow)(nil),
+			columns: []string{"archived_at"},
+		},
+		{
+			name:    "strategy_versions_strategy_version_unique",
+			model:   (*StrategyVersionRow)(nil),
+			columns: []string{"strategy_id", "version"},
+			unique:  true,
+		},
+		{
+			name:    "idx_strategy_versions_query_hash",
+			model:   (*StrategyVersionRow)(nil),
+			columns: []string{"query_hash"},
+		},
+		{
+			name:    "screen_runs_alias_unique",
+			model:   (*ScreenRunRow)(nil),
+			columns: []string{"alias"},
+			unique:  true,
+		},
+		{
+			name:    "idx_screen_runs_started_at",
+			model:   (*ScreenRunRow)(nil),
+			columns: []string{"started_at"},
+		},
+		{
+			name:    "idx_screen_runs_strategy_started",
+			model:   (*ScreenRunRow)(nil),
+			columns: []string{"strategy_id", "started_at"},
+		},
+		{
+			name:    "screen_run_items_run_ordinal_unique",
+			model:   (*ScreenRunItemRow)(nil),
+			columns: []string{"screen_run_id", "ordinal"},
+			unique:  true,
+		},
+		{
+			name:    "idx_screen_run_items_symbol",
+			model:   (*ScreenRunItemRow)(nil),
+			columns: []string{"symbol"},
+		},
+	}
+	for _, index := range indexes {
+		query := db.NewCreateIndex().
+			Model(index.model).
+			Index(index.name).
+			Column(index.columns...).
+			IfNotExists()
+		if index.unique {
+			query = query.Unique()
+		}
+		if _, err := query.Exec(ctx); err != nil {
+			return errb.With("index", index.name).Wrapf(err, "create daily_bar index")
 		}
 	}
 	return nil

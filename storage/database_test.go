@@ -43,3 +43,48 @@ func TestDatabaseRejectsEmptyPath(t *testing.T) {
 		t.Fatal("empty database path error is nil")
 	}
 }
+
+func TestDatabaseCreatesDailyBarIndexes(t *testing.T) {
+	database := NewDatabase(filepath.Join(t.TempDir(), "mwosa.db"))
+	t.Cleanup(func() {
+		if err := database.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+
+	client, err := database.Client(context.Background())
+	if err != nil {
+		t.Fatalf("client: %v", err)
+	}
+
+	rows, err := client.QueryContext(context.Background(), `PRAGMA index_list('daily_bar')`)
+	if err != nil {
+		t.Fatalf("index list: %v", err)
+	}
+	defer rows.Close()
+
+	indexes := make(map[string]bool)
+	for rows.Next() {
+		var seq int
+		var name string
+		var unique bool
+		var origin string
+		var partial bool
+		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
+			t.Fatalf("scan index row: %v", err)
+		}
+		indexes[name] = unique
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate index rows: %v", err)
+	}
+
+	if !indexes["daily_bar_natural_key"] {
+		t.Fatal("daily_bar_natural_key unique index was not created")
+	}
+	for _, name := range []string{"idx_daily_bar_date", "idx_daily_bar_symbol_date"} {
+		if _, ok := indexes[name]; !ok {
+			t.Fatalf("%s index was not created", name)
+		}
+	}
+}

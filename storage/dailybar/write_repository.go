@@ -7,8 +7,6 @@ import (
 	coredailybar "github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/service/daily"
 	"github.com/ev3rlit/mwosa/storage"
-	entdb "github.com/ev3rlit/mwosa/storage/ent"
-	dailybarent "github.com/ev3rlit/mwosa/storage/ent/dailybar"
 	"github.com/samber/oops"
 )
 
@@ -33,7 +31,7 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 		return daily.WriteResult{}, errb.Wrap(err)
 	}
 
-	tx, err := client.Tx(ctx)
+	tx, err := client.BeginTx(ctx, nil)
 	if err != nil {
 		return daily.WriteResult{}, errb.Wrapf(err, "begin daily bar sqlite transaction")
 	}
@@ -62,16 +60,25 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 			return daily.WriteResult{}, barErrb.Wrap(err)
 		}
 		now := time.Now()
-		err = setDailyBarCreateFields(tx.DailyBar.Create(), bar, extensionsJSON, now).
-			OnConflictColumns(
-				dailybarent.FieldMarket,
-				dailybarent.FieldSecurityType,
-				dailybarent.FieldTradingDate,
-				dailybarent.FieldSymbol,
-				dailybarent.FieldProvider,
-				dailybarent.FieldProviderGroup,
-			).
-			UpdateNewValues().
+		row := dailyBarToRow(bar, extensionsJSON, now)
+		_, err = tx.NewInsert().
+			Model(&row).
+			On("CONFLICT (market, security_type, trading_date, symbol, provider, provider_group) DO UPDATE").
+			Set("operation = EXCLUDED.operation").
+			Set("isin = EXCLUDED.isin").
+			Set("name = EXCLUDED.name").
+			Set("currency = EXCLUDED.currency").
+			Set("opening_price = EXCLUDED.opening_price").
+			Set("highest_price = EXCLUDED.highest_price").
+			Set("lowest_price = EXCLUDED.lowest_price").
+			Set("closing_price = EXCLUDED.closing_price").
+			Set("price_change_from_previous_close = EXCLUDED.price_change_from_previous_close").
+			Set("price_change_rate_from_previous_close = EXCLUDED.price_change_rate_from_previous_close").
+			Set("traded_volume = EXCLUDED.traded_volume").
+			Set("traded_amount = EXCLUDED.traded_amount").
+			Set("market_capitalization = EXCLUDED.market_capitalization").
+			Set("extensions_json = EXCLUDED.extensions_json").
+			Set("updated_at = EXCLUDED.updated_at").
 			Exec(ctx)
 		if err != nil {
 			return daily.WriteResult{}, barErrb.Wrapf(err, "upsert daily bar sqlite row")
@@ -89,27 +96,29 @@ func (r *writeRepository) UpsertDailyBars(ctx context.Context, bars []coredailyb
 	}, nil
 }
 
-func setDailyBarCreateFields(create *entdb.DailyBarCreate, bar coredailybar.Bar, extensionsJSON string, now time.Time) *entdb.DailyBarCreate {
-	return create.
-		SetProvider(string(bar.Provider)).
-		SetProviderGroup(string(bar.Group)).
-		SetOperation(string(bar.Operation)).
-		SetMarket(string(bar.Market)).
-		SetSecurityType(string(bar.SecurityType)).
-		SetSymbol(bar.Symbol).
-		SetIsin(bar.ISIN).
-		SetName(bar.Name).
-		SetTradingDate(bar.TradingDate).
-		SetCurrency(bar.Currency).
-		SetOpeningPrice(bar.Open).
-		SetHighestPrice(bar.High).
-		SetLowestPrice(bar.Low).
-		SetClosingPrice(bar.Close).
-		SetPriceChangeFromPreviousClose(bar.Change).
-		SetPriceChangeRateFromPreviousClose(bar.ChangeRate).
-		SetTradedVolume(bar.Volume).
-		SetTradedAmount(bar.TradedValue).
-		SetMarketCapitalization(bar.MarketCap).
-		SetExtensionsJSON(extensionsJSON).
-		SetUpdatedAt(now)
+func dailyBarToRow(bar coredailybar.Bar, extensionsJSON string, now time.Time) storage.DailyBarRow {
+	return storage.DailyBarRow{
+		Provider:                         string(bar.Provider),
+		ProviderGroup:                    string(bar.Group),
+		Operation:                        string(bar.Operation),
+		Market:                           string(bar.Market),
+		SecurityType:                     string(bar.SecurityType),
+		Symbol:                           bar.Symbol,
+		ISIN:                             bar.ISIN,
+		Name:                             bar.Name,
+		TradingDate:                      bar.TradingDate,
+		Currency:                         bar.Currency,
+		OpeningPrice:                     bar.Open,
+		HighestPrice:                     bar.High,
+		LowestPrice:                      bar.Low,
+		ClosingPrice:                     bar.Close,
+		PriceChangeFromPreviousClose:     bar.Change,
+		PriceChangeRateFromPreviousClose: bar.ChangeRate,
+		TradedVolume:                     bar.Volume,
+		TradedAmount:                     bar.TradedValue,
+		MarketCapitalization:             bar.MarketCap,
+		ExtensionsJSON:                   extensionsJSON,
+		CreatedAt:                        now,
+		UpdatedAt:                        now,
+	}
 }

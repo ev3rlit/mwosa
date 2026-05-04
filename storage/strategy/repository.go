@@ -2,16 +2,14 @@ package strategy
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
 	strategyservice "github.com/ev3rlit/mwosa/service/strategy"
 	"github.com/ev3rlit/mwosa/storage"
-	entdb "github.com/ev3rlit/mwosa/storage/ent"
-	screenrunent "github.com/ev3rlit/mwosa/storage/ent/screenrun"
-	screenrunitement "github.com/ev3rlit/mwosa/storage/ent/screenrunitem"
-	strategyent "github.com/ev3rlit/mwosa/storage/ent/strategy"
 	"github.com/samber/oops"
 )
 
@@ -34,7 +32,7 @@ func (r *repository) CreateStrategyWithVersion(ctx context.Context, in strategys
 	if err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrap(err)
 	}
-	tx, err := client.Tx(ctx)
+	tx, err := client.BeginTx(ctx, nil)
 	if err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "begin strategy transaction")
 	}
@@ -45,28 +43,22 @@ func (r *repository) CreateStrategyWithVersion(ctx context.Context, in strategys
 		}
 	}()
 
-	row, err := tx.Strategy.Create().
-		SetID(in.ID).
-		SetName(in.Name).
-		SetEngine(string(in.Engine)).
-		SetActiveVersionID(in.ActiveVersionID).
-		SetCreatedAt(in.CreatedAt).
-		SetUpdatedAt(in.UpdatedAt).
-		Save(ctx)
-	if err != nil {
+	strategyRow := strategyToRow(in)
+	if _, err := tx.NewInsert().Model(&strategyRow).Exec(ctx); err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "create strategy sqlite row")
 	}
-	versionRow, err := createStrategyVersion(tx.StrategyVersion.Create(), version).Save(ctx)
-	if err != nil {
+	versionRow := strategyVersionToRow(version)
+	if _, err := tx.NewInsert().Model(&versionRow).Exec(ctx); err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "create strategy version sqlite row")
 	}
 	if err := tx.Commit(); err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "commit strategy transaction")
 	}
 	committed = true
+
 	return strategyservice.StrategyDetail{
-		Strategy:      strategyFromEnt(row),
-		ActiveVersion: strategyVersionFromEnt(versionRow),
+		Strategy:      strategyFromRow(&strategyRow),
+		ActiveVersion: strategyVersionFromRow(&versionRow),
 	}, nil
 }
 
@@ -76,22 +68,25 @@ func (r *repository) ListStrategies(ctx context.Context) ([]strategyservice.Stra
 	if err != nil {
 		return nil, errb.Wrap(err)
 	}
-	rows, err := client.Strategy.Query().
-		Where(strategyent.ArchivedAtIsNil()).
-		Order(entdb.Asc(strategyent.FieldName)).
-		All(ctx)
-	if err != nil {
+
+	var rows []storage.StrategyRow
+	if err := client.NewSelect().
+		Model(&rows).
+		Where("archived_at IS NULL").
+		Order("name ASC").
+		Scan(ctx); err != nil {
 		return nil, errb.Wrapf(err, "list strategy sqlite rows")
 	}
+
 	details := make([]strategyservice.StrategyDetail, 0, len(rows))
-	for _, row := range rows {
-		version, err := client.StrategyVersion.Get(ctx, row.ActiveVersionID)
+	for i := range rows {
+		version, err := r.getStrategyVersionByID(ctx, rows[i].ActiveVersionID)
 		if err != nil {
-			return nil, errb.With("strategy_id", row.ID, "version_id", row.ActiveVersionID).Wrapf(err, "load active strategy version")
+			return nil, errb.With("strategy_id", rows[i].ID, "version_id", rows[i].ActiveVersionID).Wrapf(err, "load active strategy version")
 		}
 		details = append(details, strategyservice.StrategyDetail{
-			Strategy:      strategyFromEnt(row),
-			ActiveVersion: strategyVersionFromEnt(version),
+			Strategy:      strategyFromRow(&rows[i]),
+			ActiveVersion: version,
 		})
 	}
 	return details, nil
@@ -103,22 +98,25 @@ func (r *repository) GetStrategy(ctx context.Context, name string) (strategyserv
 	if err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrap(err)
 	}
-	row, err := client.Strategy.Query().
-		Where(strategyent.NameEQ(name), strategyent.ArchivedAtIsNil()).
-		Only(ctx)
-	if err != nil {
-		if entdb.IsNotFound(err) {
+
+	var row storage.StrategyRow
+	if err := client.NewSelect().
+		Model(&row).
+		Where("name = ?", name).
+		Where("archived_at IS NULL").
+		Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return strategyservice.StrategyDetail{}, errb.Errorf("strategy not found: %s", name)
 		}
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "get strategy sqlite row")
 	}
-	version, err := client.StrategyVersion.Get(ctx, row.ActiveVersionID)
+	version, err := r.getStrategyVersionByID(ctx, row.ActiveVersionID)
 	if err != nil {
 		return strategyservice.StrategyDetail{}, errb.With("strategy_id", row.ID, "version_id", row.ActiveVersionID).Wrapf(err, "load active strategy version")
 	}
 	return strategyservice.StrategyDetail{
-		Strategy:      strategyFromEnt(row),
-		ActiveVersion: strategyVersionFromEnt(version),
+		Strategy:      strategyFromRow(&row),
+		ActiveVersion: version,
 	}, nil
 }
 
@@ -128,7 +126,7 @@ func (r *repository) AddStrategyVersion(ctx context.Context, name string, versio
 	if err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrap(err)
 	}
-	tx, err := client.Tx(ctx)
+	tx, err := client.BeginTx(ctx, nil)
 	if err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "begin update strategy transaction")
 	}
@@ -138,34 +136,41 @@ func (r *repository) AddStrategyVersion(ctx context.Context, name string, versio
 			_ = tx.Rollback()
 		}
 	}()
-	row, err := tx.Strategy.Query().
-		Where(strategyent.NameEQ(name), strategyent.ArchivedAtIsNil()).
-		Only(ctx)
-	if err != nil {
-		if entdb.IsNotFound(err) {
+
+	var strategyRow storage.StrategyRow
+	if err := tx.NewSelect().
+		Model(&strategyRow).
+		Where("name = ?", name).
+		Where("archived_at IS NULL").
+		Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return strategyservice.StrategyDetail{}, errb.Errorf("strategy not found: %s", name)
 		}
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "load strategy for version update")
 	}
-	version.StrategyID = row.ID
-	versionRow, err := createStrategyVersion(tx.StrategyVersion.Create(), version).Save(ctx)
-	if err != nil {
+	version.StrategyID = strategyRow.ID
+	versionRow := strategyVersionToRow(version)
+	if _, err := tx.NewInsert().Model(&versionRow).Exec(ctx); err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "create updated strategy version")
 	}
-	row, err = tx.Strategy.UpdateOneID(row.ID).
-		SetActiveVersionID(version.ID).
-		SetUpdatedAt(now).
-		Save(ctx)
-	if err != nil {
+	if _, err := tx.NewUpdate().
+		Model((*storage.StrategyRow)(nil)).
+		Set("active_version_id = ?", version.ID).
+		Set("updated_at = ?", now).
+		Where("id = ?", strategyRow.ID).
+		Exec(ctx); err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "update active strategy version")
 	}
+	strategyRow.ActiveVersionID = version.ID
+	strategyRow.UpdatedAt = now
 	if err := tx.Commit(); err != nil {
 		return strategyservice.StrategyDetail{}, errb.Wrapf(err, "commit update strategy transaction")
 	}
 	committed = true
+
 	return strategyservice.StrategyDetail{
-		Strategy:      strategyFromEnt(row),
-		ActiveVersion: strategyVersionFromEnt(versionRow),
+		Strategy:      strategyFromRow(&strategyRow),
+		ActiveVersion: strategyVersionFromRow(&versionRow),
 	}, nil
 }
 
@@ -175,13 +180,19 @@ func (r *repository) ArchiveStrategy(ctx context.Context, name string, archivedA
 	if err != nil {
 		return errb.Wrap(err)
 	}
-	affected, err := client.Strategy.Update().
-		Where(strategyent.NameEQ(name), strategyent.ArchivedAtIsNil()).
-		SetArchivedAt(archivedAt).
-		SetUpdatedAt(archivedAt).
-		Save(ctx)
+	result, err := client.NewUpdate().
+		Model((*storage.StrategyRow)(nil)).
+		Set("archived_at = ?", archivedAt).
+		Set("updated_at = ?", archivedAt).
+		Where("name = ?", name).
+		Where("archived_at IS NULL").
+		Exec(ctx)
 	if err != nil {
 		return errb.Wrapf(err, "archive strategy sqlite row")
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return errb.Wrapf(err, "read archive strategy affected rows")
 	}
 	if affected == 0 {
 		return errb.Errorf("strategy not found: %s", name)
@@ -195,7 +206,7 @@ func (r *repository) CreateScreenRun(ctx context.Context, run strategyservice.Sc
 	if err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrap(err)
 	}
-	tx, err := client.Tx(ctx)
+	tx, err := client.BeginTx(ctx, nil)
 	if err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrapf(err, "begin screen run transaction")
 	}
@@ -206,37 +217,33 @@ func (r *repository) CreateScreenRun(ctx context.Context, run strategyservice.Sc
 		}
 	}()
 
-	runRow, err := createScreenRun(tx.ScreenRun.Create(), run).Save(ctx)
-	if err != nil {
+	runRow := screenRunToRow(run)
+	if _, err := tx.NewInsert().Model(&runRow).Exec(ctx); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrapf(err, "create screen run sqlite row")
 	}
-	itemRows := make([]*entdb.ScreenRunItem, 0, len(items))
+	itemRows := make([]storage.ScreenRunItemRow, 0, len(items))
 	for _, item := range items {
-		row, err := tx.ScreenRunItem.Create().
-			SetID(item.ID).
-			SetScreenRunID(item.ScreenRunID).
-			SetOrdinal(item.Ordinal).
-			SetSymbol(item.Symbol).
-			SetPayloadJSON(item.PayloadJSON).
-			Save(ctx)
-		if err != nil {
+		row := screenRunItemToRow(item)
+		if _, err := tx.NewInsert().Model(&row).Exec(ctx); err != nil {
 			return strategyservice.ScreenRunDetail{}, errb.With("ordinal", item.Ordinal).Wrapf(err, "create screen run item sqlite row")
 		}
 		itemRows = append(itemRows, row)
 	}
-	strategyRow, err := tx.Strategy.Get(ctx, run.StrategyID)
-	if err != nil {
+
+	var strategyRow storage.StrategyRow
+	if err := tx.NewSelect().Model(&strategyRow).Where("id = ?", run.StrategyID).Scan(ctx); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrapf(err, "load screen run strategy")
 	}
-	versionRow, err := tx.StrategyVersion.Get(ctx, run.StrategyVersionID)
-	if err != nil {
+	var versionRow storage.StrategyVersionRow
+	if err := tx.NewSelect().Model(&versionRow).Where("id = ?", run.StrategyVersionID).Scan(ctx); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrapf(err, "load screen run strategy version")
 	}
 	if err := tx.Commit(); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrapf(err, "commit screen run transaction")
 	}
 	committed = true
-	return screenRunDetailFromEnt(runRow, strategyRow, versionRow, itemRows), nil
+
+	return screenRunDetailFromRows(&runRow, &strategyRow, &versionRow, itemRows), nil
 }
 
 func (r *repository) ListScreenRuns(ctx context.Context, limit int) ([]strategyservice.ScreenRun, error) {
@@ -245,16 +252,18 @@ func (r *repository) ListScreenRuns(ctx context.Context, limit int) ([]strategys
 	if err != nil {
 		return nil, errb.Wrap(err)
 	}
-	rows, err := client.ScreenRun.Query().
-		Order(entdb.Desc(screenrunent.FieldStartedAt)).
+
+	var rows []storage.ScreenRunRow
+	if err := client.NewSelect().
+		Model(&rows).
+		Order("started_at DESC").
 		Limit(limit).
-		All(ctx)
-	if err != nil {
+		Scan(ctx); err != nil {
 		return nil, errb.Wrapf(err, "list screen runs sqlite rows")
 	}
 	runs := make([]strategyservice.ScreenRun, 0, len(rows))
-	for _, row := range rows {
-		runs = append(runs, screenRunFromEnt(row))
+	for i := range rows {
+		runs = append(runs, screenRunFromRow(&rows[i]))
 	}
 	return runs, nil
 }
@@ -265,73 +274,107 @@ func (r *repository) GetScreenRun(ctx context.Context, ref string) (strategyserv
 	if err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.Wrap(err)
 	}
-	runRow, err := client.ScreenRun.Query().
-		Where(screenrunent.Or(screenrunent.IDEQ(ref), screenrunent.AliasEQ(ref))).
-		Only(ctx)
-	if err != nil {
-		if entdb.IsNotFound(err) {
+
+	var runRow storage.ScreenRunRow
+	if err := client.NewSelect().
+		Model(&runRow).
+		Where("id = ? OR alias = ?", ref, ref).
+		Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return strategyservice.ScreenRunDetail{}, errb.Errorf("screen run not found: %s", ref)
 		}
 		return strategyservice.ScreenRunDetail{}, errb.Wrapf(err, "get screen run sqlite row")
 	}
-	strategyRow, err := client.Strategy.Get(ctx, runRow.StrategyID)
-	if err != nil {
+	var strategyRow storage.StrategyRow
+	if err := client.NewSelect().Model(&strategyRow).Where("id = ?", runRow.StrategyID).Scan(ctx); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.With("strategy_id", runRow.StrategyID).Wrapf(err, "load screen run strategy")
 	}
-	versionRow, err := client.StrategyVersion.Get(ctx, runRow.StrategyVersionID)
-	if err != nil {
+	var versionRow storage.StrategyVersionRow
+	if err := client.NewSelect().Model(&versionRow).Where("id = ?", runRow.StrategyVersionID).Scan(ctx); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.With("strategy_version_id", runRow.StrategyVersionID).Wrapf(err, "load screen run strategy version")
 	}
-	itemRows, err := client.ScreenRunItem.Query().
-		Where(screenrunitement.ScreenRunIDEQ(runRow.ID)).
-		Order(entdb.Asc(screenrunitement.FieldOrdinal)).
-		All(ctx)
-	if err != nil {
+	var itemRows []storage.ScreenRunItemRow
+	if err := client.NewSelect().
+		Model(&itemRows).
+		Where("screen_run_id = ?", runRow.ID).
+		Order("ordinal ASC").
+		Scan(ctx); err != nil {
 		return strategyservice.ScreenRunDetail{}, errb.With("screen_run_id", runRow.ID).Wrapf(err, "load screen run items")
 	}
-	return screenRunDetailFromEnt(runRow, strategyRow, versionRow, itemRows), nil
+	return screenRunDetailFromRows(&runRow, &strategyRow, &versionRow, itemRows), nil
 }
 
-func createStrategyVersion(create *entdb.StrategyVersionCreate, version strategyservice.StrategyVersion) *entdb.StrategyVersionCreate {
-	return create.
-		SetID(version.ID).
-		SetStrategyID(version.StrategyID).
-		SetVersion(version.Version).
-		SetQueryText(version.QueryText).
-		SetQueryHash(version.QueryHash).
-		SetInputDataset(version.InputDataset).
-		SetInputSchemaVersion(version.InputSchemaVersion).
-		SetParamsJSON(normalizeRawMessage(version.ParamsJSON)).
-		SetCreatedAt(version.CreatedAt).
-		SetNote(version.Note)
+func (r *repository) getStrategyVersionByID(ctx context.Context, id string) (strategyservice.StrategyVersion, error) {
+	client, err := r.database.Client(ctx)
+	if err != nil {
+		return strategyservice.StrategyVersion{}, err
+	}
+	var row storage.StrategyVersionRow
+	if err := client.NewSelect().Model(&row).Where("id = ?", id).Scan(ctx); err != nil {
+		return strategyservice.StrategyVersion{}, err
+	}
+	return strategyVersionFromRow(&row), nil
 }
 
-func createScreenRun(create *entdb.ScreenRunCreate, run strategyservice.ScreenRun) *entdb.ScreenRunCreate {
-	builder := create.
-		SetID(run.ID).
-		SetStrategyID(run.StrategyID).
-		SetStrategyVersionID(run.StrategyVersionID).
-		SetQueryHash(run.QueryHash).
-		SetInputDataset(run.InputDataset).
-		SetInputSchemaVersion(run.InputSchemaVersion).
-		SetParamsJSON(normalizeRawMessage(run.ParamsJSON)).
-		SetDataFrom(run.DataFrom).
-		SetDataTo(run.DataTo).
-		SetDataAsOf(run.DataAsOf).
-		SetStartedAt(run.StartedAt).
-		SetStatus(string(run.Status)).
-		SetResultCount(run.ResultCount).
-		SetResultHash(run.ResultHash).
-		SetResultSizeBytes(run.ResultSizeBytes).
-		SetSummaryJSON(normalizeRawMessage(run.SummaryJSON)).
-		SetErrorMessage(run.ErrorMessage)
-	if strings.TrimSpace(run.Alias) != "" {
-		builder.SetAlias(run.Alias)
+func strategyToRow(in strategyservice.Strategy) storage.StrategyRow {
+	return storage.StrategyRow{
+		ID:              in.ID,
+		Name:            in.Name,
+		Engine:          string(in.Engine),
+		ActiveVersionID: in.ActiveVersionID,
+		CreatedAt:       in.CreatedAt,
+		UpdatedAt:       in.UpdatedAt,
+		ArchivedAt:      in.ArchivedAt,
 	}
-	if run.FinishedAt != nil {
-		builder.SetFinishedAt(*run.FinishedAt)
+}
+
+func strategyVersionToRow(version strategyservice.StrategyVersion) storage.StrategyVersionRow {
+	return storage.StrategyVersionRow{
+		ID:                 version.ID,
+		StrategyID:         version.StrategyID,
+		Version:            version.Version,
+		QueryText:          version.QueryText,
+		QueryHash:          version.QueryHash,
+		InputDataset:       version.InputDataset,
+		InputSchemaVersion: version.InputSchemaVersion,
+		ParamsJSON:         string(normalizeRawMessage(version.ParamsJSON)),
+		CreatedAt:          version.CreatedAt,
+		Note:               version.Note,
 	}
-	return builder
+}
+
+func screenRunToRow(run strategyservice.ScreenRun) storage.ScreenRunRow {
+	return storage.ScreenRunRow{
+		ID:                 run.ID,
+		Alias:              strings.TrimSpace(run.Alias),
+		StrategyID:         run.StrategyID,
+		StrategyVersionID:  run.StrategyVersionID,
+		QueryHash:          run.QueryHash,
+		InputDataset:       run.InputDataset,
+		InputSchemaVersion: run.InputSchemaVersion,
+		ParamsJSON:         string(normalizeRawMessage(run.ParamsJSON)),
+		DataFrom:           run.DataFrom,
+		DataTo:             run.DataTo,
+		DataAsOf:           run.DataAsOf,
+		StartedAt:          run.StartedAt,
+		FinishedAt:         run.FinishedAt,
+		Status:             string(run.Status),
+		ResultCount:        run.ResultCount,
+		ResultHash:         run.ResultHash,
+		ResultSizeBytes:    run.ResultSizeBytes,
+		SummaryJSON:        string(normalizeRawMessage(run.SummaryJSON)),
+		ErrorMessage:       run.ErrorMessage,
+	}
+}
+
+func screenRunItemToRow(item strategyservice.ScreenRunItem) storage.ScreenRunItemRow {
+	return storage.ScreenRunItemRow{
+		ID:          item.ID,
+		ScreenRunID: item.ScreenRunID,
+		Ordinal:     item.Ordinal,
+		Symbol:      item.Symbol,
+		PayloadJSON: string(item.PayloadJSON),
+	}
 }
 
 func normalizeRawMessage(raw json.RawMessage) []byte {
@@ -341,7 +384,7 @@ func normalizeRawMessage(raw json.RawMessage) []byte {
 	return raw
 }
 
-func strategyFromEnt(row *entdb.Strategy) strategyservice.Strategy {
+func strategyFromRow(row *storage.StrategyRow) strategyservice.Strategy {
 	return strategyservice.Strategy{
 		ID:              row.ID,
 		Name:            row.Name,
@@ -353,7 +396,7 @@ func strategyFromEnt(row *entdb.Strategy) strategyservice.Strategy {
 	}
 }
 
-func strategyVersionFromEnt(row *entdb.StrategyVersion) strategyservice.StrategyVersion {
+func strategyVersionFromRow(row *storage.StrategyVersionRow) strategyservice.StrategyVersion {
 	return strategyservice.StrategyVersion{
 		ID:                 row.ID,
 		StrategyID:         row.StrategyID,
@@ -362,21 +405,22 @@ func strategyVersionFromEnt(row *entdb.StrategyVersion) strategyservice.Strategy
 		QueryHash:          row.QueryHash,
 		InputDataset:       row.InputDataset,
 		InputSchemaVersion: row.InputSchemaVersion,
-		ParamsJSON:         row.ParamsJSON,
+		ParamsJSON:         json.RawMessage(row.ParamsJSON),
 		CreatedAt:          row.CreatedAt,
 		Note:               row.Note,
 	}
 }
 
-func screenRunFromEnt(row *entdb.ScreenRun) strategyservice.ScreenRun {
-	run := strategyservice.ScreenRun{
+func screenRunFromRow(row *storage.ScreenRunRow) strategyservice.ScreenRun {
+	return strategyservice.ScreenRun{
 		ID:                 row.ID,
+		Alias:              row.Alias,
 		StrategyID:         row.StrategyID,
 		StrategyVersionID:  row.StrategyVersionID,
 		QueryHash:          row.QueryHash,
 		InputDataset:       row.InputDataset,
 		InputSchemaVersion: row.InputSchemaVersion,
-		ParamsJSON:         row.ParamsJSON,
+		ParamsJSON:         json.RawMessage(row.ParamsJSON),
 		DataFrom:           row.DataFrom,
 		DataTo:             row.DataTo,
 		DataAsOf:           row.DataAsOf,
@@ -386,34 +430,30 @@ func screenRunFromEnt(row *entdb.ScreenRun) strategyservice.ScreenRun {
 		ResultCount:        row.ResultCount,
 		ResultHash:         row.ResultHash,
 		ResultSizeBytes:    row.ResultSizeBytes,
-		SummaryJSON:        row.SummaryJSON,
+		SummaryJSON:        json.RawMessage(row.SummaryJSON),
 		ErrorMessage:       row.ErrorMessage,
 	}
-	if row.Alias != nil {
-		run.Alias = *row.Alias
-	}
-	return run
 }
 
-func screenRunItemFromEnt(row *entdb.ScreenRunItem) strategyservice.ScreenRunItem {
+func screenRunItemFromRow(row *storage.ScreenRunItemRow) strategyservice.ScreenRunItem {
 	return strategyservice.ScreenRunItem{
 		ID:          row.ID,
 		ScreenRunID: row.ScreenRunID,
 		Ordinal:     row.Ordinal,
 		Symbol:      row.Symbol,
-		PayloadJSON: row.PayloadJSON,
+		PayloadJSON: json.RawMessage(row.PayloadJSON),
 	}
 }
 
-func screenRunDetailFromEnt(run *entdb.ScreenRun, strategy *entdb.Strategy, version *entdb.StrategyVersion, items []*entdb.ScreenRunItem) strategyservice.ScreenRunDetail {
+func screenRunDetailFromRows(run *storage.ScreenRunRow, strategy *storage.StrategyRow, version *storage.StrategyVersionRow, items []storage.ScreenRunItemRow) strategyservice.ScreenRunDetail {
 	detail := strategyservice.ScreenRunDetail{
-		Run:             screenRunFromEnt(run),
-		Strategy:        strategyFromEnt(strategy),
-		StrategyVersion: strategyVersionFromEnt(version),
+		Run:             screenRunFromRow(run),
+		Strategy:        strategyFromRow(strategy),
+		StrategyVersion: strategyVersionFromRow(version),
 		Items:           make([]strategyservice.ScreenRunItem, 0, len(items)),
 	}
-	for _, item := range items {
-		detail.Items = append(detail.Items, screenRunItemFromEnt(item))
+	for i := range items {
+		detail.Items = append(detail.Items, screenRunItemFromRow(&items[i]))
 	}
 	return detail
 }
