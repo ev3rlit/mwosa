@@ -10,6 +10,7 @@ func registerStrategyCommands(roots commandRoots, opts *Options) {
 	roots.List.AddCommand(newListStrategiesCommand(opts))
 	roots.Update.AddCommand(newUpdateStrategyCommand(opts))
 	roots.Delete.AddCommand(newDeleteStrategyCommand(opts))
+	roots.Screen.AddCommand(newScreenETFCommand(opts))
 	roots.Screen.AddCommand(newScreenStrategyCommand(opts))
 	roots.History.AddCommand(newHistoryScreenCommand(opts))
 	roots.Inspect.AddCommand(newInspectStrategyCommand(opts))
@@ -119,6 +120,39 @@ func newDeleteStrategyCommand(opts *Options) *cobra.Command {
 			return writeDeleteStrategyResult(cmd.OutOrStdout(), opts.Output, deleteStrategyResult{Name: args[0], Deleted: true})
 		},
 	}
+}
+
+func newScreenETFCommand(opts *Options) *cobra.Command {
+	flags := strategySourceFlags{Input: "etf_daily_metrics"}
+	cmd := &cobra.Command{
+		Use:     "etf",
+		Aliases: []string{"etfs"},
+		Short:   "Run an inline jq screen against stored ETF daily records",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) (err error) {
+			queryText, err := resolveJQSource(flags)
+			if err != nil {
+				return err
+			}
+			runtime, err := newAppRuntime(opts, false)
+			if err != nil {
+				return err
+			}
+			defer closeAppRuntime(runtime, &err)
+
+			result, err := runtime.Services.Strategy.ScreenJQ(cmd.Context(), strategyservice.ScreenJQRequest{
+				InputDataset: flags.Input,
+				QueryText:    queryText,
+			})
+			if err != nil {
+				return err
+			}
+			return writeScreenResult(cmd.OutOrStdout(), opts.Output, result)
+		},
+	}
+	cmd.Flags().StringVar(&flags.Input, "input", flags.Input, "input dataset name")
+	addJQFlags(cmd, &flags)
+	return cmd
 }
 
 func newScreenStrategyCommand(opts *Options) *cobra.Command {

@@ -28,6 +28,7 @@ func addStrategySourceFlags(cmd *cobra.Command, flags *strategySourceFlags, incl
 func addJQFlags(cmd *cobra.Command, flags *strategySourceFlags) {
 	cmd.Flags().StringVar(&flags.JQ, "jq", flags.JQ, "inline jq query")
 	cmd.Flags().StringVar(&flags.JQFile, "jq-file", flags.JQFile, "path to a jq query file")
+	mustMarkFlagFilename(cmd, "jq-file", "jq")
 }
 
 func resolveJQSource(flags strategySourceFlags) (string, error) {

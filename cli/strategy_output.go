@@ -148,6 +148,28 @@ func writeScreenRunDetail(w io.Writer, output OutputMode, detail strategyservice
 	}
 }
 
+func writeScreenResult(w io.Writer, output OutputMode, result strategyservice.ScreenResult) error {
+	switch output {
+	case "", OutputModeTable:
+		rows := make([][]string, 0, len(result.Items))
+		for _, item := range result.Items {
+			rows = append(rows, []string{fmt.Sprint(item.Ordinal), item.Symbol, string(item.PayloadJSON)})
+		}
+		if len(rows) == 0 {
+			rows = append(rows, []string{"", "", fmt.Sprintf("screen %s with %d results", result.QueryHash, result.ResultCount)})
+		}
+		return writeTable(w, []string{"ordinal", "symbol", "payload"}, rows)
+	case OutputModeJSON:
+		return writeIndentedJSON(w, result)
+	case OutputModeNDJSON:
+		return writeNDJSON(w, result.Items)
+	case OutputModeCSV:
+		return writeCSV(w, result.Items)
+	default:
+		return oops.In("cli_output").With("format", output).Errorf("unsupported output format: %s", output)
+	}
+}
+
 func writeIndentedJSON(w io.Writer, value any) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")

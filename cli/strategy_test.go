@@ -140,6 +140,45 @@ func TestStrategyLifecycleStoresJQSourceAndScreensFixtureData(t *testing.T) {
 	}
 }
 
+func TestScreenETFExecutesInlineJQWithoutSavedStrategy(t *testing.T) {
+	ctx := context.Background()
+	databasePath := filepath.Join(t.TempDir(), "mwosa.db")
+	seedStrategyDailyBars(t, ctx, databasePath)
+
+	var screenOut bytes.Buffer
+	screenCmd := NewRootCommand(BuildInfo{})
+	screenCmd.SetOut(&screenOut)
+	screenCmd.SetErr(&screenOut)
+	if err := executeForTest(t, ctx, screenCmd,
+		"--database", databasePath,
+		"--output", "json",
+		"screen", "etfs",
+		"--jq", `map(select(.symbol == "069500"))`,
+	); err != nil {
+		t.Fatalf("screen etfs inline jq: %v\n%s", err, screenOut.String())
+	}
+	for _, want := range []string{`"input_dataset": "etf_daily_metrics"`, `"result_count": 1`, `"symbol": "069500"`} {
+		if !strings.Contains(screenOut.String(), want) {
+			t.Fatalf("screen etfs output missing %q in:\n%s", want, screenOut.String())
+		}
+	}
+
+	var historyOut bytes.Buffer
+	historyCmd := NewRootCommand(BuildInfo{})
+	historyCmd.SetOut(&historyOut)
+	historyCmd.SetErr(&historyOut)
+	if err := executeForTest(t, ctx, historyCmd,
+		"--database", databasePath,
+		"--output", "json",
+		"history", "screen",
+	); err != nil {
+		t.Fatalf("history screen after inline jq: %v\n%s", err, historyOut.String())
+	}
+	if strings.Contains(historyOut.String(), `"result_count"`) {
+		t.Fatalf("inline jq screen should not create saved screen history:\n%s", historyOut.String())
+	}
+}
+
 func seedStrategyDailyBars(t *testing.T, ctx context.Context, databasePath string) {
 	t.Helper()
 	database := storage.NewDatabase(databasePath)

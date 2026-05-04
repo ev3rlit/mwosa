@@ -82,6 +82,20 @@ type ScreenRunItem struct {
 	PayloadJSON json.RawMessage `json:"payload" csv:"-"`
 }
 
+type ScreenResultItem struct {
+	Ordinal     int             `json:"ordinal" csv:"ordinal"`
+	Symbol      string          `json:"symbol,omitempty" csv:"symbol"`
+	PayloadJSON json.RawMessage `json:"payload" csv:"-"`
+}
+
+type ScreenResult struct {
+	QueryHash          string             `json:"query_hash" csv:"query_hash"`
+	InputDataset       string             `json:"input_dataset" csv:"input_dataset"`
+	InputSchemaVersion int                `json:"input_schema_version" csv:"input_schema_version"`
+	ResultCount        int                `json:"result_count" csv:"result_count"`
+	Items              []ScreenResultItem `json:"items" csv:"-"`
+}
+
 type StrategyDetail struct {
 	Strategy      Strategy        `json:"strategy"`
 	ActiveVersion StrategyVersion `json:"active_version"`
@@ -246,6 +260,29 @@ type ScreenStrategyRequest struct {
 	Alias string
 }
 
+type ScreenJQRequest struct {
+	InputDataset string
+	QueryText    string
+}
+
+func (s Service) ScreenJQ(ctx context.Context, req ScreenJQRequest) (ScreenResult, error) {
+	errb := oops.In("strategy_service").With("input_dataset", req.InputDataset)
+	if s.dataset == nil {
+		return ScreenResult{}, errb.New("strategy dataset reader is nil")
+	}
+	if strings.TrimSpace(req.InputDataset) == "" {
+		return ScreenResult{}, errb.New("screen jq input dataset is required")
+	}
+	if strings.TrimSpace(req.QueryText) == "" {
+		return ScreenResult{}, errb.New("screen jq query is required")
+	}
+	dataset, rows, err := s.executeJQAgainstDataset(ctx, req.InputDataset, req.QueryText)
+	if err != nil {
+		return ScreenResult{}, errb.Wrap(err)
+	}
+	return screenResultFromRows(req.QueryText, dataset, rows), nil
+}
+
 func (s Service) Screen(ctx context.Context, req ScreenStrategyRequest) (ScreenRunDetail, error) {
 	errb := oops.In("strategy_service").With("name", req.Name, "alias", req.Alias)
 	if strings.TrimSpace(req.Name) == "" {
@@ -256,15 +293,7 @@ func (s Service) Screen(ctx context.Context, req ScreenStrategyRequest) (ScreenR
 		return ScreenRunDetail{}, errb.Wrapf(err, "load strategy")
 	}
 	started := s.now()
-	dataset, err := s.dataset.ReadDataset(ctx, detail.ActiveVersion.InputDataset)
-	if err != nil {
-		return s.recordFailedRun(ctx, detail, req.Alias, started, errb.Wrapf(err, "read input dataset"))
-	}
-	input, err := datasetInputValue(dataset.Records)
-	if err != nil {
-		return s.recordFailedRun(ctx, detail, req.Alias, started, errb.Wrapf(err, "decode input dataset"))
-	}
-	rows, err := executeJQ(ctx, detail.ActiveVersion.QueryText, input)
+	dataset, rows, err := s.executeJQAgainstDataset(ctx, detail.ActiveVersion.InputDataset, detail.ActiveVersion.QueryText)
 	if err != nil {
 		return s.recordFailedRun(ctx, detail, req.Alias, started, errb.Wrapf(err, "execute jq strategy"))
 	}
@@ -283,6 +312,23 @@ func (s Service) InspectScreen(ctx context.Context, ref string) (ScreenRunDetail
 		return ScreenRunDetail{}, oops.In("strategy_service").New("inspect screen requires id or alias")
 	}
 	return s.repo.GetScreenRun(ctx, ref)
+}
+
+func (s Service) executeJQAgainstDataset(ctx context.Context, inputDataset string, queryText string) (Dataset, []json.RawMessage, error) {
+	errb := oops.In("strategy_service").With("input_dataset", inputDataset)
+	dataset, err := s.dataset.ReadDataset(ctx, inputDataset)
+	if err != nil {
+		return Dataset{}, nil, errb.Wrapf(err, "read input dataset")
+	}
+	input, err := datasetInputValue(dataset.Records)
+	if err != nil {
+		return Dataset{}, nil, errb.Wrapf(err, "decode input dataset")
+	}
+	rows, err := executeJQ(ctx, queryText, input)
+	if err != nil {
+		return Dataset{}, nil, errb.Wrapf(err, "execute jq")
+	}
+	return dataset, rows, nil
 }
 
 func (s Service) recordSucceededRun(ctx context.Context, detail StrategyDetail, alias string, started time.Time, dataset Dataset, rows []json.RawMessage) (ScreenRunDetail, error) {
@@ -322,6 +368,24 @@ func (s Service) recordSucceededRun(ctx context.Context, detail StrategyDetail, 
 		})
 	}
 	return s.repo.CreateScreenRun(ctx, run, items)
+}
+
+func screenResultFromRows(queryText string, dataset Dataset, rows []json.RawMessage) ScreenResult {
+	items := make([]ScreenResultItem, 0, len(rows))
+	for i, row := range rows {
+		items = append(items, ScreenResultItem{
+			Ordinal:     i,
+			Symbol:      extractSymbol(row),
+			PayloadJSON: row,
+		})
+	}
+	return ScreenResult{
+		QueryHash:          hashutil.SHA256([]byte(queryText)),
+		InputDataset:       dataset.Name,
+		InputSchemaVersion: dataset.SchemaVersion,
+		ResultCount:        len(rows),
+		Items:              items,
+	}
 }
 
 func (s Service) recordFailedRun(ctx context.Context, detail StrategyDetail, alias string, started time.Time, runErr error) (ScreenRunDetail, error) {
