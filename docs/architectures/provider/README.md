@@ -597,3 +597,4 @@ instrument.Profile
 ## 관련 문서
 
 - `docs/architectures/layers/README.md`
+- `docs/architectures/provider/group-role-registration-patterns.md`
