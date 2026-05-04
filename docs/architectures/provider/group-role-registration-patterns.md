@@ -412,10 +412,15 @@ data dependency: required identifiers are resolved from input or canonical store
 `securitiesProductPrice`, `stockPrice`, `krxListedInstrument` 를 각각 독립적으로
 활성화하고 진단할 수 있다.
 
+현재 구현 기준은 이렇다.
+
+- registry 는 provider 가 `RoleRegistrations()` 를 제공하면 그 명시적 목록을 우선 등록한다.
+- 기존 embedded role field reflection 경로는 그대로 유지한다.
+- `datago` 는 `securitiesProductPrice` group 이 daily bar 와 instrument role registration 을 제공한다.
+- 아직 추가하지 않은 group 은 client module 과 group adapter 가 생길 때 같은 방식으로 붙인다.
+
 ## 구현 시 확인할 질문
 
-- 현재 `Registry.RegisterProvider` 의 reflection 기반 등록은 그대로 두고,
-  group별 explicit registration 을 어떤 이름의 API 로 추가할 것인가?
 - `ProviderBuilder.Build` 는 provider 하나를 반환해야 하는가, 아니면 group별
   role registration bundle 을 반환할 수 있어야 하는가?
 - `ConfigSpec` 는 group별 required auth 를 표현할 수 있어야 하는가?

@@ -99,6 +99,27 @@ type Provider struct {
 
 embedded role field 만 봐도 provider 가 어떤 역할을 제공하는지 알 수 있다. 지원하지 않는 기능은 unsupported method 로 남기지 않고 role 을 임베딩하지 않는다.
 
+단일 provider 안에 여러 provider group 이 있고 같은 role 을 group 별로 여러 번
+등록해야 한다면 explicit role registration 을 사용한다. 이 경우 provider 는
+`RoleRegistrations()` 로 group 이 제공하는 role 후보를 반환하고, registry 는
+embedded role field reflection 보다 이 명시적 등록 목록을 우선한다.
+
+```go
+type Provider struct {
+	provider.Identity
+
+	groups []provider.GroupRoleProvider
+}
+
+func (p *Provider) RoleRegistrations() []provider.RoleRegistration {
+	// group별 role registration 을 모아서 반환한다.
+}
+```
+
+이 구조는 `datago` 처럼 `securitiesProductPrice`, `stockPrice`,
+`krxListedInstrument`, `corporateFinancial` 같은 group 이 독립적으로 늘어나는
+provider 에 사용한다. 기존 provider 의 embedded role field 방식은 계속 유지한다.
+
 ## Role Package
 
 provider 역할 interface, registry, router 는 `providers/core` 아래에 둔다. provider 별 adapter 도 같은 `providers` 아래에 두고, 폴더 이름은 provider 이름을 그대로 쓴다.

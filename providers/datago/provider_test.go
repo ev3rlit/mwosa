@@ -343,6 +343,35 @@ func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
 	}
 }
 
+func TestProviderRegistersGroupRoleEntries(t *testing.T) {
+	p := NewWithClient(nil)
+	registrations := p.RoleRegistrations()
+	if len(registrations) != 2 {
+		t.Fatalf("registrations len = %d, want 2", len(registrations))
+	}
+
+	roles := make(map[provider.Role]provider.GroupID)
+	for _, registration := range registrations {
+		roles[registration.Profile.Role] = registration.Profile.Group
+	}
+	for _, role := range []provider.Role{provider.RoleDailyBar, provider.RoleInstrument} {
+		if roles[role] != provider.GroupSecuritiesProductPrice {
+			t.Fatalf("role %s group = %s, want %s", role, roles[role], provider.GroupSecuritiesProductPrice)
+		}
+	}
+
+	registry := provider.NewRegistry()
+	if err := Register(registry, p); err != nil {
+		t.Fatalf("register datago provider: %v", err)
+	}
+	if len(registry.Entries(provider.RoleDailyBar)) != 1 {
+		t.Fatalf("dailybar entries len = %d, want 1", len(registry.Entries(provider.RoleDailyBar)))
+	}
+	if len(registry.Entries(provider.RoleInstrument)) != 1 {
+		t.Fatalf("instrument entries len = %d, want 1", len(registry.Entries(provider.RoleInstrument)))
+	}
+}
+
 func newTestProvider(t *testing.T, baseURL string) *Provider {
 	t.Helper()
 	p, err := New(Config{

@@ -22,6 +22,12 @@ type namedRoleFieldProvider struct {
 	DailyBars dailybar.Fetcher
 }
 
+type explicitRegistrationProvider struct {
+	provider.Identity
+
+	registrations []provider.RoleRegistration
+}
+
 func TestRegisterProviderCollectsEmbeddedRoleFields(t *testing.T) {
 	registry := provider.NewRegistry()
 	p := &registryTestProvider{
@@ -49,6 +55,35 @@ func TestRegisterProviderCollectsEmbeddedRoleFields(t *testing.T) {
 	if _, ok := entries[0].Impl.(dailybar.Fetcher); !ok {
 		t.Fatalf("impl type = %T, want dailybar.Fetcher", entries[0].Impl)
 	}
+}
+
+func TestRegisterProviderUsesExplicitRoleRegistrations(t *testing.T) {
+	registry := provider.NewRegistry()
+	p := &explicitRegistrationProvider{
+		Identity: provider.Identity{
+			ID:          provider.ProviderID("test"),
+			DisplayName: "test",
+		},
+		registrations: []provider.RoleRegistration{
+			newRegistryTestDailyBarFetcher().RoleRegistration(),
+		},
+	}
+
+	if err := registry.RegisterProvider(p); err != nil {
+		t.Fatalf("register provider: %v", err)
+	}
+
+	entries := registry.Entries(provider.RoleDailyBar)
+	if len(entries) != 1 {
+		t.Fatalf("dailybar entries len = %d, want 1", len(entries))
+	}
+	if entries[0].Provider.ID != provider.ProviderID("test") {
+		t.Fatalf("provider id = %s, want test", entries[0].Provider.ID)
+	}
+}
+
+func (p *explicitRegistrationProvider) RoleRegistrations() []provider.RoleRegistration {
+	return p.registrations
 }
 
 func TestRegistryRolesReturnsRegisteredRolesOnce(t *testing.T) {
