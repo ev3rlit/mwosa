@@ -270,8 +270,79 @@ func TestSearchInstrumentsReturnsEmptyResult(t *testing.T) {
 	if len(result.Instruments) != 0 {
 		t.Fatalf("instruments len = %d, want 0", len(result.Instruments))
 	}
-	if len(result.Operations) != 2 {
-		t.Fatalf("operations len = %d, want ETF/ETN defaults", len(result.Operations))
+	if len(result.Operations) != 3 {
+		t.Fatalf("operations len = %d, want ETF/ETN/stock defaults", len(result.Operations))
+	}
+}
+
+func TestFetchStockDailyBarsUsesStockPriceGroup(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getStockPriceInfo" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		assertCommonQuery(t, r, "1", "1000")
+		if got := r.URL.Query().Get("resultType"); got != "json" {
+			t.Fatalf("resultType = %q, want json", got)
+		}
+		if got := r.URL.Query().Get("likeSrtnCd"); got != "005930" {
+			t.Fatalf("likeSrtnCd = %q, want 005930", got)
+		}
+		fmt.Fprint(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 100,
+				"pageNo": 1,
+				"totalCount": 1,
+				"items": {
+					"item": {
+						"basDt": "20240415",
+						"srtnCd": "005930",
+						"isinCd": "KR7005930003",
+						"itmsNm": "Samsung Electronics",
+						"mrktCtg": "KOSPI",
+						"clpr": "82200",
+						"vs": "-100",
+						"fltRt": "-0.12",
+						"mkp": "82400",
+						"hipr": "82500",
+						"lopr": "81500",
+						"trqu": "12345678",
+						"trPrc": "1000000000000",
+						"lstgStCnt": "5969782550",
+						"mrktTotAmt": "490000000000000"
+					}
+				}
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server.URL)
+	result, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeStock,
+		Symbol:       "005930",
+		From:         "20240415",
+		To:           "20240415",
+	})
+	if err != nil {
+		t.Fatalf("fetch stock daily bars: %v", err)
+	}
+	if len(result.Bars) != 1 {
+		t.Fatalf("bars len = %d, want 1", len(result.Bars))
+	}
+	bar := result.Bars[0]
+	if bar.Group != provider.GroupStockPrice {
+		t.Fatalf("group = %s, want %s", bar.Group, provider.GroupStockPrice)
+	}
+	if bar.Operation != provider.OperationGetStockPriceInfo {
+		t.Fatalf("operation = %s, want %s", bar.Operation, provider.OperationGetStockPriceInfo)
+	}
+	if bar.SecurityType != provider.SecurityTypeStock || bar.Symbol != "005930" || bar.Close != "82200" {
+		t.Fatalf("unexpected stock bar: %+v", bar)
+	}
+	if bar.Extensions["lstgStCnt"] != "5969782550" || bar.Extensions["mrktCtg"] != "KOSPI" {
+		t.Fatalf("stock extensions = %+v, want listing count and market category", bar.Extensions)
 	}
 }
 
@@ -301,17 +372,17 @@ func TestUnsupportedSecurityTypeIsNotHiddenAsEmptySuccess(t *testing.T) {
 	p := NewWithClient(nil)
 	_, err := p.FetchDailyBars(context.Background(), dailybar.FetchInput{
 		Market:       provider.MarketKRX,
-		SecurityType: provider.SecurityTypeStock,
-		Symbol:       "005930",
+		SecurityType: provider.SecurityType("bond"),
+		Symbol:       "KRW-BOND",
 	})
 	if err == nil {
-		t.Fatal("fetch stock error = nil, want unsupported error")
+		t.Fatal("fetch unsupported security type error = nil, want unsupported error")
 	}
 	var unsupported *provider.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error type = %T, want UnsupportedError: %v", err, err)
 	}
-	for _, want := range []string{"provider=datago", "group=securitiesProductPrice", "security_type=stock", "symbol=005930"} {
+	for _, want := range []string{"provider=datago", "group=securitiesProductPrice", "security_type=bond", "symbol=KRW-BOND"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %q in %q", want, err.Error())
 		}
@@ -319,7 +390,12 @@ func TestUnsupportedSecurityTypeIsNotHiddenAsEmptySuccess(t *testing.T) {
 }
 
 func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
-	p := NewWithClient(nil)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{}`)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server.URL)
 	registry := provider.NewRegistry()
 	if err := Register(registry, p); err != nil {
 		t.Fatalf("register datago provider: %v", err)
@@ -346,8 +422,12 @@ func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
 func newTestProvider(t *testing.T, baseURL string) *Provider {
 	t.Helper()
 	p, err := New(Config{
-		ServiceKey:       "test-key",
-		BaseURL:          baseURL,
+		ServiceKey: "test-key",
+		BaseURL:    baseURL,
+		StockPrice: GroupConfig{
+			ServiceKey: "test-key",
+			BaseURL:    baseURL,
+		},
 		RetryMaxAttempts: 1,
 	})
 	if err != nil {

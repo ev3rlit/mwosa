@@ -30,6 +30,10 @@ type RoleProvider interface {
 	RoleRegistration() RoleRegistration
 }
 
+type RoleRegistrationsProvider interface {
+	RoleRegistrations() []RoleRegistration
+}
+
 type RoleEntry struct {
 	Provider Identity
 	Profile  RoleProfile
@@ -57,6 +61,14 @@ func (r *Registry) RegisterProvider(provider IdentityProvider) error {
 	identity := provider.ProviderIdentity()
 	if identity.ID == "" {
 		return errb.New("register provider: provider id is empty")
+	}
+
+	if registrationProvider, ok := provider.(RoleRegistrationsProvider); ok {
+		registrations := registrationProvider.RoleRegistrations()
+		if len(registrations) == 0 {
+			return errb.With("provider", identity.ID).New("register provider: provider has no role registrations")
+		}
+		return r.Register(provider, registrations...)
 	}
 
 	value = reflect.Indirect(value)

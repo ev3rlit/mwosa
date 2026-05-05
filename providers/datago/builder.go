@@ -8,9 +8,15 @@ import (
 )
 
 const (
-	serviceKeyEnv         = "MWOSA_DATAGO_SERVICE_KEY"
-	serviceKeyFallbackEnv = "DATAGO_SERVICE_KEY"
-	baseURLEnv            = "MWOSA_DATAGO_BASE_URL"
+	serviceKeyEnv              = "MWOSA_DATAGO_SERVICE_KEY"
+	serviceKeyFallbackEnv      = "DATAGO_SERVICE_KEY"
+	baseURLEnv                 = "MWOSA_DATAGO_BASE_URL"
+	etpServiceKeyEnv           = "MWOSA_DATAGO_ETP_SERVICE_KEY"
+	etpServiceKeyFallbackEnv   = "DATAGO_ETP_SERVICE_KEY"
+	etpBaseURLEnv              = "MWOSA_DATAGO_ETP_BASE_URL"
+	stockServiceKeyEnv         = "MWOSA_DATAGO_STOCK_PRICE_SERVICE_KEY"
+	stockServiceKeyFallbackEnv = "DATAGO_STOCK_PRICE_SERVICE_KEY"
+	stockBaseURLEnv            = "MWOSA_DATAGO_STOCK_PRICE_BASE_URL"
 )
 
 type Builder struct{}
@@ -36,6 +42,17 @@ func (Builder) DefaultConfig() provider.Config {
 		"groups": map[string]any{
 			string(provider.GroupSecuritiesProductPrice): map[string]any{
 				"enabled": true,
+				"auth": map[string]any{
+					"service_key": "",
+				},
+				"base_url": "",
+			},
+			string(provider.GroupStockPrice): map[string]any{
+				"enabled": true,
+				"auth": map[string]any{
+					"service_key": "",
+				},
+				"base_url": "",
 			},
 		},
 	}
@@ -48,16 +65,44 @@ func (Builder) ConfigSpec() provider.ConfigSpec {
 			{
 				Path:        "auth.service_key",
 				Flag:        "service-key",
-				Required:    true,
+				Required:    false,
 				Secret:      true,
-				Description: "공공데이터포털 service key",
+				Description: "legacy 공공데이터포털 service key for securitiesProductPrice",
 				Env:         []string{serviceKeyEnv, serviceKeyFallbackEnv},
+			},
+			{
+				Path:        "groups.securitiesProductPrice.auth.service_key",
+				Flag:        "etp-service-key",
+				Required:    false,
+				Secret:      true,
+				Description: "공공데이터포털 securitiesProductPrice service key",
+				Env:         []string{etpServiceKeyEnv, etpServiceKeyFallbackEnv},
+			},
+			{
+				Path:        "groups.stockPrice.auth.service_key",
+				Flag:        "stock-price-service-key",
+				Required:    false,
+				Secret:      true,
+				Description: "공공데이터포털 stockPrice service key",
+				Env:         []string{stockServiceKeyEnv, stockServiceKeyFallbackEnv},
 			},
 			{
 				Path:        "base_url",
 				Flag:        "base-url",
-				Description: "override datago API base URL",
+				Description: "legacy override datago securitiesProductPrice API base URL",
 				Env:         []string{baseURLEnv},
+			},
+			{
+				Path:        "groups.securitiesProductPrice.base_url",
+				Flag:        "etp-base-url",
+				Description: "override datago securitiesProductPrice API base URL",
+				Env:         []string{etpBaseURLEnv},
+			},
+			{
+				Path:        "groups.stockPrice.base_url",
+				Flag:        "stock-price-base-url",
+				Description: "override datago stockPrice API base URL",
+				Env:         []string{stockBaseURLEnv},
 			},
 		},
 	}
@@ -77,7 +122,7 @@ func (Builder) Decide(opts provider.RegisterOptions, config provider.Config) pro
 			Reason:   "another provider is forced",
 		}
 	}
-	if serviceKeyFromConfig(config) != "" {
+	if hasAnyGroupServiceKey(config) {
 		return provider.RegistrationDecision{
 			Register: true,
 			Reason:   "datago config is present",
@@ -96,19 +141,66 @@ func (Builder) Decide(opts provider.RegisterOptions, config provider.Config) pro
 }
 
 func (Builder) Build(config provider.Config) (provider.IdentityProvider, error) {
-	serviceKey := serviceKeyFromConfig(config)
-	if serviceKey == "" {
+	etpServiceKey := etpServiceKeyFromConfig(config)
+	stockServiceKey := stockServiceKeyFromConfig(config)
+	if etpServiceKey == "" && stockServiceKey == "" {
 		return nil, oops.In("provider_registry").
 			With("provider", provider.ProviderDataGo).
-			New("datago provider config requires service key: configure providers.datago.auth.service_key or set MWOSA_DATAGO_SERVICE_KEY or DATAGO_SERVICE_KEY")
+			New("datago provider config requires at least one group service key: configure providers.datago.groups.securitiesProductPrice.auth.service_key or providers.datago.groups.stockPrice.auth.service_key")
 	}
 	return New(Config{
-		ServiceKey: serviceKey,
-		BaseURL:    baseURLFromConfig(config),
+		ServiceKey: legacyServiceKeyFromConfig(config),
+		BaseURL:    legacyBaseURLFromConfig(config),
+		SecuritiesProductPrice: GroupConfig{
+			ServiceKey: etpServiceKey,
+			BaseURL:    etpBaseURLFromConfig(config),
+		},
+		StockPrice: GroupConfig{
+			ServiceKey: stockServiceKey,
+			BaseURL:    stockBaseURLFromConfig(config),
+		},
 	})
 }
 
-func serviceKeyFromConfig(config provider.Config) string {
+func hasAnyGroupServiceKey(config provider.Config) bool {
+	return etpServiceKeyFromConfig(config) != "" || stockServiceKeyFromConfig(config) != ""
+}
+
+func etpServiceKeyFromConfig(config provider.Config) string {
+	if !groupEnabledFromConfig(config, provider.GroupSecuritiesProductPrice) {
+		return ""
+	}
+	serviceKey := strings.TrimSpace(config.String("providers", "datago", "groups", string(provider.GroupSecuritiesProductPrice), "auth", "service_key"))
+	if serviceKey != "" {
+		return serviceKey
+	}
+	serviceKey = strings.TrimSpace(config.Env(etpServiceKeyEnv))
+	if serviceKey != "" {
+		return serviceKey
+	}
+	serviceKey = strings.TrimSpace(config.Env(etpServiceKeyFallbackEnv))
+	if serviceKey != "" {
+		return serviceKey
+	}
+	return legacyServiceKeyFromConfig(config)
+}
+
+func stockServiceKeyFromConfig(config provider.Config) string {
+	if !groupEnabledFromConfig(config, provider.GroupStockPrice) {
+		return ""
+	}
+	serviceKey := strings.TrimSpace(config.String("providers", "datago", "groups", string(provider.GroupStockPrice), "auth", "service_key"))
+	if serviceKey != "" {
+		return serviceKey
+	}
+	serviceKey = strings.TrimSpace(config.Env(stockServiceKeyEnv))
+	if serviceKey != "" {
+		return serviceKey
+	}
+	return strings.TrimSpace(config.Env(stockServiceKeyFallbackEnv))
+}
+
+func legacyServiceKeyFromConfig(config provider.Config) string {
 	serviceKey := strings.TrimSpace(config.String("providers", "datago", "auth", "service_key"))
 	if serviceKey != "" {
 		return serviceKey
@@ -120,7 +212,27 @@ func serviceKeyFromConfig(config provider.Config) string {
 	return strings.TrimSpace(config.Env(serviceKeyFallbackEnv))
 }
 
-func baseURLFromConfig(config provider.Config) string {
+func etpBaseURLFromConfig(config provider.Config) string {
+	baseURL := strings.TrimSpace(config.String("providers", "datago", "groups", string(provider.GroupSecuritiesProductPrice), "base_url"))
+	if baseURL != "" {
+		return baseURL
+	}
+	baseURL = strings.TrimSpace(config.Env(etpBaseURLEnv))
+	if baseURL != "" {
+		return baseURL
+	}
+	return legacyBaseURLFromConfig(config)
+}
+
+func stockBaseURLFromConfig(config provider.Config) string {
+	baseURL := strings.TrimSpace(config.String("providers", "datago", "groups", string(provider.GroupStockPrice), "base_url"))
+	if baseURL != "" {
+		return baseURL
+	}
+	return strings.TrimSpace(config.Env(stockBaseURLEnv))
+}
+
+func legacyBaseURLFromConfig(config provider.Config) string {
 	baseURL := strings.TrimSpace(config.String("providers", "datago", "base_url"))
 	if baseURL != "" {
 		return baseURL
@@ -130,6 +242,11 @@ func baseURLFromConfig(config provider.Config) string {
 
 func enabledFromConfig(config provider.Config) bool {
 	enabled, ok := config.Bool("providers", "datago", "enabled")
+	return !ok || enabled
+}
+
+func groupEnabledFromConfig(config provider.Config, group provider.GroupID) bool {
+	enabled, ok := config.Bool("providers", "datago", "groups", string(group), "enabled")
 	return !ok || enabled
 }
 

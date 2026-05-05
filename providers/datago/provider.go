@@ -3,9 +3,11 @@ package datago
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	datagoetp "github.com/ev3rlit/mwosa/clients/datago-etp"
+	datagostock "github.com/ev3rlit/mwosa/clients/datago-stock-price"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
@@ -13,9 +15,23 @@ import (
 	"github.com/samber/oops"
 )
 
-type Config = datagoetp.Config
+type Config struct {
+	ServiceKey             string
+	BaseURL                string
+	SecuritiesProductPrice GroupConfig
+	StockPrice             GroupConfig
+	HTTPClient             *http.Client
+	RetryMaxAttempts       int
+	RetryInitialWait       time.Duration
+	RetryMaxWait           time.Duration
+}
 
-type priceClient interface {
+type GroupConfig struct {
+	ServiceKey string
+	BaseURL    string
+}
+
+type etpPriceClient interface {
 	GetETFPriceInfo(context.Context, datagoetp.ETFPriceInfoQuery) (datagoetp.ETFPriceInfoResult, error)
 	GetAllETFPriceInfo(context.Context, datagoetp.ETFPriceInfoQuery) (datagoetp.ETFPriceInfoResult, error)
 	GetETNPriceInfo(context.Context, datagoetp.ETNPriceInfoQuery) (datagoetp.ETNPriceInfoResult, error)
@@ -24,85 +40,189 @@ type priceClient interface {
 	GetAllELWPriceInfo(context.Context, datagoetp.ELWPriceInfoQuery) (datagoetp.ELWPriceInfoResult, error)
 }
 
+type stockPriceClient interface {
+	GetStockPriceInfo(context.Context, datagostock.StockPriceInfoQuery) (datagostock.StockPriceInfoResult, error)
+	GetAllStockPriceInfo(context.Context, datagostock.StockPriceInfoQuery) (datagostock.StockPriceInfoResult, error)
+}
+
 type Provider struct {
 	provider.Identity
 
-	dailybar.Fetcher
-	instrument.Searcher
-
-	client priceClient
+	etpClient         etpPriceClient
+	stockClient       stockPriceClient
+	roleRegistrations []provider.RoleRegistration
 }
 
 func New(config Config) (*Provider, error) {
-	errb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice)
-	client, err := datagoetp.New(config)
+	errb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo)
+	etpClient, err := newETPClient(config)
 	if err != nil {
-		return nil, errb.Wrap(err)
+		return nil, errb.With("group", provider.GroupSecuritiesProductPrice).Wrap(err)
 	}
-	return NewWithClient(client), nil
+	stockClient, err := newStockClient(config)
+	if err != nil {
+		return nil, errb.With("group", provider.GroupStockPrice).Wrap(err)
+	}
+	if etpClient == nil && stockClient == nil {
+		return nil, errb.New("datago provider config requires at least one group service key")
+	}
+	return NewWithClients(etpClient, stockClient), nil
 }
 
-func NewWithClient(client priceClient) *Provider {
+func newETPClient(config Config) (etpPriceClient, error) {
+	serviceKey := config.SecuritiesProductPrice.ServiceKey
+	if serviceKey == "" {
+		serviceKey = config.ServiceKey
+	}
+	if serviceKey == "" {
+		return nil, nil
+	}
+	baseURL := config.SecuritiesProductPrice.BaseURL
+	if baseURL == "" {
+		baseURL = config.BaseURL
+	}
+	return datagoetp.New(datagoetp.Config{
+		ServiceKey:       serviceKey,
+		BaseURL:          baseURL,
+		HTTPClient:       config.HTTPClient,
+		RetryMaxAttempts: config.RetryMaxAttempts,
+		RetryInitialWait: config.RetryInitialWait,
+		RetryMaxWait:     config.RetryMaxWait,
+	})
+}
+
+func newStockClient(config Config) (stockPriceClient, error) {
+	serviceKey := config.StockPrice.ServiceKey
+	if serviceKey == "" {
+		return nil, nil
+	}
+	return datagostock.New(datagostock.Config{
+		ServiceKey:       serviceKey,
+		BaseURL:          config.StockPrice.BaseURL,
+		HTTPClient:       config.HTTPClient,
+		RetryMaxAttempts: config.RetryMaxAttempts,
+		RetryInitialWait: config.RetryInitialWait,
+		RetryMaxWait:     config.RetryMaxWait,
+	})
+}
+
+func NewWithClient(client etpPriceClient) *Provider {
+	return NewWithClients(client, nil)
+}
+
+func NewWithClients(etpClient etpPriceClient, stockClient stockPriceClient) *Provider {
 	p := &Provider{
 		Identity: provider.Identity{
 			ID:          provider.ProviderDataGo,
 			DisplayName: "공공데이터포털",
 		},
-		client: client,
+		etpClient:   etpClient,
+		stockClient: stockClient,
 	}
 
-	p.Fetcher = spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
-		Markets(provider.MarketKRX).
-		SecurityTypes(
-			provider.SecurityTypeETF,
-			provider.SecurityTypeETN,
-			provider.SecurityTypeELW,
-		).
-		Group(provider.GroupSecuritiesProductPrice).
-		Operations(
-			provider.OperationGetETFPriceInfo,
-			provider.OperationGetETNPriceInfo,
-			provider.OperationGetELWPriceInfo,
-		).
-		RequiresAuth(provider.CredentialScopeDataGo).
-		RangeQuery(dailybar.RangeQuerySupported).
-		CompatibilityNotes(
-			"latest available basDt is typically the previous business day",
-			"current trading-day data is not supported",
-		).
-		Priority(50).
-		Limitations(
-			"daily basDt data only; not a realtime or current trading-day provider",
-			"latest available data is typically D-1 business day EOD",
-			"ELW uses explicit security_type=elw because canonical schema policy is separate from ETF/ETN",
-		).
-		MustBuild()
-	p.Searcher = spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
-		Markets(provider.MarketKRX).
-		SecurityTypes(
-			provider.SecurityTypeETF,
-			provider.SecurityTypeETN,
-			provider.SecurityTypeELW,
-		).
-		Group(provider.GroupSecuritiesProductPrice).
-		Operations(
-			provider.OperationGetETFPriceInfo,
-			provider.OperationGetETNPriceInfo,
-			provider.OperationGetELWPriceInfo,
-		).
-		RequiresAuth(provider.CredentialScopeDataGo).
-		CompatibilityNotes(
-			"instrument snapshots are derived from D-1 business day EOD price rows",
-			"current trading-day data is not supported",
-		).
-		Priority(50).
-		Limitations(
-			"searches public D-1 business day EOD price rows and derives instrument snapshots",
-			"not suitable for realtime or current trading-day instrument state",
-			"ELW search requires explicit security_type=elw",
-		).
-		MustBuild()
+	if etpClient != nil {
+		etpDaily := spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
+			Markets(provider.MarketKRX).
+			SecurityTypes(
+				provider.SecurityTypeETF,
+				provider.SecurityTypeETN,
+				provider.SecurityTypeELW,
+			).
+			Group(provider.GroupSecuritiesProductPrice).
+			Operations(
+				provider.OperationGetETFPriceInfo,
+				provider.OperationGetETNPriceInfo,
+				provider.OperationGetELWPriceInfo,
+			).
+			RequiresAuth(provider.CredentialScopeDataGo).
+			RangeQuery(dailybar.RangeQuerySupported).
+			CompatibilityNotes(
+				"latest available basDt is typically the previous business day",
+				"current trading-day data is not supported",
+			).
+			Priority(50).
+			Limitations(
+				"daily basDt data only; not a realtime or current trading-day provider",
+				"latest available data is typically D-1 business day EOD",
+				"ELW uses explicit security_type=elw because canonical schema policy is separate from ETF/ETN",
+			).
+			MustBuild()
+		etpSearch := spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
+			Markets(provider.MarketKRX).
+			SecurityTypes(
+				provider.SecurityTypeETF,
+				provider.SecurityTypeETN,
+				provider.SecurityTypeELW,
+			).
+			Group(provider.GroupSecuritiesProductPrice).
+			Operations(
+				provider.OperationGetETFPriceInfo,
+				provider.OperationGetETNPriceInfo,
+				provider.OperationGetELWPriceInfo,
+			).
+			RequiresAuth(provider.CredentialScopeDataGo).
+			CompatibilityNotes(
+				"instrument snapshots are derived from D-1 business day EOD price rows",
+				"current trading-day data is not supported",
+			).
+			Priority(50).
+			Limitations(
+				"searches public D-1 business day EOD price rows and derives instrument snapshots",
+				"not suitable for realtime or current trading-day instrument state",
+				"ELW search requires explicit security_type=elw",
+			).
+			MustBuild()
+		p.roleRegistrations = append(p.roleRegistrations, etpDaily.RoleRegistration(), etpSearch.RoleRegistration())
+	}
+	if stockClient != nil {
+		stockDaily := spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
+			Markets(provider.MarketKRX).
+			SecurityTypes(provider.SecurityTypeStock).
+			Group(provider.GroupStockPrice).
+			Operations(provider.OperationGetStockPriceInfo).
+			RequiresAuth(provider.CredentialScopeDataGo).
+			RangeQuery(dailybar.RangeQuerySupported).
+			CompatibilityNotes(
+				"latest available basDt is typically the previous business day",
+				"current trading-day data is not supported",
+			).
+			Priority(50).
+			Limitations(
+				"daily basDt data only; not a realtime or current trading-day provider",
+				"latest available data is typically D-1 business day EOD",
+			).
+			MustBuild()
+		stockSearch := spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
+			Markets(provider.MarketKRX).
+			SecurityTypes(provider.SecurityTypeStock).
+			Group(provider.GroupStockPrice).
+			Operations(provider.OperationGetStockPriceInfo).
+			RequiresAuth(provider.CredentialScopeDataGo).
+			CompatibilityNotes(
+				"instrument snapshots are derived from D-1 business day EOD stock price rows",
+				"current trading-day data is not supported",
+			).
+			Priority(50).
+			Limitations(
+				"searches public D-1 business day EOD stock price rows and derives instrument snapshots",
+				"not suitable for realtime or current trading-day instrument state",
+			).
+			MustBuild()
+		p.roleRegistrations = append(p.roleRegistrations, stockDaily.RoleRegistration(), stockSearch.RoleRegistration())
+	}
 	return p
+}
+
+func (p *Provider) RoleRegistrations() []provider.RoleRegistration {
+	return append([]provider.RoleRegistration(nil), p.roleRegistrations...)
+}
+
+func (p *Provider) FetchDailyBars(ctx context.Context, input dailybar.FetchInput) (dailybar.FetchResult, error) {
+	return p.fetchDailyBars(ctx, input)
+}
+
+func (p *Provider) SearchInstruments(ctx context.Context, input instrument.SearchInput) (instrument.SearchResult, error) {
+	return p.searchInstruments(ctx, input)
 }
 
 func Register(registry *provider.Registry, p *Provider) error {
@@ -118,10 +238,8 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 	if err != nil {
 		return dailybar.FetchResult{}, inputErrb.Wrap(err)
 	}
-	providerErrb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice)
-	if p.client == nil {
-		return dailybar.FetchResult{}, providerErrb.New("datago adapter client is nil")
-	}
+	group := groupForOperation(operation)
+	providerErrb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", group)
 
 	query := datagoetp.SecuritiesProductPriceQuery{
 		NumOfRows: numOfRowsForDailyFetch(input.Limit),
@@ -157,7 +275,7 @@ func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput
 	return dailybar.FetchResult{
 		Bars:       bars,
 		Provider:   p.Identity,
-		Group:      provider.GroupSecuritiesProductPrice,
+		Group:      group,
 		Operation:  operation,
 		TotalCount: result.TotalCount,
 	}, nil
@@ -172,10 +290,7 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 	if err != nil {
 		return instrument.SearchResult{}, inputErrb.Wrap(err)
 	}
-	providerErrb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo, "group", provider.GroupSecuritiesProductPrice)
-	if p.client == nil {
-		return instrument.SearchResult{}, providerErrb.New("datago adapter client is nil")
-	}
+	providerErrb := oops.In("datago_adapter").With("provider", provider.ProviderDataGo)
 
 	instruments := make([]instrument.Instrument, 0)
 	totalCount := 0
@@ -196,7 +311,7 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 				return instrument.SearchResult{
 					Instruments: instruments,
 					Provider:    p.Identity,
-					Group:       provider.GroupSecuritiesProductPrice,
+					Group:       groupForOperation(spec.Operation),
 					Operations:  operationIDs(operations),
 					TotalCount:  totalCount,
 				}, nil
@@ -207,7 +322,7 @@ func (p *Provider) searchInstruments(ctx context.Context, input instrument.Searc
 	return instrument.SearchResult{
 		Instruments: instruments,
 		Provider:    p.Identity,
-		Group:       provider.GroupSecuritiesProductPrice,
+		Group:       groupForOperations(operations),
 		Operations:  operationIDs(operations),
 		TotalCount:  totalCount,
 	}, nil
@@ -241,6 +356,7 @@ func operationsForSearch(securityType provider.SecurityType, symbol string) ([]o
 	return []operationSpec{
 		{SecurityType: provider.SecurityTypeETF, Operation: provider.OperationGetETFPriceInfo},
 		{SecurityType: provider.SecurityTypeETN, Operation: provider.OperationGetETNPriceInfo},
+		{SecurityType: provider.SecurityTypeStock, Operation: provider.OperationGetStockPriceInfo},
 	}, nil
 }
 
@@ -252,6 +368,8 @@ func operationForSecurityType(capability provider.Role, securityType provider.Se
 		return provider.OperationGetETNPriceInfo, nil
 	case provider.SecurityTypeELW:
 		return provider.OperationGetELWPriceInfo, nil
+	case provider.SecurityTypeStock:
+		return provider.OperationGetStockPriceInfo, nil
 	case "":
 		return "", provider.NewUnsupported(provider.UnsupportedError{
 			Capability: capability,
@@ -265,11 +383,11 @@ func operationForSecurityType(capability provider.Role, securityType provider.Se
 		return "", provider.NewUnsupported(provider.UnsupportedError{
 			Capability:   capability,
 			ProviderID:   provider.ProviderDataGo,
-			GroupID:      provider.GroupSecuritiesProductPrice,
+			GroupID:      groupForSecurityType(securityType),
 			Market:       provider.MarketKRX,
 			SecurityType: securityType,
 			Symbol:       symbol,
-			Reason:       "security_type is not supported by datago securitiesProductPrice",
+			Reason:       "security_type is not supported by datago",
 		})
 	}
 }
@@ -281,11 +399,11 @@ func validateMarket(capability provider.Role, market provider.Market, symbol str
 	return provider.NewUnsupported(provider.UnsupportedError{
 		Capability:   capability,
 		ProviderID:   provider.ProviderDataGo,
-		GroupID:      provider.GroupSecuritiesProductPrice,
+		GroupID:      groupForSecurityType(securityType),
 		Market:       market,
 		SecurityType: securityType,
 		Symbol:       symbol,
-		Reason:       "market is not supported by datago securitiesProductPrice",
+		Reason:       "market is not supported by datago",
 	})
 }
 
@@ -319,62 +437,141 @@ func operationIDs(specs []operationSpec) []provider.OperationID {
 	return operations
 }
 
+func groupForOperations(specs []operationSpec) provider.GroupID {
+	if len(specs) == 0 {
+		return ""
+	}
+	group := groupForOperation(specs[0].Operation)
+	for _, spec := range specs[1:] {
+		if groupForOperation(spec.Operation) != group {
+			return ""
+		}
+	}
+	return group
+}
+
+func groupForOperation(operation provider.OperationID) provider.GroupID {
+	switch operation {
+	case provider.OperationGetStockPriceInfo:
+		return provider.GroupStockPrice
+	default:
+		return provider.GroupSecuritiesProductPrice
+	}
+}
+
+func groupForSecurityType(securityType provider.SecurityType) provider.GroupID {
+	if securityType == provider.SecurityTypeStock {
+		return provider.GroupStockPrice
+	}
+	return provider.GroupSecuritiesProductPrice
+}
+
 func (p *Provider) fetchPriceRecords(ctx context.Context, spec operationSpec, query datagoetp.SecuritiesProductPriceQuery, allPages bool) (priceRecordsResult, error) {
 	errb := oops.In("datago_adapter").With(
 		"provider", provider.ProviderDataGo,
-		"group", provider.GroupSecuritiesProductPrice,
+		"group", groupForOperation(spec.Operation),
 		"operation", spec.Operation,
 		"security_type", spec.SecurityType,
 	)
 
 	switch spec.Operation {
 	case provider.OperationGetETFPriceInfo:
+		if p.etpClient == nil {
+			return priceRecordsResult{}, errb.New("datago securitiesProductPrice adapter client is nil")
+		}
 		query := datagoetp.ETFPriceInfoQuery{
 			SecuritiesProductPriceQuery: query,
 		}
 		var result datagoetp.ETFPriceInfoResult
 		var err error
 		if allPages {
-			result, err = p.client.GetAllETFPriceInfo(ctx, query)
+			result, err = p.etpClient.GetAllETFPriceInfo(ctx, query)
 		} else {
-			result, err = p.client.GetETFPriceInfo(ctx, query)
+			result, err = p.etpClient.GetETFPriceInfo(ctx, query)
 		}
 		if err != nil {
 			return priceRecordsResult{}, errb.Wrap(err)
 		}
 		return priceRecordsResult{Records: recordsFromETF(result.Items), TotalCount: result.TotalCount}, nil
 	case provider.OperationGetETNPriceInfo:
+		if p.etpClient == nil {
+			return priceRecordsResult{}, errb.New("datago securitiesProductPrice adapter client is nil")
+		}
 		query := datagoetp.ETNPriceInfoQuery{
 			SecuritiesProductPriceQuery: query,
 		}
 		var result datagoetp.ETNPriceInfoResult
 		var err error
 		if allPages {
-			result, err = p.client.GetAllETNPriceInfo(ctx, query)
+			result, err = p.etpClient.GetAllETNPriceInfo(ctx, query)
 		} else {
-			result, err = p.client.GetETNPriceInfo(ctx, query)
+			result, err = p.etpClient.GetETNPriceInfo(ctx, query)
 		}
 		if err != nil {
 			return priceRecordsResult{}, errb.Wrap(err)
 		}
 		return priceRecordsResult{Records: recordsFromETN(result.Items), TotalCount: result.TotalCount}, nil
 	case provider.OperationGetELWPriceInfo:
+		if p.etpClient == nil {
+			return priceRecordsResult{}, errb.New("datago securitiesProductPrice adapter client is nil")
+		}
 		query := datagoetp.ELWPriceInfoQuery{
 			SecuritiesProductPriceQuery: query,
 		}
 		var result datagoetp.ELWPriceInfoResult
 		var err error
 		if allPages {
-			result, err = p.client.GetAllELWPriceInfo(ctx, query)
+			result, err = p.etpClient.GetAllELWPriceInfo(ctx, query)
 		} else {
-			result, err = p.client.GetELWPriceInfo(ctx, query)
+			result, err = p.etpClient.GetELWPriceInfo(ctx, query)
 		}
 		if err != nil {
 			return priceRecordsResult{}, errb.Wrap(err)
 		}
 		return priceRecordsResult{Records: recordsFromELW(result.Items), TotalCount: result.TotalCount}, nil
+	case provider.OperationGetStockPriceInfo:
+		if p.stockClient == nil {
+			return priceRecordsResult{}, errb.New("datago stockPrice adapter client is nil")
+		}
+		stockQuery := stockQueryFromSecuritiesProductQuery(query)
+		var result datagostock.StockPriceInfoResult
+		var err error
+		if allPages {
+			result, err = p.stockClient.GetAllStockPriceInfo(ctx, stockQuery)
+		} else {
+			result, err = p.stockClient.GetStockPriceInfo(ctx, stockQuery)
+		}
+		if err != nil {
+			return priceRecordsResult{}, errb.Wrap(err)
+		}
+		return priceRecordsResult{Records: recordsFromStock(result.Items), TotalCount: result.TotalCount}, nil
 	default:
 		return priceRecordsResult{}, errb.New("unsupported datago price info operation")
+	}
+}
+
+func stockQueryFromSecuritiesProductQuery(query datagoetp.SecuritiesProductPriceQuery) datagostock.StockPriceInfoQuery {
+	return datagostock.StockPriceInfoQuery{
+		NumOfRows:       query.NumOfRows,
+		PageNo:          query.PageNo,
+		Workers:         query.Workers,
+		BasDt:           query.BasDt,
+		BeginBasDt:      query.BeginBasDt,
+		EndBasDt:        query.EndBasDt,
+		LikeBasDt:       query.LikeBasDt,
+		LikeSrtnCd:      query.LikeSrtnCd,
+		IsinCd:          query.IsinCd,
+		LikeIsinCd:      query.LikeIsinCd,
+		ItmsNm:          query.ItmsNm,
+		LikeItmsNm:      query.LikeItmsNm,
+		BeginVs:         query.BeginVs,
+		EndVs:           query.EndVs,
+		BeginTrqu:       query.BeginTrqu,
+		EndTrqu:         query.EndTrqu,
+		BeginTrPrc:      query.BeginTrPrc,
+		EndTrPrc:        query.EndTrPrc,
+		BeginMrktTotAmt: query.BeginMrktTotAmt,
+		EndMrktTotAmt:   query.EndMrktTotAmt,
 	}
 }
 
@@ -402,11 +599,36 @@ func recordsFromELW(items []datagoetp.ELWPriceInfo) []priceRecord {
 	return records
 }
 
+func recordsFromStock(items []datagostock.StockPriceInfo) []priceRecord {
+	records := make([]priceRecord, 0, len(items))
+	for _, item := range items {
+		records = append(records, priceRecord{
+			Common: datagoetp.CommonPriceInfo{
+				BasDt:      item.BasDt,
+				SrtnCd:     item.SrtnCd,
+				IsinCd:     item.IsinCd,
+				ItmsNm:     item.ItmsNm,
+				Clpr:       item.Clpr,
+				Vs:         item.Vs,
+				FltRt:      item.FltRt,
+				Mkp:        item.Mkp,
+				Hipr:       item.Hipr,
+				Lopr:       item.Lopr,
+				Trqu:       item.Trqu,
+				TrPrc:      item.TrPrc,
+				MrktTotAmt: item.MrktTotAmt,
+			},
+			Fields: item.Fields(),
+		})
+	}
+	return records
+}
+
 func normalizeDailyBar(record priceRecord, securityType provider.SecurityType, operation provider.OperationID) dailybar.Bar {
 	item := record.Common
 	return dailybar.Bar{
 		Provider:     provider.ProviderDataGo,
-		Group:        provider.GroupSecuritiesProductPrice,
+		Group:        groupForOperation(operation),
 		Operation:    operation,
 		Market:       provider.MarketKRX,
 		SecurityType: securityType,
@@ -433,7 +655,7 @@ func normalizeInstrument(record priceRecord, securityType provider.SecurityType,
 	securityCode := item.SrtnCd
 	return instrument.Instrument{
 		Provider:     provider.ProviderDataGo,
-		Group:        provider.GroupSecuritiesProductPrice,
+		Group:        groupForOperation(operation),
 		Operation:    operation,
 		Market:       provider.MarketKRX,
 		SecurityType: securityType,

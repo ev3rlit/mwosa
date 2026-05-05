@@ -3,4 +3,5 @@ go 1.25.6
 use (
 	.
 	./clients/datago-etp
+	./clients/datago-stock-price
 )

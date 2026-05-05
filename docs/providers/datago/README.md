@@ -6,16 +6,20 @@
 
 공공데이터포털은 하나의 종합 API 보다 개별 API 서비스를 따로 제공하는 경우가 많다. 그래서 `datago` 는 provider 이름을 하나로 유지하고, 실제 승인 범위와 endpoint 묶음은 provider group 으로 나눈다.
 
-현재 문서는 첫 group 인 `securitiesProductPrice` 를 기준으로 작성한다. 이 group 은 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집한다.
+현재 구현은 `securitiesProductPrice` 와 `stockPrice` 두 group 을 지원한다.
+`securitiesProductPrice` 는 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집한다.
+`stockPrice` 는 `금융위원회_주식시세정보` OpenAPI를 사용해 상장 주식 시세 데이터를 수집한다.
 
 원본 OpenAPI 스펙은 provider client module 안의
 `clients/datago-etp/docs/securitiesProductPrice.openapi.yaml` 에 보관한다.
+주식시세정보 client 는 `clients/datago-stock-price` 독립 module 에 둔다.
 
 이 provider 의 client 구현체는 `mwosa` workspace 안의 **독립 Go module** 로 관리한다. `mwosa` repository root 의 `go.work` 로 CLI module 과 함께 개발하고, 필요하면 나중에 별도 repository 로 분리할 수 있다.
 
 이 provider 는 canonical schema 관점에서 다음 역할을 가진다.
 
 - ETF / ETN / ELW 종목의 일별 시세 공급
+- 상장 주식 종목의 일별 시세 공급
 - 종목 메타데이터 snapshot 공급
 - provider-neutral 검색 소스 중 하나로 동작
 
@@ -78,30 +82,38 @@ group 은 다음 기준으로 나눈다.
 | group | 상태 | 공공데이터포털 API | 주요 operation | capability |
 | --- | --- | --- | --- | --- |
 | `securitiesProductPrice` | `core` | 금융위원회_증권상품시세정보 | `getETFPriceInfo`, `getETNPriceInfo`, `getELWPriceInfo` | `daily_bar`, `instrument` |
-| `stockPrice` | `planned` | 금융위원회_주식시세정보 | `getStockPriceInfo` | `daily_bar`, `instrument` |
+| `stockPrice` | `core` | 금융위원회_주식시세정보 | `getStockPriceInfo` | `daily_bar`, `instrument` |
 
 config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에서 오버라이드한다.
+공공데이터포털 활용신청은 OpenAPI 서비스 단위이므로, 실제 인증 키는 group 별로 분리해서 관리한다.
+기존 `providers.datago.auth.service_key` 는 `securitiesProductPrice` 호환용 fallback 으로만 사용한다.
 
 ```json
 {
   "providers": {
     "datago": {
       "enabled": true,
-      "auth": {
-        "service_key": "..."
-      },
       "groups": {
         "securitiesProductPrice": {
-          "enabled": true
+          "enabled": true,
+          "auth": {
+            "service_key": "..."
+          }
         },
         "stockPrice": {
-          "enabled": false
+          "enabled": true,
+          "auth": {
+            "service_key": "..."
+          }
         }
       }
     }
   }
 }
 ```
+
+한 group 의 key 만 설정하면 해당 group 의 role 만 provider registry 에 등록한다.
+예를 들어 `stockPrice` key 만 있으면 `stock` daily/instrument 는 등록되지만 ETF/ETN/ELW role 은 등록하지 않는다.
 
 ## `securitiesProductPrice` API 표면
 
@@ -121,6 +133,21 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 
 즉, 이 group 은 단건 `quote` API 라기보다 **검색 가능한 일별 시세 목록 API** 에 가깝다.
 
+## `stockPrice` API 표면
+
+OpenAPI 스펙 기준으로 노출된 operation 은 1개다.
+
+- `GET /getStockPriceInfo`
+
+이 operation 은 다음 성격을 가진다.
+
+- `basDt`, `beginBasDt`, `endBasDt` 기준 조회 가능
+- `likeSrtnCd`, `isinCd`, `itmsNm`, `mrktCls` 기반 검색 가능
+- 등락률, 거래량, 거래대금, 상장주식수, 시가총액 조건 검색 가능
+- 결과는 페이지네이션과 조건 검색을 지원
+- 본문은 `body.items.item` 배열 또는 단건 객체로 내려올 수 있음
+- 최신 사용 가능 `basDt` 는 일반적으로 오늘이 아니라 D-1 영업일이다.
+
 ## 데이터 호환성
 
 `securitiesProductPrice` group 의 provider compatibility 는 다음처럼 본다.
@@ -135,9 +162,11 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 데이터 공개 지연 특성으로 취급한다. 오늘 투자 판단에 필요한 current price provider 와는 별도로
 다뤄야 한다.
 
+`stockPrice` group 도 같은 공개 지연 특성을 가진다.
+
 ## v1 지원 범위
 
-`datago` provider 의 초기 지원 범위는 `securitiesProductPrice` group 기준으로 다음과 같다.
+`datago` provider 의 초기 지원 범위는 `securitiesProductPrice` 와 `stockPrice` group 기준으로 다음과 같다.
 
 - `daily_bar`
 - `instrument`
@@ -153,7 +182,7 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 
 ## Canonical endpoint 매핑
 
-아래 매핑은 `securitiesProductPrice` group 기준이다.
+아래 매핑은 `securitiesProductPrice` 와 `stockPrice` group 기준이다.
 
 ### ETF
 
@@ -186,6 +215,14 @@ OpenAPI 스펙 기준으로 노출된 operation 은 3개다.
 - `datago` 를 ELW 까지 공식 지원하려면 canonical `security_type` enum 에 `elw` 를 추가하는 후속 결정이 필요하다.
 - 그 결정 전까지는 구현 범위를 ETF, ETN 우선으로 제한하는 편이 안전하다.
 
+### Stock
+
+- source operation: `getStockPriceInfo`
+- canonical security type: `stock`
+- canonical record:
+  - `daily_bar`
+  - `instrument`
+
 ## 요청 모델
 
 provider adapter 는 public CLI 요청을 내부적으로 OpenAPI query 로 변환한다.
@@ -217,7 +254,7 @@ backfill daily --market krx --security-type etf --from <YYYYMMDD> --to <YYYYMMDD
 - `ensure daily <security_code>` 는 필요한 날짜가 없으면 해당 날짜의 batch 를 먼저 수집한 뒤 저장소에서 `security_code` 를 조회한다.
 - `resultType=json`
 - page-level client 는 `numOfRows`, `pageNo`, `totalCount` 를 노출한다. `sync/backfill/ensure` 의 batch 수집은 all-page helper 를 사용해 남은 page 를 끝까지 순회하고, `--workers` 는 `backfill` 의 remaining page fetch 병렬도다.
-- `provider=datago`, `provider_group=securitiesProductPrice`, 실제 operation 을 provenance 로 남긴다.
+- `provider=datago`, 실제 group(`securitiesProductPrice` 또는 `stockPrice`), 실제 operation 을 provenance 로 남긴다.
 - 최신 데이터 요청은 오늘이 아니라 latest available basDt, 즉 보통 D-1 영업일 기준으로 해석한다.
 
 주의:
@@ -225,7 +262,7 @@ backfill daily --market krx --security-type etf --from <YYYYMMDD> --to <YYYYMMDD
 - 이 API 는 단건 ticker endpoint 보다 날짜별 batch endpoint 로 쓰는 편이 효율적이다.
 - 현재 거래일 데이터는 제공되지 않을 수 있으므로 realtime/current-day provider 로 사용하지 않는다.
 - `get daily` 는 조회 명령이므로 데이터가 없을 때 빈 성공을 반환하지 않는다.
-- ETF/ETN 은 기본 지원 대상으로 두고, ELW 는 `--security-type elw` 처럼 명시적으로 다룬다.
+- stock/ETF/ETN 은 기본 지원 대상으로 두고, ELW 는 `--security-type elw` 처럼 명시적으로 다룬다.
 
 ### `search instrument`
 
@@ -307,7 +344,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 - `market = "krx"`
 - `provider = "datago"`
-- `provider_group = "securitiesProductPrice"`
+- `provider_group = "securitiesProductPrice"` 또는 `"stockPrice"`
 - `currency_code = "KRW"`
 - `market_session = "regular"`
 - `price_adjustment_type = "raw"`
@@ -328,7 +365,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 - `security_key = krx:<security_code>`
 - `canonical_record_key = instrument:krx:<security_code>:current`
-- `security_type` 는 operation 에 따라 `etf`, `etn`, `elw`
+- `security_type` 는 operation 에 따라 `stock`, `etf`, `etn`, `elw`
 - `market_segment` 는 operation category 와 동일하게 둔다
 - `country_code = "KR"`
 - `timezone = "Asia/Seoul"`
@@ -388,7 +425,7 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 - `daily_bar` 는 `datago` 또는 `kis` 중 가능한 provider 선택
 - `quote_snapshot` 는 `datago` 를 후보에서 제외
 - instrument search 는 `datago` 를 포함한 provider fan-out 가능
-- provenance 에는 `provider=datago`, `provider_group=securitiesProductPrice`, 실제 operation 을 함께 남김
+- provenance 에는 `provider=datago`, 실제 group, 실제 operation 을 함께 남김
 
 ## 오류 및 edge case
 
@@ -402,11 +439,11 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 ## 구현 체크포인트
 
-이 provider 문서를 기준으로 다음 구현을 진행한다.
+이 provider 문서를 기준으로 다음 구현을 관리한다.
 
-1. provider client module `clients/datago-etp` 생성
+1. provider client module `clients/datago-etp`, `clients/datago-stock-price` 관리
 2. client module 내부 provider group / operation registry 작성
-3. `securitiesProductPrice` OpenAPI query builder 작성
+3. `securitiesProductPrice`, `stockPrice` OpenAPI query builder 작성
 4. client module 내부 item normalization 구현
 5. Go CLI adapter `providers/datago` 추가
 6. `daily_bar` 와 `instrument` upsert 구현
