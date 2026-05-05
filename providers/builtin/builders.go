@@ -8,5 +8,6 @@ import (
 func Builders() []provider.ProviderBuilder {
 	return []provider.ProviderBuilder{
 		datago.NewBuilder(),
+		datago.NewCorporateFinanceBuilder(),
 	}
 }

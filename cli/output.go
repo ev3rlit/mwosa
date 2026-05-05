@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/service/daily"
 	"github.com/jszwec/csvutil"
 	"github.com/olekukonko/tablewriter"
@@ -123,6 +124,31 @@ func writeCollectResult(w io.Writer, output OutputMode, result daily.CollectResu
 	}
 }
 
+func writeFinancialStatements(w io.Writer, output OutputMode, statements []financials.Statement) error {
+	errb := oops.In("cli_output").With("format", output)
+
+	switch output {
+	case "", OutputModeTable:
+		return writeFinancialStatementsTable(w, statements)
+	case OutputModeJSON:
+		encoder := json.NewEncoder(w)
+		encoder.SetIndent("", "  ")
+		return errb.With("rows", len(statements)).Wrap(encoder.Encode(statements))
+	case OutputModeNDJSON:
+		encoder := json.NewEncoder(w)
+		for _, statement := range statements {
+			if err := encoder.Encode(statement); err != nil {
+				return errb.With("symbol", statement.Symbol, "statement", statement.Statement).Wrapf(err, "write financial statement ndjson")
+			}
+		}
+		return nil
+	case OutputModeCSV:
+		return writeCSV(w, flattenFinancialStatementLines(statements))
+	default:
+		return errb.Errorf("unsupported output format: %s", output)
+	}
+}
+
 func writeTable(w io.Writer, header []string, rows [][]string) error {
 	errb := oops.In("cli_output").With("columns", len(header), "rows", len(rows))
 	table := tablewriter.NewTable(w,
@@ -179,4 +205,65 @@ func writeCollectResultTable(w io.Writer, result daily.CollectResult) error {
 			fmt.Sprint(result.RowsAffected),
 		}},
 	)
+}
+
+func writeFinancialStatementsTable(w io.Writer, statements []financials.Statement) error {
+	rows := make([][]string, 0)
+	for _, statement := range statements {
+		for _, line := range statement.Lines {
+			rows = append(rows, []string{
+				string(statement.Statement),
+				statement.FiscalYear,
+				string(statement.Period),
+				line.AccountName,
+				line.Value,
+				firstNonEmpty(line.Currency, statement.Currency),
+				firstNonEmpty(line.Unit, statement.Unit),
+			})
+		}
+	}
+	return writeTable(w, []string{"statement", "year", "period", "account", "value", "currency", "unit"}, rows)
+}
+
+type financialStatementLineRow struct {
+	Statement    financials.StatementType `csv:"statement"`
+	Symbol       string                   `csv:"symbol"`
+	FiscalYear   string                   `csv:"fiscal_year"`
+	FiscalPeriod string                   `csv:"fiscal_period"`
+	Period       financials.PeriodType    `csv:"period"`
+	AccountID    string                   `csv:"account_id"`
+	AccountName  string                   `csv:"account_name"`
+	Value        string                   `csv:"value"`
+	Currency     string                   `csv:"currency"`
+	Unit         string                   `csv:"unit"`
+}
+
+func flattenFinancialStatementLines(statements []financials.Statement) []financialStatementLineRow {
+	rows := make([]financialStatementLineRow, 0)
+	for _, statement := range statements {
+		for _, line := range statement.Lines {
+			rows = append(rows, financialStatementLineRow{
+				Statement:    statement.Statement,
+				Symbol:       statement.Symbol,
+				FiscalYear:   statement.FiscalYear,
+				FiscalPeriod: statement.FiscalPeriod,
+				Period:       statement.Period,
+				AccountID:    line.AccountID,
+				AccountName:  line.AccountName,
+				Value:        line.Value,
+				Currency:     firstNonEmpty(line.Currency, statement.Currency),
+				Unit:         firstNonEmpty(line.Unit, statement.Unit),
+			})
+		}
+	}
+	return rows
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

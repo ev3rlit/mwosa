@@ -122,9 +122,26 @@ func completeMarkets(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion
 
 func completeSecurityTypes(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
 	return []cobra.Completion{
+		cobra.CompletionWithDesc(string(provider.SecurityTypeStock), "Stock"),
 		cobra.CompletionWithDesc(string(provider.SecurityTypeETF), "Exchange-traded fund"),
 		cobra.CompletionWithDesc(string(provider.SecurityTypeETN), "Exchange-traded note"),
 		cobra.CompletionWithDesc(string(provider.SecurityTypeELW), "Equity-linked warrant"),
+	}, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeFinancialPeriods(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	return []cobra.Completion{
+		cobra.CompletionWithDesc("annual", "Annual financial statements"),
+		cobra.CompletionWithDesc("quarter", "Quarterly financial statements"),
+	}, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeFinancialStatementTypes(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	return []cobra.Completion{
+		cobra.CompletionWithDesc("summary", "Summary financial statement"),
+		cobra.CompletionWithDesc("income_statement", "Income statement"),
+		cobra.CompletionWithDesc("balance_sheet", "Balance sheet"),
+		cobra.CompletionWithDesc("cash_flow", "Cash flow statement"),
 	}, cobra.ShellCompDirectiveNoFileComp
 }
 

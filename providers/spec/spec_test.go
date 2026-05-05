@@ -7,6 +7,7 @@ import (
 
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
 )
 
@@ -97,6 +98,36 @@ func TestPreviousBusinessDayInstrumentSearchBuildsExecutableRole(t *testing.T) {
 	result, err := role.SearchInstruments(context.Background(), instrument.SearchInput{})
 	if err != nil {
 		t.Fatalf("search instruments: %v", err)
+	}
+	if result.TotalCount != 1 {
+		t.Fatalf("total count = %d, want 1", result.TotalCount)
+	}
+}
+
+func TestHistoricalFinancialsBuildsExecutableRole(t *testing.T) {
+	role, err := HistoricalFinancials(func(context.Context, financials.FetchInput) (financials.FetchResult, error) {
+		return financials.FetchResult{TotalCount: 1}, nil
+	}).
+		Markets(provider.MarketKRX).
+		SecurityTypes(provider.SecurityTypeStock).
+		Group(provider.GroupID("dartFinancialStatements")).
+		Operations(provider.OperationID("getFinancialStatements")).
+		RequiresAuth(provider.CredentialScope("dart")).
+		Build()
+	if err != nil {
+		t.Fatalf("build role: %v", err)
+	}
+
+	profile := role.FinancialsProfile()
+	if profile.RoleProfile().Role != provider.RoleFinancials {
+		t.Fatalf("role = %s, want %s", profile.RoleProfile().Role, provider.RoleFinancials)
+	}
+	if profile.Freshness != provider.FreshnessFiling {
+		t.Fatalf("freshness = %s, want %s", profile.Freshness, provider.FreshnessFiling)
+	}
+	result, err := role.FetchFinancialStatements(context.Background(), financials.FetchInput{})
+	if err != nil {
+		t.Fatalf("fetch financials: %v", err)
 	}
 	if result.TotalCount != 1 {
 		t.Fatalf("total count = %d, want 1", result.TotalCount)

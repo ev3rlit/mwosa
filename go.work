@@ -2,5 +2,7 @@ go 1.25.6
 
 use (
 	.
+	./clients/datago-corpfin
 	./clients/datago-etp
+	./clients/datago-krxlisted
 )
