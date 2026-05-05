@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/ev3rlit/mwosa/app/handler"
 	strategyservice "github.com/ev3rlit/mwosa/service/strategy"
 	"github.com/spf13/cobra"
 )
@@ -23,28 +24,24 @@ func newCreateStrategyCommand(opts *Options) *cobra.Command {
 		Use:   "strategy <name>",
 		Short: "Create a saved screening strategy",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			queryText, err := resolveJQSource(flags)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.Create(cmd.Context(), strategyservice.CreateStrategyRequest{
+			return runtime.Handlers.Strategy.Create(cmd.Context(), handler.CreateStrategyRequest{
 				Name:         args[0],
 				Engine:       strategyservice.Engine(flags.Engine),
 				InputDataset: flags.Input,
 				QueryText:    queryText,
 			})
-			if err != nil {
-				return err
-			}
-			return writeStrategyDetail(cmd.OutOrStdout(), opts.Output, result)
-		},
+		}),
 	}
 	addStrategySourceFlags(cmd, &flags, true)
 	return cmd
@@ -55,19 +52,15 @@ func newListStrategiesCommand(opts *Options) *cobra.Command {
 		Use:   "strategies",
 		Short: "List saved screening strategies",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, _ []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.List(cmd.Context())
-			if err != nil {
-				return err
-			}
-			return writeStrategyList(cmd.OutOrStdout(), opts.Output, result)
-		},
+			return runtime.Handlers.Strategy.List(cmd.Context(), handler.ListStrategiesRequest{})
+		}),
 	}
 }
 
@@ -77,26 +70,22 @@ func newUpdateStrategyCommand(opts *Options) *cobra.Command {
 		Use:   "strategy <name>",
 		Short: "Create a new version of a saved screening strategy",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			queryText, err := resolveJQSource(flags)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.Update(cmd.Context(), strategyservice.UpdateStrategyRequest{
+			return runtime.Handlers.Strategy.Update(cmd.Context(), handler.UpdateStrategyRequest{
 				Name:      args[0],
 				QueryText: queryText,
 			})
-			if err != nil {
-				return err
-			}
-			return writeStrategyDetail(cmd.OutOrStdout(), opts.Output, result)
-		},
+		}),
 	}
 	addJQFlags(cmd, &flags)
 	return cmd
@@ -107,18 +96,15 @@ func newDeleteStrategyCommand(opts *Options) *cobra.Command {
 		Use:   "strategy <name>",
 		Short: "Soft delete a saved screening strategy",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			if err := runtime.Services.Strategy.Delete(cmd.Context(), args[0]); err != nil {
-				return err
-			}
-			return writeDeleteStrategyResult(cmd.OutOrStdout(), opts.Output, deleteStrategyResult{Name: args[0], Deleted: true})
-		},
+			return runtime.Handlers.Strategy.Delete(cmd.Context(), handler.DeleteStrategyRequest{Name: args[0]})
+		}),
 	}
 }
 
@@ -129,26 +115,22 @@ func newScreenETFCommand(opts *Options) *cobra.Command {
 		Aliases: []string{"etfs"},
 		Short:   "Run an inline jq screen against stored ETF daily records",
 		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, _ []string) (result any, err error) {
 			queryText, err := resolveJQSource(flags)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.ScreenJQ(cmd.Context(), strategyservice.ScreenJQRequest{
+			return runtime.Handlers.Strategy.ScreenJQ(cmd.Context(), handler.ScreenJQRequest{
 				InputDataset: flags.Input,
 				QueryText:    queryText,
 			})
-			if err != nil {
-				return err
-			}
-			return writeScreenResult(cmd.OutOrStdout(), opts.Output, result)
-		},
+		}),
 	}
 	cmd.Flags().StringVar(&flags.Input, "input", flags.Input, "input dataset name")
 	addJQFlags(cmd, &flags)
@@ -161,22 +143,18 @@ func newScreenStrategyCommand(opts *Options) *cobra.Command {
 		Use:   "strategy <name>",
 		Short: "Run a saved screening strategy",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.Screen(cmd.Context(), strategyservice.ScreenStrategyRequest{
+			return runtime.Handlers.Strategy.Screen(cmd.Context(), handler.ScreenStrategyRequest{
 				Name:  args[0],
 				Alias: flags.Alias,
 			})
-			if err != nil {
-				return err
-			}
-			return writeScreenRunDetail(cmd.OutOrStdout(), opts.Output, result)
-		},
+		}),
 	}
 	cmd.Flags().StringVar(&flags.Alias, "alias", flags.Alias, "optional screen run alias")
 	return cmd
@@ -188,19 +166,15 @@ func newHistoryScreenCommand(opts *Options) *cobra.Command {
 		Use:   "screen",
 		Short: "List saved screening runs",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, _ []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.History(cmd.Context(), flags.History)
-			if err != nil {
-				return err
-			}
-			return writeScreenRunHistory(cmd.OutOrStdout(), opts.Output, result)
-		},
+			return runtime.Handlers.Strategy.History(cmd.Context(), handler.ScreenHistoryRequest{Limit: flags.History})
+		}),
 	}
 	cmd.Flags().IntVar(&flags.History, "limit", flags.History, "maximum number of screen runs to list")
 	return cmd
@@ -211,19 +185,15 @@ func newInspectStrategyCommand(opts *Options) *cobra.Command {
 		Use:   "strategy <name>",
 		Short: "Inspect a saved screening strategy",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.Inspect(cmd.Context(), args[0])
-			if err != nil {
-				return err
-			}
-			return writeStrategyDetail(cmd.OutOrStdout(), opts.Output, result)
-		},
+			return runtime.Handlers.Strategy.Inspect(cmd.Context(), handler.InspectStrategyRequest{Name: args[0]})
+		}),
 	}
 }
 
@@ -232,18 +202,14 @@ func newInspectScreenCommand(opts *Options) *cobra.Command {
 		Use:   "screen <screen-id-or-alias>",
 		Short: "Inspect a saved screening run",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Strategy.InspectScreen(cmd.Context(), args[0])
-			if err != nil {
-				return err
-			}
-			return writeScreenRunDetail(cmd.OutOrStdout(), opts.Output, result)
-		},
+			return runtime.Handlers.Strategy.InspectScreen(cmd.Context(), handler.InspectScreenRequest{Ref: args[0]})
+		}),
 	}
 }

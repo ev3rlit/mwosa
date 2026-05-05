@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 
 	appconfig "github.com/ev3rlit/mwosa/app/config"
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -77,26 +75,26 @@ func newConfigSetCommand(opts *Options) *cobra.Command {
 		Use:   "set <path> <value>",
 		Short: "Set a config value",
 		Args:  cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			resolved, err := appconfig.SetValue(appconfig.Options{
 				ConfigPath:       opts.Config,
 				Market:           opts.Market,
 				ProviderDefaults: providerDefaults(),
 			}, args[0], args[1])
 			if err != nil {
-				return oops.In("cli").Wrapf(err, "set config")
+				return nil, oops.In("cli").Wrapf(err, "set config")
 			}
 			opts.Config = resolved.ConfigPath
 			opts.Database = resolved.DatabasePath
 			opts.ProviderConfig = resolved.ProviderConfig
 			opts.ConfigState = resolved
 			opts.configLoaded = true
-			return writeConfigOutput(cmd.OutOrStdout(), configSetResult{
+			return configSetResult{
 				ConfigFile: resolved.ConfigPath,
 				Setting:    args[0],
 				Value:      maskedConfigSetValue(args[0], args[1]),
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -105,12 +103,12 @@ func newInspectConfigCommand(opts *Options) *cobra.Command {
 		Use:   "config",
 		Short: "Inspect resolved config and data paths",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, _ []string) (any, error) {
 			if err := loadConfig(opts); err != nil {
-				return err
+				return nil, err
 			}
-			return writeConfigOutput(cmd.OutOrStdout(), configInspectFromResolved(opts.ConfigState))
-		},
+			return configInspectFromResolved(opts.ConfigState), nil
+		}),
 	}
 }
 
@@ -172,17 +170,6 @@ func providerInspectFromConfig(config provider.Config) providerInspectItem {
 		}
 	}
 	return item
-}
-
-func writeConfigOutput(w io.Writer, result any) error {
-	data, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return oops.In("cli_output").Wrapf(err, "marshal config output")
-	}
-	if _, err := w.Write(append(data, '\n')); err != nil {
-		return oops.In("cli_output").Wrapf(err, "write config output")
-	}
-	return nil
 }
 
 func maskedConfigSetValue(path string, value string) string {
