@@ -113,6 +113,36 @@ func TestRegistrySkipsDataGoWhenConfigDisablesProvider(t *testing.T) {
 	}
 }
 
+func TestRegistrySkipsDataGoWhenSecuritiesProductPriceGroupDisabled(t *testing.T) {
+	registry := provider.NewRegistry()
+	err := registry.RegisterConfigured(provider.RegisterOptions{}, provider.Config{
+		"providers": map[string]any{
+			"datago": map[string]any{
+				"auth": map[string]any{
+					"service_key": "test-key",
+				},
+				"groups": map[string]any{
+					"securitiesProductPrice": map[string]any{
+						"enabled": false,
+					},
+				},
+			},
+		},
+	}, datago.NewBuilder())
+	if err != nil {
+		t.Fatalf("RegisterConfigured error = %v", err)
+	}
+
+	_, err = dailybar.NewRouter(provider.NewRouter(registry)).RouteDailyBars(context.Background(), dailybar.RouteInput{
+		ProviderID:   provider.ProviderDataGo,
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeETF,
+	})
+	if !provider.IsNoProvider(err) {
+		t.Fatalf("RouteDailyBars error = %v, want ErrNoProvider", err)
+	}
+}
+
 func TestRegistryRegistersDataGoWhenProviderRequestedAndEnvConfigPresent(t *testing.T) {
 	registry := provider.NewRegistry()
 	err := registry.RegisterConfigured(provider.RegisterOptions{

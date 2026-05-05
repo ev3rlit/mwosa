@@ -53,7 +53,7 @@
 - JSON/XML 응답 파싱 정책
 - `item` 단건/배열 shape 처리
 - provider-native error model
-- provider group 별 operation dispatch
+- provider group별 operation dispatch
 - request builder, parser, error mapping 단위 테스트
 
 ### CLI 안 provider adapter 에 둘 것
@@ -83,6 +83,21 @@ group 은 다음 기준으로 나눈다.
 | --- | --- | --- | --- | --- |
 | `securitiesProductPrice` | `core` | 금융위원회_증권상품시세정보 | `getETFPriceInfo`, `getETNPriceInfo`, `getELWPriceInfo` | `daily_bar`, `instrument` |
 | `stockPrice` | `core` | 금융위원회_주식시세정보 | `getStockPriceInfo` | `daily_bar`, `instrument` |
+| `krxListedInstrument` | `planned` | KRX상장종목정보 | 미정 | `instrument` |
+| `corporateFinancial` | `planned` | 기업 재무 정보 | 미정 | `fundamentals`, `financials` |
+
+`corporateFinancial` group 은 기업 재무 정보를 조회할 때 `crno` 같은 등록번호를
+요구할 수 있다. 이 경우 의존성은 `krxListedInstrument` group 자체가 아니라
+canonical instrument store 에 저장된 `crno` 데이터다. `krxListedInstrument` group
+은 KRX 상장 기업 목록과 `crno` 를 저장소에 채우는 source 중 하나로 둔다.
+
+즉, group 간 강한 의존성보다 데이터 의존성으로 본다. `crno` 를 확보할 수 있으면
+기업 재무 정보와 매출 정보를 표시하고, 확보할 수 없으면 해당 데이터만 비활성 또는
+unavailable 상태로 설명한다.
+
+이 의존성은 더 좁게 보면 field 의존성이다. 기업 재무 정보는 canonical
+`instrument` record 전체가 아니라 `instrument.crno` field 를 요구한다.
+`krxListedInstrument` group 은 이 field 를 채울 수 있는 source 중 하나다.
 
 config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에서 오버라이드한다.
 공공데이터포털 활용신청은 OpenAPI 서비스 단위이므로, 실제 인증 키는 group 별로 분리해서 관리한다.
@@ -105,6 +120,12 @@ config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에
           "auth": {
             "service_key": "..."
           }
+        },
+        "krxListedInstrument": {
+          "enabled": false
+        },
+        "corporateFinancial": {
+          "enabled": false
         }
       }
     }
@@ -441,6 +462,9 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 
 이 provider 문서를 기준으로 다음 구현을 관리한다.
 
+OpenAPI 활용신청 단위가 늘어나는 구조 결정은
+`docs/architectures/provider/group-role-registration-patterns.md` 를 함께 본다.
+
 1. provider client module `clients/datago-etp`, `clients/datago-stock-price` 관리
 2. client module 내부 provider group / operation registry 작성
 3. `securitiesProductPrice`, `stockPrice` OpenAPI query builder 작성
@@ -450,3 +474,4 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 7. provider group 과 operation provenance 저장 위치 결정
 8. provider extension metadata 저장 위치 결정
 9. KIS provider 와 함께 registry 우선순위 정책 연결
+10. `corporateFinancial` 의 `crno` 데이터 의존성과 canonical instrument 저장 흐름 결정

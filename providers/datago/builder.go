@@ -104,6 +104,14 @@ func (Builder) ConfigSpec() provider.ConfigSpec {
 				Description: "override datago stockPrice API base URL",
 				Env:         []string{stockBaseURLEnv},
 			},
+			{
+				Path:        "groups.securitiesProductPrice.enabled",
+				Description: "enable datago securitiesProductPrice group",
+			},
+			{
+				Path:        "groups.stockPrice.enabled",
+				Description: "enable datago stockPrice group",
+			},
 		},
 	}
 }
@@ -120,6 +128,12 @@ func (Builder) Decide(opts provider.RegisterOptions, config provider.Config) pro
 		return provider.RegistrationDecision{
 			Register: false,
 			Reason:   "another provider is forced",
+		}
+	}
+	if !anyGroupEnabledFromConfig(config) {
+		return provider.RegistrationDecision{
+			Register: false,
+			Reason:   "datago groups disabled",
 		}
 	}
 	if hasAnyGroupServiceKey(config) {
@@ -248,6 +262,11 @@ func enabledFromConfig(config provider.Config) bool {
 func groupEnabledFromConfig(config provider.Config, group provider.GroupID) bool {
 	enabled, ok := config.Bool("providers", "datago", "groups", string(group), "enabled")
 	return !ok || enabled
+}
+
+func anyGroupEnabledFromConfig(config provider.Config) bool {
+	return groupEnabledFromConfig(config, provider.GroupSecuritiesProductPrice) ||
+		groupEnabledFromConfig(config, provider.GroupStockPrice)
 }
 
 func requestsDataGo(opts provider.RegisterOptions) bool {

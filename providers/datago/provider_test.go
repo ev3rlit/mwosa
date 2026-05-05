@@ -419,6 +419,41 @@ func TestRouterReportsUnsupportedQuotePath(t *testing.T) {
 	}
 }
 
+func TestProviderRegistersGroupRoleEntries(t *testing.T) {
+	p := newTestProvider(t, "http://example.invalid")
+	registrations := p.RoleRegistrations()
+	if len(registrations) != 4 {
+		t.Fatalf("registrations len = %d, want 4", len(registrations))
+	}
+
+	roles := make(map[provider.GroupID]map[provider.Role]bool)
+	for _, registration := range registrations {
+		group := registration.Profile.Group
+		if roles[group] == nil {
+			roles[group] = map[provider.Role]bool{}
+		}
+		roles[group][registration.Profile.Role] = true
+	}
+	for _, group := range []provider.GroupID{provider.GroupSecuritiesProductPrice, provider.GroupStockPrice} {
+		for _, role := range []provider.Role{provider.RoleDailyBar, provider.RoleInstrument} {
+			if !roles[group][role] {
+				t.Fatalf("group %s missing role %s in registrations: %+v", group, role, registrations)
+			}
+		}
+	}
+
+	registry := provider.NewRegistry()
+	if err := Register(registry, p); err != nil {
+		t.Fatalf("register datago provider: %v", err)
+	}
+	if len(registry.Entries(provider.RoleDailyBar)) != 2 {
+		t.Fatalf("dailybar entries len = %d, want 2", len(registry.Entries(provider.RoleDailyBar)))
+	}
+	if len(registry.Entries(provider.RoleInstrument)) != 2 {
+		t.Fatalf("instrument entries len = %d, want 2", len(registry.Entries(provider.RoleInstrument)))
+	}
+}
+
 func newTestProvider(t *testing.T, baseURL string) *Provider {
 	t.Helper()
 	p, err := New(Config{

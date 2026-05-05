@@ -76,15 +76,15 @@ func newListProvidersCommand(opts *Options) *cobra.Command {
 		Use:   "providers",
 		Short: "List configured and available providers",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, _ []string) (any, error) {
 			if err := loadConfig(opts); err != nil {
-				return err
+				return nil, err
 			}
-			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+			return providerDoctorResult{
 				ConfigFile: opts.ConfigState.ConfigPath,
 				Providers:  doctorProviders(builtin.Builders(), opts.ProviderConfig),
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -94,19 +94,19 @@ func newInspectProviderCommand(opts *Options) *cobra.Command {
 		Short:             "Inspect provider configuration and readiness",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeProviderIDs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			if err := loadConfig(opts); err != nil {
-				return err
+				return nil, err
 			}
 			builder, err := providerBuilder(provider.ProviderID(args[0]))
 			if err != nil {
-				return err
+				return nil, err
 			}
-			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+			return providerDoctorResult{
 				ConfigFile: opts.ConfigState.ConfigPath,
 				Providers:  []providerDoctorProvider{doctorProvider(builder, opts.ProviderConfig)},
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -128,20 +128,25 @@ func newLoginProviderIDCommand(opts *Options, builder provider.ProviderBuilder) 
 		Use:   string(builder.ID()),
 		Short: fmt.Sprintf("Register %s provider credentials", builder.ID()),
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, _ []string) (any, error) {
 			updates := map[string]string{
 				providerSettingPath(builder.ID(), "enabled"): "true",
 			}
 			fields := make([]providerLoginFieldResult, 0, len(spec.Fields))
 			for _, field := range spec.Fields {
-				rawValue := strings.TrimSpace(*values[field.Path])
-				flagChanged := cmd.Flags().Changed(field.Flag)
+				value, hasFlag := values[field.Path]
+				rawValue := ""
+				flagChanged := false
+				if hasFlag {
+					rawValue = strings.TrimSpace(*value)
+					flagChanged = cmd.Flags().Changed(field.Flag)
+				}
 				if field.Required && rawValue == "" {
-					return oops.In("cli").
+					return nil, oops.In("cli").
 						With("provider", builder.ID(), "setting", field.Path, "flag", field.Flag).
 						Errorf("provider %s requires --%s", builder.ID(), field.Flag)
 				}
-				if rawValue != "" || flagChanged {
+				if hasFlag && (rawValue != "" || flagChanged) {
 					updates[providerSettingPath(builder.ID(), field.Path)] = rawValue
 				}
 				fields = append(fields, providerLoginFieldResult{
@@ -156,19 +161,22 @@ func newLoginProviderIDCommand(opts *Options, builder provider.ProviderBuilder) 
 				ProviderDefaults: providerDefaults(),
 			}, updates)
 			if err != nil {
-				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "login provider")
+				return nil, oops.In("cli").With("provider", builder.ID()).Wrapf(err, "login provider")
 			}
 			applyResolvedConfig(opts, resolved)
-			return writeConfigOutput(cmd.OutOrStdout(), providerLoginResult{
+			return providerLoginResult{
 				ConfigFile: resolved.ConfigPath,
 				Provider:   string(builder.ID()),
 				Enabled:    true,
 				Fields:     fields,
-			})
-		},
+			}, nil
+		}),
 	}
 	for _, field := range spec.Fields {
 		field := field
+		if field.Flag == "" {
+			continue
+		}
 		values[field.Path] = new(string)
 		cmd.Flags().StringVar(values[field.Path], field.Flag, "", field.Description)
 	}
@@ -181,10 +189,10 @@ func newLogoutProviderCommand(opts *Options) *cobra.Command {
 		Short:             "Remove provider credentials",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeProviderIDs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			builder, err := providerBuilder(provider.ProviderID(args[0]))
 			if err != nil {
-				return err
+				return nil, err
 			}
 			updates := map[string]string{}
 			for _, field := range builder.ConfigSpec().Fields {
@@ -198,15 +206,15 @@ func newLogoutProviderCommand(opts *Options) *cobra.Command {
 				ProviderDefaults: providerDefaults(),
 			}, updates)
 			if err != nil {
-				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "logout provider")
+				return nil, oops.In("cli").With("provider", builder.ID()).Wrapf(err, "logout provider")
 			}
 			applyResolvedConfig(opts, resolved)
-			return writeConfigOutput(cmd.OutOrStdout(), providerActionResult{
+			return providerActionResult{
 				ConfigFile: resolved.ConfigPath,
 				Provider:   string(builder.ID()),
 				Action:     "logout",
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -216,23 +224,23 @@ func newValidateProviderCommand(opts *Options) *cobra.Command {
 		Short:             "Validate provider configuration",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeProviderIDs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			if err := loadConfig(opts); err != nil {
-				return err
+				return nil, err
 			}
 			builders := builtin.Builders()
 			if len(args) == 1 {
 				builder, err := providerBuilder(provider.ProviderID(args[0]))
 				if err != nil {
-					return err
+					return nil, err
 				}
 				builders = []provider.ProviderBuilder{builder}
 			}
-			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+			return providerDoctorResult{
 				ConfigFile: opts.ConfigState.ConfigPath,
 				Providers:  doctorProviders(builders, opts.ProviderConfig),
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -242,19 +250,19 @@ func newDoctorProviderCommand(opts *Options) *cobra.Command {
 		Short:             "Diagnose provider configuration and client construction",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeProviderIDs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			if err := loadConfig(opts); err != nil {
-				return err
+				return nil, err
 			}
 			builder, err := providerBuilder(provider.ProviderID(args[0]))
 			if err != nil {
-				return err
+				return nil, err
 			}
-			return writeConfigOutput(cmd.OutOrStdout(), providerDoctorResult{
+			return providerDoctorResult{
 				ConfigFile: opts.ConfigState.ConfigPath,
 				Providers:  []providerDoctorProvider{doctorProvider(builder, opts.ProviderConfig)},
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -272,10 +280,10 @@ func newProviderEnabledCommand(opts *Options, action string, short string, enabl
 		Short:             short,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeProviderIDs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			builder, err := providerBuilder(provider.ProviderID(args[0]))
 			if err != nil {
-				return err
+				return nil, err
 			}
 			resolved, err := appconfig.SetValue(appconfig.Options{
 				ConfigPath:       opts.Config,
@@ -283,16 +291,16 @@ func newProviderEnabledCommand(opts *Options, action string, short string, enabl
 				ProviderDefaults: providerDefaults(),
 			}, providerSettingPath(builder.ID(), "enabled"), fmt.Sprint(enabled))
 			if err != nil {
-				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "%s provider", action)
+				return nil, oops.In("cli").With("provider", builder.ID()).Wrapf(err, "%s provider", action)
 			}
 			applyResolvedConfig(opts, resolved)
-			return writeConfigOutput(cmd.OutOrStdout(), providerActionResult{
+			return providerActionResult{
 				ConfigFile: resolved.ConfigPath,
 				Provider:   string(builder.ID()),
 				Action:     action,
 				Enabled:    &enabled,
-			})
-		},
+			}, nil
+		}),
 	}
 }
 
@@ -302,10 +310,10 @@ func newPreferProviderCommand(opts *Options) *cobra.Command {
 		Short:             "Prefer a provider when multiple providers match",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeProviderIDs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: runJSONResult(func(cmd *cobra.Command, args []string) (any, error) {
 			builder, err := providerBuilder(provider.ProviderID(args[0]))
 			if err != nil {
-				return err
+				return nil, err
 			}
 			resolved, err := appconfig.SetValue(appconfig.Options{
 				ConfigPath:       opts.Config,
@@ -313,16 +321,16 @@ func newPreferProviderCommand(opts *Options) *cobra.Command {
 				ProviderDefaults: providerDefaults(),
 			}, "app.preferred_provider", string(builder.ID()))
 			if err != nil {
-				return oops.In("cli").With("provider", builder.ID()).Wrapf(err, "prefer provider")
+				return nil, oops.In("cli").With("provider", builder.ID()).Wrapf(err, "prefer provider")
 			}
 			applyResolvedConfig(opts, resolved)
-			return writeConfigOutput(cmd.OutOrStdout(), providerActionResult{
+			return providerActionResult{
 				ConfigFile: resolved.ConfigPath,
 				Provider:   string(builder.ID()),
 				Action:     "prefer",
 				Preferred:  true,
-			})
-		},
+			}, nil
+		}),
 	}
 }
 

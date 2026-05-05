@@ -30,8 +30,13 @@ type RoleProvider interface {
 	RoleRegistration() RoleRegistration
 }
 
-type RoleRegistrationsProvider interface {
+type RoleRegistrationProvider interface {
 	RoleRegistrations() []RoleRegistration
+}
+
+type GroupRoleProvider interface {
+	RoleRegistrationProvider
+	ProviderGroup() GroupID
 }
 
 type RoleEntry struct {
@@ -63,7 +68,12 @@ func (r *Registry) RegisterProvider(provider IdentityProvider) error {
 		return errb.New("register provider: provider id is empty")
 	}
 
-	if registrationProvider, ok := provider.(RoleRegistrationsProvider); ok {
+	value = reflect.Indirect(value)
+	if !value.IsValid() || value.Kind() != reflect.Struct {
+		return errb.With("provider", identity.ID).New("register provider: provider must be a struct or struct pointer")
+	}
+
+	if registrationProvider, ok := provider.(RoleRegistrationProvider); ok {
 		registrations := registrationProvider.RoleRegistrations()
 		if len(registrations) == 0 {
 			return errb.With("provider", identity.ID).New("register provider: provider has no role registrations")
@@ -71,11 +81,19 @@ func (r *Registry) RegisterProvider(provider IdentityProvider) error {
 		return r.Register(provider, registrations...)
 	}
 
-	value = reflect.Indirect(value)
-	if !value.IsValid() || value.Kind() != reflect.Struct {
-		return errb.With("provider", identity.ID).New("register provider: provider must be a struct or struct pointer")
+	registrations, err := collectEmbeddedRoleRegistrations(value, identity)
+	if err != nil {
+		return err
+	}
+	if len(registrations) == 0 {
+		return errb.With("provider", identity.ID).New("register provider: provider has no role fields")
 	}
 
+	return r.Register(provider, registrations...)
+}
+
+func collectEmbeddedRoleRegistrations(value reflect.Value, identity Identity) ([]RoleRegistration, error) {
+	errb := oops.In("provider_registry")
 	roleProviderType := reflect.TypeOf((*RoleProvider)(nil)).Elem()
 	registrations := make([]RoleRegistration, 0)
 	for i := 0; i < value.NumField(); i++ {
@@ -94,19 +112,15 @@ func (r *Registry) RegisterProvider(provider IdentityProvider) error {
 			continue
 		}
 		if isNilReflectValue(field) {
-			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: embedded role field is nil")
+			return nil, errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: embedded role field is nil")
 		}
 		roleProvider, ok := field.Interface().(RoleProvider)
 		if !ok {
-			return errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: embedded role field does not implement RoleProvider")
+			return nil, errb.With("provider", identity.ID, "field", fieldInfo.Name).New("register provider: embedded role field does not implement RoleProvider")
 		}
 		registrations = append(registrations, roleProvider.RoleRegistration())
 	}
-	if len(registrations) == 0 {
-		return errb.With("provider", identity.ID).New("register provider: provider has no role fields")
-	}
-
-	return r.Register(provider, registrations...)
+	return registrations, nil
 }
 
 func (r *Registry) Register(provider IdentityProvider, roles ...RoleRegistration) error {
