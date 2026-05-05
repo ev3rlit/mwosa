@@ -443,7 +443,6 @@ presentation
 
 이 문서는 아직 뼈대만 둔다. 아래 항목은 이후 구현 대화에서 채운다.
 
-- `handler/cli` 를 처음부터 분리할지 여부
 - `presentation` 을 `format` 과 별도로 둘지 여부
 - middleware chain 의 구체적인 함수 signature
 - TTY abstraction interface
@@ -453,6 +452,7 @@ presentation
 
 ## 관련 문서
 
+- `docs/adr/0002-command-handler-renderer-separation.md`
 - `docs/architectures/provider/README.md`
 - `docs/architectures/tech-stack/README.md`
 - `docs/architectures/packages/README.md`
