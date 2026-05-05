@@ -91,6 +91,10 @@ canonical instrument store 에 저장된 `crno` 데이터다. `krxListedInstrume
 기업 재무 정보와 매출 정보를 표시하고, 확보할 수 없으면 해당 데이터만 비활성 또는
 unavailable 상태로 설명한다.
 
+이 의존성은 더 좁게 보면 field 의존성이다. 기업 재무 정보는 canonical
+`instrument` record 전체가 아니라 `instrument.crno` field 를 요구한다.
+`krxListedInstrument` group 은 이 field 를 채울 수 있는 source 중 하나다.
+
 config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에서 오버라이드한다.
 
 ```json

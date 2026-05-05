@@ -14,6 +14,8 @@ provider client 와 role registration 을 어떻게 구성할지 비교한다.
 이 문서는 구현 결정을 확정하는 ADR 이 아니라, 다음 구현 전에 선택지를 검토하기
 위한 설계 메모다.
 
+현재 채택된 결정은 `docs/adr/0003-provider-group-role-registration.md` 에 기록한다.
+
 ## 판단 기준
 
 비교할 때는 아래 기준을 우선한다.
@@ -69,6 +71,11 @@ service layer 는 `datago`, `securitiesProductPrice` 같은 구현 이름을 직
 `KRX상장종목정보` group 자체가 아니라 canonical instrument store 에 저장된 `crno`
 다. `KRX상장종목정보` group 은 종목코드와 `crno` 를 연결하는 데이터를 채우는
 source 중 하나로 본다.
+
+이때 의존성은 record 전체보다 더 작은 field 단위일 수 있다. 기업 재무 정보는
+`instrument` record 전체가 아니라 `instrument.crno` field 를 요구한다. 따라서
+종목명, 종목코드, ISIN 이 저장되어 있어도 `crno` field 가 비어 있으면 재무 정보만
+unavailable 로 설명해야 한다.
 
 따라서 기업 재무 정보 group 을 `KRX상장종목정보` group 에 강하게 묶기보다,
 `crno` 가 있으면 재무제표와 매출 정보를 조회하고 없으면 해당 데이터만
@@ -296,12 +303,14 @@ truth” 라는 단순 모델을 일부 확장해야 한다. 구현한다면 기
 
 ## 데이터 의존성 처리
 
-의존성은 provider runtime dependency 와 데이터 의존성으로 나눈다.
+의존성은 provider runtime dependency 와 데이터 의존성으로 나눈다. 데이터 의존성은
+다시 record 의존성과 field 의존성으로 나눠서 표현한다.
 
 | 종류 | 의미 | 예시 | 처리 방식 |
 | --- | --- | --- | --- |
 | provider runtime dependency | 대상 구성 요소가 없으면 client 자체를 만들 수 없다. | 공통 OAuth token issuer 가 반드시 필요한 API | build 단계에서 실패하거나 group 을 등록하지 않는다. |
-| 데이터 의존성 | role 실행에 특정 식별자나 저장 데이터가 필요하다. | 기업 재무 정보 조회에 필요한 `crno` | role 은 등록하되 실행 계획에서 빠진 데이터를 설명한다. |
+| record 의존성 | role 실행 전에 특정 canonical record 가 필요하다. | 특정 symbol 의 canonical `instrument` record | role 은 등록하되 실행 전에 repository 에서 record 를 찾는다. |
+| field 의존성 | role 실행 전에 canonical record 의 특정 field 가 필요하다. | 기업 재무 정보 조회에 필요한 `instrument.crno` | field 가 없으면 해당 데이터만 unavailable 로 설명한다. |
 
 Datago 의 기업 재무 정보는 provider dependency 가 아니라 데이터 의존성으로 본다.
 기업 재무 정보 OpenAPI 는 `crno` 를 요구할 수 있지만, `crno` 는 여러 경로에서 올 수
@@ -328,7 +337,8 @@ provider=datago
 group=corporateFinancial
 role=fundamentals
 status=unavailable
-reason=crno is required
+required_field=instrument.crno
+reason=required field is missing
 suggestion=sync KRX listed instruments or provide crno directly
 ```
 
@@ -342,6 +352,7 @@ suggestion=sync KRX listed instruments or provide crno directly
 - role 이 요구하는 입력 데이터: 예: `symbol`, `isin`, `crno`
 - role 이 직접 받을 수 있는 identifier
 - role 실행 전에 조회할 repository 데이터
+- role 실행 전에 필요한 canonical field: 예: `instrument.crno`
 - 데이터가 없을 때의 unavailable reason
 - `inspect provider` 에 표시할 required 데이터 관계
 

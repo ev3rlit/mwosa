@@ -617,5 +617,6 @@ instrument.Profile
 
 ## 관련 문서
 
+- `docs/adr/0003-provider-group-role-registration.md`
 - `docs/architectures/layers/README.md`
 - `docs/architectures/provider/group-role-registration-patterns.md`
