@@ -99,6 +99,27 @@ type Provider struct {
 
 embedded role field 만 봐도 provider 가 어떤 역할을 제공하는지 알 수 있다. 지원하지 않는 기능은 unsupported method 로 남기지 않고 role 을 임베딩하지 않는다.
 
+단일 provider 안에 여러 provider group 이 있고 같은 role 을 group 별로 여러 번
+등록해야 한다면 explicit role registration 을 사용한다. 이 경우 provider 는
+`RoleRegistrations()` 로 group 이 제공하는 role 후보를 반환하고, registry 는
+embedded role field reflection 보다 이 명시적 등록 목록을 우선한다.
+
+```go
+type Provider struct {
+	provider.Identity
+
+	groups []provider.GroupRoleProvider
+}
+
+func (p *Provider) RoleRegistrations() []provider.RoleRegistration {
+	// group별 role registration 을 모아서 반환한다.
+}
+```
+
+이 구조는 `datago` 처럼 `securitiesProductPrice`, `stockPrice`,
+`krxListedInstrument`, `corporateFinancial` 같은 group 이 독립적으로 늘어나는
+provider 에 사용한다. 기존 provider 의 embedded role field 방식은 계속 유지한다.
+
 ## Role Package
 
 provider 역할 interface, registry, router 는 `providers/core` 아래에 둔다. provider 별 adapter 도 같은 `providers` 아래에 두고, 폴더 이름은 provider 이름을 그대로 쓴다.
@@ -506,7 +527,7 @@ config 는 provider 전체 설정을 기본값으로 두고, 필요한 경우 gr
 }
 ```
 
-이 구조에서는 provider 이름에 `-` 나 `/` 를 붙여 하위 API 를 표현하지 않는다. `datago` 는 provider id 로 유지하고, 세부 API 범위는 `group` 필드로 표현한다.
+기본 구조에서는 provider 이름에 `-` 나 `/` 를 붙여 하위 API 를 표현하지 않는다. 다만 활용신청과 credential 이 사용자가 별도로 관리해야 할 단위라면 `datago-corpfin` 처럼 datago 계열 하위 provider 로 분리할 수 있다. 이 경우에도 원천 API 식별과 role registration 은 `corporateFinance` 같은 provider group 으로 유지한다.
 
 ## Unsupported 처리
 
@@ -596,4 +617,6 @@ instrument.Profile
 
 ## 관련 문서
 
+- `docs/adr/0003-provider-group-role-registration.md`
 - `docs/architectures/layers/README.md`
+- `docs/architectures/provider/group-role-registration-patterns.md`

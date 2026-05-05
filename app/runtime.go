@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/ev3rlit/mwosa/app/handler"
 	"github.com/ev3rlit/mwosa/providers/builtin"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
@@ -30,6 +31,7 @@ type Runtime struct {
 	Storage   StorageRuntime
 	Providers ProviderRuntime
 	Services  ServiceRuntime
+	Handlers  Handlers
 }
 
 type StorageRuntime struct {
@@ -57,6 +59,12 @@ type ServiceRuntime struct {
 	Financials financialsservice.Service
 	Providers  providerservice.Service
 	Strategy   strategyservice.Service
+}
+
+type Handlers struct {
+	Daily      handler.Daily
+	Financials handler.Financials
+	Strategy   handler.Strategy
 }
 
 type DailyServices struct {
@@ -150,6 +158,9 @@ func NewRuntimeWithProviderBuilders(opts Options, builders ...provider.ProviderB
 			database.Close(),
 		)
 	}
+	dailyHandler := handler.NewDaily(dailyReader, dailyCollector)
+	financialsHandler := handler.NewFinancials(financialsService)
+	strategyHandler := handler.NewStrategy(strategyService)
 
 	return &Runtime{
 		Storage: StorageRuntime{
@@ -169,6 +180,11 @@ func NewRuntimeWithProviderBuilders(opts Options, builders ...provider.ProviderB
 			Financials: financialsService,
 			Providers:  providersService,
 			Strategy:   strategyService,
+		},
+		Handlers: Handlers{
+			Daily:      dailyHandler,
+			Financials: financialsHandler,
+			Strategy:   strategyHandler,
 		},
 	}, nil
 }

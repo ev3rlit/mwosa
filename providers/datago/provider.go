@@ -13,7 +13,6 @@ import (
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
-	"github.com/ev3rlit/mwosa/providers/spec"
 	"github.com/samber/oops"
 )
 
@@ -57,6 +56,7 @@ type Provider struct {
 	instrument.Searcher
 
 	client priceClient
+	groups []provider.GroupRoleProvider
 }
 
 type CorporateFinanceProvider struct {
@@ -66,6 +66,7 @@ type CorporateFinanceProvider struct {
 
 	financialClient financialClient
 	listedClient    listedClient
+	groups          []provider.GroupRoleProvider
 }
 
 func New(config Config) (*Provider, error) {
@@ -90,57 +91,10 @@ func NewWithClient(client priceClient) *Provider {
 		client: client,
 	}
 
-	p.Fetcher = spec.PreviousBusinessDayDailyBar(p.fetchDailyBars).
-		Markets(provider.MarketKRX).
-		SecurityTypes(
-			provider.SecurityTypeETF,
-			provider.SecurityTypeETN,
-			provider.SecurityTypeELW,
-		).
-		Group(provider.GroupSecuritiesProductPrice).
-		Operations(
-			provider.OperationGetETFPriceInfo,
-			provider.OperationGetETNPriceInfo,
-			provider.OperationGetELWPriceInfo,
-		).
-		RequiresAuth(provider.CredentialScopeDataGo).
-		RangeQuery(dailybar.RangeQuerySupported).
-		CompatibilityNotes(
-			"latest available basDt is typically the previous business day",
-			"current trading-day data is not supported",
-		).
-		Priority(50).
-		Limitations(
-			"daily basDt data only; not a realtime or current trading-day provider",
-			"latest available data is typically D-1 business day EOD",
-			"ELW uses explicit security_type=elw because canonical schema policy is separate from ETF/ETN",
-		).
-		MustBuild()
-	p.Searcher = spec.PreviousBusinessDayInstrumentSearch(p.searchInstruments).
-		Markets(provider.MarketKRX).
-		SecurityTypes(
-			provider.SecurityTypeETF,
-			provider.SecurityTypeETN,
-			provider.SecurityTypeELW,
-		).
-		Group(provider.GroupSecuritiesProductPrice).
-		Operations(
-			provider.OperationGetETFPriceInfo,
-			provider.OperationGetETNPriceInfo,
-			provider.OperationGetELWPriceInfo,
-		).
-		RequiresAuth(provider.CredentialScopeDataGo).
-		CompatibilityNotes(
-			"instrument snapshots are derived from D-1 business day EOD price rows",
-			"current trading-day data is not supported",
-		).
-		Priority(50).
-		Limitations(
-			"searches public D-1 business day EOD price rows and derives instrument snapshots",
-			"not suitable for realtime or current trading-day instrument state",
-			"ELW search requires explicit security_type=elw",
-		).
-		MustBuild()
+	group := newSecuritiesProductPriceGroup(p.fetchDailyBars, p.searchInstruments)
+	p.Fetcher = group.Fetcher
+	p.Searcher = group.Searcher
+	p.groups = []provider.GroupRoleProvider{group}
 	return p
 }
 
@@ -174,33 +128,36 @@ func NewCorporateFinanceWithClients(financialClient financialClient, listedClien
 		financialClient: financialClient,
 		listedClient:    listedClient,
 	}
-	p.Fetch = spec.HistoricalFinancials(p.fetchFinancialStatements).
-		Markets(provider.MarketKRX).
-		SecurityTypes(provider.SecurityTypeStock).
-		Group(provider.GroupCorporateFinance).
-		Operations(
-			provider.OperationGetSummFinaStatV2,
-			provider.OperationGetBalanceSheetV2,
-			provider.OperationGetIncomeStatementV2,
-		).
-		RequiresAuth(provider.CredentialScopeDataGo).
-		CompatibilityNotes(
-			"company financial statements are looked up by corporation registration number (crno)",
-			"KRX short codes and ISINs are resolved through krxListedInfo/getItemInfo before financial statement lookup",
-			"financial commission APIs are not realtime; data is refreshed after provider-side collection",
-		).
-		Priority(40).
-		Limitations(
-			"foreign companies may not provide a domestic corporation registration number",
-			"requires both Data.go.kr corporateFinance and krxListedInfo API approvals for name/code resolution",
-			"cash flow statements are not provided by this Datago API",
-		).
-		MustBuild()
+	group := newCorporateFinanceGroup(p.fetchFinancialStatements)
+	p.Fetch = group.Fetch
+	p.groups = []provider.GroupRoleProvider{group}
 	return p
 }
 
 func Register(registry *provider.Registry, p provider.IdentityProvider) error {
 	return registry.RegisterProvider(p)
+}
+
+func (p *Provider) RoleRegistrations() []provider.RoleRegistration {
+	if p == nil {
+		return nil
+	}
+	return roleRegistrationsFromGroups(p.groups)
+}
+
+func (p *CorporateFinanceProvider) RoleRegistrations() []provider.RoleRegistration {
+	if p == nil {
+		return nil
+	}
+	return roleRegistrationsFromGroups(p.groups)
+}
+
+func roleRegistrationsFromGroups(groups []provider.GroupRoleProvider) []provider.RoleRegistration {
+	registrations := make([]provider.RoleRegistration, 0)
+	for _, group := range groups {
+		registrations = append(registrations, group.RoleRegistrations()...)
+	}
+	return registrations
 }
 
 func (p *Provider) fetchDailyBars(ctx context.Context, input dailybar.FetchInput) (dailybar.FetchResult, error) {

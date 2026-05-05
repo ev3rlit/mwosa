@@ -60,6 +60,7 @@ viewport:
 - `docs/architectures/tech-stack/README.md`: Go, Cobra, SQLite 결정
 - `docs/architectures/layers/README.md`: 레이어 책임, 금지 방향, 디렉터리 예시
 - `docs/architectures/provider/README.md`: provider role/router/adapter 구조
+- `docs/architectures/provider/group-role-registration-patterns.md`: Datago 처럼 group 별 활용신청이 필요한 provider 구조 비교
 - `docs/architectures/indicator/README.md`: 지표와 추세 계산 레이어
 - `docs/architectures/packages/README.md`: 독립 core package 경계
 - `docs/architectures/packages/indicators/README.md`: 투자 보조지표 계산 패키지 논의

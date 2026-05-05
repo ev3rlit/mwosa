@@ -1,9 +1,9 @@
 package cli
 
 import (
+	"github.com/ev3rlit/mwosa/app/handler"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/financials"
-	financialsservice "github.com/ev3rlit/mwosa/service/financials"
 	"github.com/spf13/cobra"
 )
 
@@ -28,14 +28,14 @@ func newGetFinancialsCommand(opts *Options) *cobra.Command {
 		Use:   "financials <company>",
 		Short: "Fetch provider-backed financial statements by company name or KRX code",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: runResult(opts, func(cmd *cobra.Command, args []string) (result any, err error) {
 			runtime, err := newAppRuntime(opts, true)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer closeAppRuntime(runtime, &err)
 
-			result, err := runtime.Services.Financials.Get(cmd.Context(), financialsservice.Request{
+			return runtime.Handlers.Financials.Get(cmd.Context(), handler.GetFinancialsRequest{
 				ProviderID:     provider.ProviderID(opts.Provider),
 				PreferProvider: provider.ProviderID(opts.PreferProvider),
 				Market:         provider.Market(opts.Market),
@@ -46,11 +46,7 @@ func newGetFinancialsCommand(opts *Options) *cobra.Command {
 				Statement:      financials.StatementType(flags.Statement),
 				Limit:          flags.Limit,
 			})
-			if err != nil {
-				return err
-			}
-			return writeFinancialStatements(cmd.OutOrStdout(), opts.Output, result.Statements)
-		},
+		}),
 	}
 	cmd.Flags().StringVar(&flags.SecurityType, "security-type", flags.SecurityType, "security type: stock, etf, etn, elw")
 	cmd.Flags().StringVar(&flags.FiscalYear, "year", flags.FiscalYear, "fiscal year, for example 2025")

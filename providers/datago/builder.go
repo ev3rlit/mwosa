@@ -48,6 +48,11 @@ func (Builder) DefaultConfig() provider.Config {
 		"auth": map[string]any{
 			"service_key": "",
 		},
+		"groups": map[string]any{
+			string(provider.GroupSecuritiesProductPrice): map[string]any{
+				"enabled": true,
+			},
+		},
 	}
 }
 
@@ -58,6 +63,11 @@ func (CorporateFinanceBuilder) DefaultConfig() provider.Config {
 		"base_url": "",
 		"auth": map[string]any{
 			"service_key": "",
+		},
+		"groups": map[string]any{
+			string(provider.GroupCorporateFinance): map[string]any{
+				"enabled": true,
+			},
 		},
 		"dependencies": map[string]any{
 			string(provider.GroupKRXListedInfo): map[string]any{
@@ -87,6 +97,10 @@ func (Builder) ConfigSpec() provider.ConfigSpec {
 				Flag:        "base-url",
 				Description: "override datago securitiesProductPrice API base URL",
 				Env:         []string{baseURLEnv},
+			},
+			{
+				Path:        "groups.securitiesProductPrice.enabled",
+				Description: "enable datago securitiesProductPrice group",
 			},
 		},
 	}
@@ -124,16 +138,36 @@ func (CorporateFinanceBuilder) ConfigSpec() provider.ConfigSpec {
 				Description: "override datago krxListedInfo API base URL",
 				Env:         []string{krxListedInfoBaseURLEnv},
 			},
+			{
+				Path:        "groups.corporateFinance.enabled",
+				Description: "enable datago-corpfin corporateFinance group",
+			},
 		},
 	}
 }
 
 func (Builder) Decide(opts provider.RegisterOptions, config provider.Config) provider.RegistrationDecision {
-	return decideProvider(provider.ProviderDataGo, "datago", opts, config, serviceKeyFromConfig(config))
+	return decideProvider(decideProviderInput{
+		ID:           provider.ProviderDataGo,
+		Label:        "datago",
+		Options:      opts,
+		Config:       config,
+		ServiceKey:   serviceKeyFromConfig(config),
+		GroupEnabled: securitiesProductPriceEnabledFromConfig(config),
+		GroupReason:  "datago securitiesProductPrice group disabled",
+	})
 }
 
 func (CorporateFinanceBuilder) Decide(opts provider.RegisterOptions, config provider.Config) provider.RegistrationDecision {
-	return decideProvider(provider.ProviderDataGoCorporateFinance, "datago-corpfin", opts, config, corporateFinanceServiceKeyFromConfig(config))
+	return decideProvider(decideProviderInput{
+		ID:           provider.ProviderDataGoCorporateFinance,
+		Label:        "datago-corpfin",
+		Options:      opts,
+		Config:       config,
+		ServiceKey:   corporateFinanceServiceKeyFromConfig(config),
+		GroupEnabled: corporateFinanceEnabledFromConfig(config),
+		GroupReason:  "datago-corpfin corporateFinance group disabled",
+	})
 }
 
 func (Builder) Build(config provider.Config) (provider.IdentityProvider, error) {
@@ -166,35 +200,51 @@ func (CorporateFinanceBuilder) Build(config provider.Config) (provider.IdentityP
 	})
 }
 
-func decideProvider(id provider.ProviderID, label string, opts provider.RegisterOptions, config provider.Config, serviceKey string) provider.RegistrationDecision {
-	if !enabledFromConfig(config, id) {
+type decideProviderInput struct {
+	ID           provider.ProviderID
+	Label        string
+	Options      provider.RegisterOptions
+	Config       provider.Config
+	ServiceKey   string
+	GroupEnabled bool
+	GroupReason  string
+}
+
+func decideProvider(input decideProviderInput) provider.RegistrationDecision {
+	if !enabledFromConfig(input.Config, input.ID) {
 		return provider.RegistrationDecision{
 			Register: false,
-			Reason:   label + " disabled",
+			Reason:   input.Label + " disabled",
 		}
 	}
-	requested := requestsProvider(opts, id)
-	if forcedOtherProvider(opts, id) && !requested {
+	requested := requestsProvider(input.Options, input.ID)
+	if forcedOtherProvider(input.Options, input.ID) && !requested {
 		return provider.RegistrationDecision{
 			Register: false,
 			Reason:   "another provider is forced",
 		}
 	}
-	if serviceKey != "" {
+	if !input.GroupEnabled {
+		return provider.RegistrationDecision{
+			Register: false,
+			Reason:   input.GroupReason,
+		}
+	}
+	if input.ServiceKey != "" {
 		return provider.RegistrationDecision{
 			Register: true,
-			Reason:   label + " config is present",
+			Reason:   input.Label + " config is present",
 		}
 	}
 	if requested {
 		return provider.RegistrationDecision{
 			Register: true,
-			Reason:   label + " requested",
+			Reason:   input.Label + " requested",
 		}
 	}
 	return provider.RegistrationDecision{
 		Register: false,
-		Reason:   label + " config missing",
+		Reason:   input.Label + " config missing",
 	}
 }
 
@@ -244,6 +294,16 @@ func stringFromConfigOrEnv(config provider.Config, path []string, envs ...string
 
 func enabledFromConfig(config provider.Config, id provider.ProviderID) bool {
 	enabled, ok := config.Bool("providers", string(id), "enabled")
+	return !ok || enabled
+}
+
+func securitiesProductPriceEnabledFromConfig(config provider.Config) bool {
+	enabled, ok := config.Bool("providers", string(provider.ProviderDataGo), "groups", string(provider.GroupSecuritiesProductPrice), "enabled")
+	return !ok || enabled
+}
+
+func corporateFinanceEnabledFromConfig(config provider.Config) bool {
+	enabled, ok := config.Bool("providers", string(provider.ProviderDataGoCorporateFinance), "groups", string(provider.GroupCorporateFinance), "enabled")
 	return !ok || enabled
 }
 

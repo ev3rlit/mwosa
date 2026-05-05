@@ -3,18 +3,16 @@ package cli
 import (
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
-	"github.com/ev3rlit/mwosa/providers/core/dailybar"
-	"github.com/ev3rlit/mwosa/providers/core/financials"
-	"github.com/ev3rlit/mwosa/service/daily"
 	"github.com/jszwec/csvutil"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/renderer"
 	"github.com/olekukonko/tablewriter/tw"
 	"github.com/samber/oops"
+	"github.com/spf13/cobra"
 )
 
 type OutputMode string
@@ -79,79 +77,157 @@ func (m OutputMode) Type() string {
 	return "output"
 }
 
-func writeBars(w io.Writer, output OutputMode, bars []dailybar.Bar) error {
-	errb := oops.In("cli_output").With("format", output)
+type resultHandler func(cmd *cobra.Command, args []string) (any, error)
 
+type JSONOutput interface {
+	JSONValue() any
+}
+
+type NDJSONOutput interface {
+	NDJSONRows() any
+}
+
+type CSVOutput interface {
+	CSVRows() any
+}
+
+type TableOutput interface {
+	TableRows() (header []string, rows [][]string)
+}
+
+func runResult(opts *Options, handler resultHandler) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		result, err := handler(cmd, args)
+		if err != nil {
+			return err
+		}
+		return Render(cmd.OutOrStdout(), opts.Output, result)
+	}
+}
+
+func runJSONResult(handler resultHandler) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		result, err := handler(cmd, args)
+		if err != nil {
+			return err
+		}
+		return writeIndentedJSON(cmd.OutOrStdout(), result)
+	}
+}
+
+func Render(w io.Writer, output OutputMode, result any) error {
+	errb := oops.In("cli_output").With("format", output)
 	switch output {
 	case "", OutputModeTable:
-		return writeDailyBarsTable(w, bars)
-	case OutputModeJSON:
-		encoder := json.NewEncoder(w)
-		encoder.SetIndent("", "  ")
-		return errb.With("rows", len(bars)).Wrap(encoder.Encode(bars))
-	case OutputModeNDJSON:
-		encoder := json.NewEncoder(w)
-		for _, bar := range bars {
-			if err := encoder.Encode(bar); err != nil {
-				return errb.With("symbol", bar.Symbol).Wrapf(err, "write daily bar ndjson")
-			}
+		if value, ok := result.(TableOutput); ok {
+			header, rows := value.TableRows()
+			return writeTable(w, header, rows)
 		}
-		return nil
+		return writeTableValue(w, result)
+	case OutputModeJSON:
+		if value, ok := result.(JSONOutput); ok {
+			result = value.JSONValue()
+		}
+		return writeIndentedJSON(w, result)
+	case OutputModeNDJSON:
+		if value, ok := result.(NDJSONOutput); ok {
+			result = value.NDJSONRows()
+		}
+		return writeNDJSONValue(w, result)
 	case OutputModeCSV:
-		return writeCSV(w, bars)
+		if value, ok := result.(CSVOutput); ok {
+			result = value.CSVRows()
+		}
+		return writeCSV(w, result)
 	default:
 		return errb.Errorf("unsupported output format: %s", output)
 	}
 }
 
-func writeCollectResult(w io.Writer, output OutputMode, result daily.CollectResult) error {
-	errb := oops.In("cli_output").With("format", output)
-	resultErrb := errb.With("provider", result.ProviderID, "group", result.Group)
-
-	switch output {
-	case "", OutputModeTable:
-		return writeCollectResultTable(w, result)
-	case OutputModeJSON:
-		encoder := json.NewEncoder(w)
-		encoder.SetIndent("", "  ")
-		return resultErrb.Wrap(encoder.Encode(result))
-	case OutputModeNDJSON:
-		return resultErrb.Wrap(json.NewEncoder(w).Encode(result))
-	case OutputModeCSV:
-		return writeCSV(w, []daily.CollectResult{result})
-	default:
-		return errb.Errorf("unsupported output format: %s", output)
-	}
+func writeIndentedJSON(w io.Writer, value any) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return oops.In("cli_output").Wrap(encoder.Encode(value))
 }
 
-func writeFinancialStatements(w io.Writer, output OutputMode, statements []financials.Statement) error {
-	errb := oops.In("cli_output").With("format", output)
+func writeJSONLine(w io.Writer, value any) error {
+	return oops.In("cli_output").Wrap(json.NewEncoder(w).Encode(value))
+}
 
-	switch output {
-	case "", OutputModeTable:
-		return writeFinancialStatementsTable(w, statements)
-	case OutputModeJSON:
+func writeNDJSONValue(w io.Writer, value any) error {
+	if value == nil {
+		return writeJSONLine(w, nil)
+	}
+	rv := reflect.ValueOf(value)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return writeJSONLine(w, nil)
+		}
+		rv = rv.Elem()
+	}
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
 		encoder := json.NewEncoder(w)
-		encoder.SetIndent("", "  ")
-		return errb.With("rows", len(statements)).Wrap(encoder.Encode(statements))
-	case OutputModeNDJSON:
-		encoder := json.NewEncoder(w)
-		for _, statement := range statements {
-			if err := encoder.Encode(statement); err != nil {
-				return errb.With("symbol", statement.Symbol, "statement", statement.Statement).Wrapf(err, "write financial statement ndjson")
+		for i := 0; i < rv.Len(); i++ {
+			if err := encoder.Encode(rv.Index(i).Interface()); err != nil {
+				return oops.In("cli_output").With("row", i).Wrapf(err, "write ndjson row")
 			}
 		}
 		return nil
-	case OutputModeCSV:
-		return writeCSV(w, flattenFinancialStatementLines(statements))
 	default:
-		return errb.Errorf("unsupported output format: %s", output)
+		return writeJSONLine(w, value)
 	}
 }
 
 func writeTable(w io.Writer, header []string, rows [][]string) error {
 	errb := oops.In("cli_output").With("columns", len(header), "rows", len(rows))
-	table := tablewriter.NewTable(w,
+	table := newOutputTable(w)
+	table.Header(header)
+	if err := table.Bulk(rows); err != nil {
+		return errb.Wrapf(err, "write table rows")
+	}
+	return errb.Wrap(table.Render())
+}
+
+func writeTableValue(w io.Writer, value any) error {
+	errb := oops.In("cli_output")
+	table := newOutputTable(w)
+	if value == nil {
+		table.Header([]string{"value"})
+		if err := table.Append(""); err != nil {
+			return errb.Wrapf(err, "write table row")
+		}
+		return errb.Wrap(table.Render())
+	}
+	rv := reflect.ValueOf(value)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			table.Header([]string{"value"})
+			if err := table.Append(""); err != nil {
+				return errb.Wrapf(err, "write table row")
+			}
+			return errb.Wrap(table.Render())
+		}
+		rv = rv.Elem()
+	}
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		if rv.Len() == 0 {
+			return nil
+		}
+		if err := table.Bulk(value); err != nil {
+			return errb.Wrapf(err, "write table rows")
+		}
+	default:
+		if err := table.Append(value); err != nil {
+			return errb.Wrapf(err, "write table row")
+		}
+	}
+	return errb.Wrap(table.Render())
+}
+
+func newOutputTable(w io.Writer) *tablewriter.Table {
+	return tablewriter.NewTable(w,
 		tablewriter.WithRenderer(renderer.NewBlueprint(tw.Rendition{
 			Borders: tw.BorderNone,
 			Settings: tw.Settings{
@@ -166,11 +242,6 @@ func writeTable(w io.Writer, header []string, rows [][]string) error {
 		tablewriter.WithRowAutoFormat(tw.Off),
 		tablewriter.WithPadding(tw.Padding{Right: "  ", Overwrite: true}),
 	)
-	table.Header(header)
-	if err := table.Bulk(rows); err != nil {
-		return errb.Wrapf(err, "write table rows")
-	}
-	return errb.Wrap(table.Render())
 }
 
 func writeCSV(w io.Writer, rows any) error {
@@ -181,89 +252,4 @@ func writeCSV(w io.Writer, rows any) error {
 	}
 	writer.Flush()
 	return oops.In("cli_output").Wrap(writer.Error())
-}
-
-func writeDailyBarsTable(w io.Writer, bars []dailybar.Bar) error {
-	rows := make([][]string, 0, len(bars))
-	for _, bar := range bars {
-		rows = append(rows, []string{bar.TradingDate, bar.Symbol, bar.Name, bar.Open, bar.High, bar.Low, bar.Close, bar.Change})
-	}
-	return writeTable(w, []string{"date", "symbol", "name", "open", "high", "low", "close", "change"}, rows)
-}
-
-func writeCollectResultTable(w io.Writer, result daily.CollectResult) error {
-	return writeTable(w,
-		[]string{"market", "security_type", "provider", "group", "dates", "fetched", "stored", "rows_affected"},
-		[][]string{{
-			string(result.Market),
-			string(result.SecurityType),
-			string(result.ProviderID),
-			string(result.Group),
-			fmt.Sprint(len(result.Dates)),
-			fmt.Sprint(result.BarsFetched),
-			fmt.Sprint(result.BarsStored),
-			fmt.Sprint(result.RowsAffected),
-		}},
-	)
-}
-
-func writeFinancialStatementsTable(w io.Writer, statements []financials.Statement) error {
-	rows := make([][]string, 0)
-	for _, statement := range statements {
-		for _, line := range statement.Lines {
-			rows = append(rows, []string{
-				string(statement.Statement),
-				statement.FiscalYear,
-				string(statement.Period),
-				line.AccountName,
-				line.Value,
-				firstNonEmpty(line.Currency, statement.Currency),
-				firstNonEmpty(line.Unit, statement.Unit),
-			})
-		}
-	}
-	return writeTable(w, []string{"statement", "year", "period", "account", "value", "currency", "unit"}, rows)
-}
-
-type financialStatementLineRow struct {
-	Statement    financials.StatementType `csv:"statement"`
-	Symbol       string                   `csv:"symbol"`
-	FiscalYear   string                   `csv:"fiscal_year"`
-	FiscalPeriod string                   `csv:"fiscal_period"`
-	Period       financials.PeriodType    `csv:"period"`
-	AccountID    string                   `csv:"account_id"`
-	AccountName  string                   `csv:"account_name"`
-	Value        string                   `csv:"value"`
-	Currency     string                   `csv:"currency"`
-	Unit         string                   `csv:"unit"`
-}
-
-func flattenFinancialStatementLines(statements []financials.Statement) []financialStatementLineRow {
-	rows := make([]financialStatementLineRow, 0)
-	for _, statement := range statements {
-		for _, line := range statement.Lines {
-			rows = append(rows, financialStatementLineRow{
-				Statement:    statement.Statement,
-				Symbol:       statement.Symbol,
-				FiscalYear:   statement.FiscalYear,
-				FiscalPeriod: statement.FiscalPeriod,
-				Period:       statement.Period,
-				AccountID:    line.AccountID,
-				AccountName:  line.AccountName,
-				Value:        line.Value,
-				Currency:     firstNonEmpty(line.Currency, statement.Currency),
-				Unit:         firstNonEmpty(line.Unit, statement.Unit),
-			})
-		}
-	}
-	return rows
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }

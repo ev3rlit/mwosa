@@ -2,21 +2,25 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ev3rlit/mwosa/app/handler"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
 	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/service/daily"
+	strategyservice "github.com/ev3rlit/mwosa/service/strategy"
 )
 
-func TestWriteBarsTableShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
+func TestRenderBarsTableShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
 	var out bytes.Buffer
 
-	err := writeBars(&out, OutputModeTable, []dailybar.Bar{dailyBarForOutputTest()})
+	err := Render(&out, OutputModeTable, handler.DailyBarsOutput{dailyBarForOutputTest()})
 	if err != nil {
-		t.Fatalf("write bars table: %v", err)
+		t.Fatalf("render bars table: %v", err)
 	}
 
 	got := out.String()
@@ -40,12 +44,12 @@ func TestWriteBarsTableShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
 	}
 }
 
-func TestWriteBarsCSVShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
+func TestRenderBarsCSVShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
 	var out bytes.Buffer
 
-	err := writeBars(&out, OutputModeCSV, []dailybar.Bar{dailyBarForOutputTest()})
+	err := Render(&out, OutputModeCSV, handler.DailyBarsOutput{dailyBarForOutputTest()})
 	if err != nil {
-		t.Fatalf("write bars csv: %v", err)
+		t.Fatalf("render bars csv: %v", err)
 	}
 
 	got := out.String()
@@ -59,10 +63,10 @@ func TestWriteBarsCSVShowsPriceFieldsWithoutProviderMetadata(t *testing.T) {
 	}
 }
 
-func TestWriteCollectResultCSVUsesServiceCSVContract(t *testing.T) {
+func TestRenderCollectResultCSVUsesServiceCSVContract(t *testing.T) {
 	var out bytes.Buffer
 
-	err := writeCollectResult(&out, OutputModeCSV, daily.CollectResult{
+	err := Render(&out, OutputModeCSV, handler.CollectResultOutput{Result: daily.CollectResult{
 		Market:       provider.MarketKRX,
 		SecurityType: provider.SecurityTypeETF,
 		ProviderID:   provider.ProviderDataGo,
@@ -71,9 +75,9 @@ func TestWriteCollectResultCSVUsesServiceCSVContract(t *testing.T) {
 		BarsFetched:  10,
 		BarsStored:   8,
 		RowsAffected: 6,
-	})
+	}})
 	if err != nil {
-		t.Fatalf("write collect result csv: %v", err)
+		t.Fatalf("render collect result csv: %v", err)
 	}
 
 	want := "market,security_type,provider,group,dates,fetched,stored,rows_affected\nkrx,etf,datago,securitiesProductPrice,2,10,8,6\n"
@@ -82,12 +86,12 @@ func TestWriteCollectResultCSVUsesServiceCSVContract(t *testing.T) {
 	}
 }
 
-func TestWriteFinancialStatementsTableFlattensStatementLines(t *testing.T) {
+func TestRenderFinancialStatementsTableFlattensStatementLines(t *testing.T) {
 	var out bytes.Buffer
 
-	err := writeFinancialStatements(&out, OutputModeTable, []financials.Statement{financialStatementForOutputTest()})
+	err := Render(&out, OutputModeTable, handler.FinancialStatementsOutput{financialStatementForOutputTest()})
 	if err != nil {
-		t.Fatalf("write financial statements table: %v", err)
+		t.Fatalf("render financial statements table: %v", err)
 	}
 
 	got := out.String()
@@ -103,12 +107,12 @@ func TestWriteFinancialStatementsTableFlattensStatementLines(t *testing.T) {
 	}
 }
 
-func TestWriteFinancialStatementsCSVFlattensStatementLines(t *testing.T) {
+func TestRenderFinancialStatementsCSVFlattensStatementLines(t *testing.T) {
 	var out bytes.Buffer
 
-	err := writeFinancialStatements(&out, OutputModeCSV, []financials.Statement{financialStatementForOutputTest()})
+	err := Render(&out, OutputModeCSV, handler.FinancialStatementsOutput{financialStatementForOutputTest()})
 	if err != nil {
-		t.Fatalf("write financial statements csv: %v", err)
+		t.Fatalf("render financial statements csv: %v", err)
 	}
 
 	got := out.String()
@@ -117,6 +121,85 @@ func TestWriteFinancialStatementsCSVFlattensStatementLines(t *testing.T) {
 	}
 	if !strings.Contains(got, "income_statement,005930,2025,FY,annual,ifrs_Revenue,Revenue,1000,KRW,원\n") {
 		t.Fatalf("csv output missing financial statement line:\n%s", got)
+	}
+}
+
+func TestRenderStrategyDetailJSONUsesServiceShape(t *testing.T) {
+	var out bytes.Buffer
+
+	err := Render(&out, OutputModeJSON, handler.StrategyDetailOutput{Detail: strategyDetailForOutputTest()})
+	if err != nil {
+		t.Fatalf("render strategy detail json: %v", err)
+	}
+
+	var parsed strategyservice.StrategyDetail
+	if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
+		t.Fatalf("strategy detail json should decode: %v\n%s", err, out.String())
+	}
+	if parsed.Strategy.Name != "momentum" || parsed.ActiveVersion.QueryHash != "hash-1" {
+		t.Fatalf("strategy detail json = %#v", parsed)
+	}
+}
+
+func TestRenderStrategyListNDJSONWritesOneDetailPerLine(t *testing.T) {
+	var out bytes.Buffer
+
+	err := Render(&out, OutputModeNDJSON, handler.StrategyListOutput{strategyDetailForOutputTest()})
+	if err != nil {
+		t.Fatalf("render strategy list ndjson: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("ndjson line count = %d, output:\n%s", len(lines), out.String())
+	}
+	if !strings.Contains(lines[0], `"strategy"`) || !strings.Contains(lines[0], `"active_version"`) {
+		t.Fatalf("ndjson line missing strategy detail shape:\n%s", out.String())
+	}
+}
+
+func TestRenderScreenResultCSVUsesItems(t *testing.T) {
+	var out bytes.Buffer
+
+	err := Render(&out, OutputModeCSV, handler.ScreenResultOutput{Result: strategyservice.ScreenResult{
+		QueryHash:          "query-hash",
+		InputDataset:       "etf_daily_metrics",
+		InputSchemaVersion: 1,
+		ResultCount:        1,
+		Items: []strategyservice.ScreenResultItem{{
+			Ordinal: 1,
+			Symbol:  "069500",
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("render screen result csv: %v", err)
+	}
+
+	want := "ordinal,symbol\n1,069500\n"
+	if got := out.String(); got != want {
+		t.Fatalf("screen result csv = %q, want %q", got, want)
+	}
+}
+
+func TestRenderScreenRunHistoryTableUsesSummaryColumns(t *testing.T) {
+	var out bytes.Buffer
+
+	err := Render(&out, OutputModeTable, handler.ScreenRunHistoryOutput{{
+		ID:           "run-1",
+		Alias:        "open",
+		Status:       strategyservice.ScreenRunSucceeded,
+		InputDataset: "etf_daily_metrics",
+		ResultCount:  3,
+		StartedAt:    time.Date(2026, 5, 5, 1, 2, 3, 0, time.UTC),
+	}})
+	if err != nil {
+		t.Fatalf("render screen run history table: %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{"id", "alias", "status", "input", "results", "started", "run-1", "open", "succeeded", "3", "2026-05-05T01:02:03Z"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("screen history table missing %q in:\n%s", want, got)
+		}
 	}
 }
 
@@ -174,6 +257,30 @@ func financialStatementForOutputTest() financials.Statement {
 		Unit:         "원",
 		Lines: []financials.LineItem{
 			{AccountID: "ifrs_Revenue", AccountName: "Revenue", Value: "1000"},
+		},
+	}
+}
+
+func strategyDetailForOutputTest() strategyservice.StrategyDetail {
+	createdAt := time.Date(2026, 5, 5, 1, 2, 3, 0, time.UTC)
+	return strategyservice.StrategyDetail{
+		Strategy: strategyservice.Strategy{
+			ID:              "strategy-1",
+			Name:            "momentum",
+			Engine:          strategyservice.EngineJQ,
+			ActiveVersionID: "version-1",
+			CreatedAt:       createdAt,
+			UpdatedAt:       createdAt,
+		},
+		ActiveVersion: strategyservice.StrategyVersion{
+			ID:                 "version-1",
+			StrategyID:         "strategy-1",
+			Version:            1,
+			QueryText:          ".[]",
+			QueryHash:          "hash-1",
+			InputDataset:       "etf_daily_metrics",
+			InputSchemaVersion: 1,
+			CreatedAt:          createdAt,
 		},
 	}
 }
