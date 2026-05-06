@@ -1,6 +1,6 @@
 # mwosa CLI Command Help
 
-Generated from `mwosa`. Use this when you need the complete installed or built CLI command surface instead of relying on source-code assumptions.
+Generated from `./bin/mwosa`. Use this when you need the complete installed or built CLI command surface instead of relying on source-code assumptions.
 
 ## Refresh Command
 
@@ -19,10 +19,10 @@ MWOSA_HELP_REPO_ROOT=/path/to/mwosa skills/mwosa/references/generate-cli-command
 ## Captured Help
 
 ```text
-mwosa v0.1.0
+mwosa v0.1.1-0.20260506112216-fff61ee80aad
 schema dev
-commit unknown
-built unknown
+commit fff61ee80aad1308f3f77176984e47d73b7c2830
+built 2026-05-06T11:22:16Z
 go go1.25.6
 Investment research CLI for provider-backed market data
 
@@ -31,20 +31,26 @@ Usage:
 
 Available Commands:
   backfill    Collect historical data ranges
-  completion  Generate the autocompletion script for the specified shell
+  completion  Generate shell completion script
   config      Manage mwosa config file
   create      Create mwosa resources
   delete      Delete mwosa resources
+  disable     Disable a resource
+  doctor      Diagnose local configuration and resources
+  enable      Enable a resource
   ensure      Fetch missing data and store it locally
   get         Read source-like data from local storage
   help        Help about any command
   history     List mwosa execution history
   inspect     Inspect mwosa resources and local state
   list        List mwosa resources
-  provider    Manage provider config and diagnostics
+  login       Register credentials for a resource
+  logout      Remove credentials for a resource
+  prefer      Set resource preference
   screen      Run screening workflows
   sync        Refresh provider-backed data batches
   update      Update mwosa resources
+  validate    Validate local configuration and resources
   version     Print mwosa build information
 
 Flags:
@@ -105,155 +111,13 @@ Global Flags:
 
 
 ### mwosa completion --help
-Generate the autocompletion script for mwosa for the specified shell.
-See each sub-command's help for details on how to use the generated script.
+Generate shell completion script
 
 Usage:
-  mwosa completion [command]
-
-Available Commands:
-  bash        Generate the autocompletion script for bash
-  fish        Generate the autocompletion script for fish
-  powershell  Generate the autocompletion script for powershell
-  zsh         Generate the autocompletion script for zsh
+  mwosa completion <shell> [flags]
 
 Flags:
   -h, --help   help for completion
-
-Global Flags:
-      --config string            config file path
-      --database string          local SQLite database path
-      --market string            market id (default "krx")
-  -o, --output output            output format: table, json, ndjson, csv (default table)
-      --prefer-provider string   prefer a provider when multiple candidates match
-      --provider string          force a provider by id
-
-Use "mwosa completion [command] --help" for more information about a command.
-
-
-### mwosa completion bash --help
-Generate the autocompletion script for the bash shell.
-
-This script depends on the 'bash-completion' package.
-If it is not installed already, you can install it via your OS's package manager.
-
-To load completions in your current shell session:
-
-	source <(mwosa completion bash)
-
-To load completions for every new session, execute once:
-
-#### Linux:
-
-	mwosa completion bash > /etc/bash_completion.d/mwosa
-
-#### macOS:
-
-	mwosa completion bash > $(brew --prefix)/etc/bash_completion.d/mwosa
-
-You will need to start a new shell for this setup to take effect.
-
-Usage:
-  mwosa completion bash
-
-Flags:
-  -h, --help              help for bash
-      --no-descriptions   disable completion descriptions
-
-Global Flags:
-      --config string            config file path
-      --database string          local SQLite database path
-      --market string            market id (default "krx")
-  -o, --output output            output format: table, json, ndjson, csv (default table)
-      --prefer-provider string   prefer a provider when multiple candidates match
-      --provider string          force a provider by id
-
-
-### mwosa completion fish --help
-Generate the autocompletion script for the fish shell.
-
-To load completions in your current shell session:
-
-	mwosa completion fish | source
-
-To load completions for every new session, execute once:
-
-	mwosa completion fish > ~/.config/fish/completions/mwosa.fish
-
-You will need to start a new shell for this setup to take effect.
-
-Usage:
-  mwosa completion fish [flags]
-
-Flags:
-  -h, --help              help for fish
-      --no-descriptions   disable completion descriptions
-
-Global Flags:
-      --config string            config file path
-      --database string          local SQLite database path
-      --market string            market id (default "krx")
-  -o, --output output            output format: table, json, ndjson, csv (default table)
-      --prefer-provider string   prefer a provider when multiple candidates match
-      --provider string          force a provider by id
-
-
-### mwosa completion powershell --help
-Generate the autocompletion script for powershell.
-
-To load completions in your current shell session:
-
-	mwosa completion powershell | Out-String | Invoke-Expression
-
-To load completions for every new session, add the output of the above command
-to your powershell profile.
-
-Usage:
-  mwosa completion powershell [flags]
-
-Flags:
-  -h, --help              help for powershell
-      --no-descriptions   disable completion descriptions
-
-Global Flags:
-      --config string            config file path
-      --database string          local SQLite database path
-      --market string            market id (default "krx")
-  -o, --output output            output format: table, json, ndjson, csv (default table)
-      --prefer-provider string   prefer a provider when multiple candidates match
-      --provider string          force a provider by id
-
-
-### mwosa completion zsh --help
-Generate the autocompletion script for the zsh shell.
-
-If shell completion is not already enabled in your environment you will need
-to enable it.  You can execute the following once:
-
-	echo "autoload -U compinit; compinit" >> ~/.zshrc
-
-To load completions in your current shell session:
-
-	source <(mwosa completion zsh)
-
-To load completions for every new session, execute once:
-
-#### Linux:
-
-	mwosa completion zsh > "${fpath[1]}/_mwosa"
-
-#### macOS:
-
-	mwosa completion zsh > $(brew --prefix)/share/zsh/site-functions/_mwosa
-
-You will need to start a new shell for this setup to take effect.
-
-Usage:
-  mwosa completion zsh [flags]
-
-Flags:
-  -h, --help              help for zsh
-      --no-descriptions   disable completion descriptions
 
 Global Flags:
       --config string            config file path
@@ -381,6 +245,129 @@ Usage:
 
 Flags:
   -h, --help   help for strategy
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa disable --help
+Disable a resource
+
+Usage:
+  mwosa disable [command]
+
+Available Commands:
+  provider    Disable a provider
+
+Flags:
+  -h, --help   help for disable
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa disable [command] --help" for more information about a command.
+
+
+### mwosa disable provider --help
+Disable a provider
+
+Usage:
+  mwosa disable provider <name> [flags]
+
+Flags:
+  -h, --help   help for provider
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa doctor --help
+Diagnose local configuration and resources
+
+Usage:
+  mwosa doctor [command]
+
+Available Commands:
+  provider    Diagnose provider configuration and client construction
+
+Flags:
+  -h, --help   help for doctor
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa doctor [command] --help" for more information about a command.
+
+
+### mwosa doctor provider --help
+Diagnose provider configuration and client construction
+
+Usage:
+  mwosa doctor provider <name> [flags]
+
+Flags:
+  -h, --help   help for provider
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa enable --help
+Enable a resource
+
+Usage:
+  mwosa enable [command]
+
+Available Commands:
+  provider    Enable a provider
+
+Flags:
+  -h, --help   help for enable
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa enable [command] --help" for more information about a command.
+
+
+### mwosa enable provider --help
+Enable a provider
+
+Usage:
+  mwosa enable provider <name> [flags]
+
+Flags:
+  -h, --help   help for provider
 
 Global Flags:
       --config string            config file path
@@ -550,6 +537,7 @@ Usage:
 
 Available Commands:
   config      Inspect resolved config and data paths
+  provider    Inspect provider configuration and readiness
   screen      Inspect a saved screening run
   strategy    Inspect a saved screening strategy
 
@@ -575,6 +563,24 @@ Usage:
 
 Flags:
   -h, --help   help for config
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa inspect provider --help
+Inspect provider configuration and readiness
+
+Usage:
+  mwosa inspect provider <name> [flags]
+
+Flags:
+  -h, --help   help for provider
 
 Global Flags:
       --config string            config file path
@@ -628,6 +634,7 @@ Usage:
   mwosa list [command]
 
 Available Commands:
+  providers   List configured and available providers
   strategies  List saved screening strategies
 
 Flags:
@@ -642,6 +649,24 @@ Global Flags:
       --provider string          force a provider by id
 
 Use "mwosa list [command] --help" for more information about a command.
+
+
+### mwosa list providers --help
+List configured and available providers
+
+Usage:
+  mwosa list providers [flags]
+
+Flags:
+  -h, --help   help for providers
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
 
 
 ### mwosa list strategies --help
@@ -662,15 +687,37 @@ Global Flags:
       --provider string          force a provider by id
 
 
-### mwosa provider --help
-Manage provider config and diagnostics
+### mwosa login --help
+Register credentials for a resource
 
 Usage:
-  mwosa provider [command]
+  mwosa login [command]
 
 Available Commands:
-  add         Add or update a provider config
-  doctor      Diagnose provider config
+  provider    Register provider credentials
+
+Flags:
+  -h, --help   help for login
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa login [command] --help" for more information about a command.
+
+
+### mwosa login provider --help
+Register provider credentials
+
+Usage:
+  mwosa login provider [command]
+
+Available Commands:
+  datago      Register datago provider credentials
 
 Flags:
   -h, --help   help for provider
@@ -683,39 +730,17 @@ Global Flags:
       --prefer-provider string   prefer a provider when multiple candidates match
       --provider string          force a provider by id
 
-Use "mwosa provider [command] --help" for more information about a command.
+Use "mwosa login provider [command] --help" for more information about a command.
 
 
-### mwosa provider add --help
-Add or update a provider config
-
-Usage:
-  mwosa provider add [command]
-
-Available Commands:
-  datago      Add or update datago provider config
-
-Flags:
-  -h, --help   help for add
-
-Global Flags:
-      --config string            config file path
-      --database string          local SQLite database path
-      --market string            market id (default "krx")
-  -o, --output output            output format: table, json, ndjson, csv (default table)
-      --prefer-provider string   prefer a provider when multiple candidates match
-      --provider string          force a provider by id
-
-Use "mwosa provider add [command] --help" for more information about a command.
-
-
-### mwosa provider add datago --help
-Add or update datago provider config
+### mwosa login provider datago --help
+Register datago provider credentials
 
 Usage:
-  mwosa provider add datago [flags]
+  mwosa login provider datago [flags]
 
 Flags:
+      -- string              enable datago securitiesProductPrice group
       --base-url string      override datago API base URL
   -h, --help                 help for datago
       --service-key string   공공데이터포털 service key
@@ -729,14 +754,78 @@ Global Flags:
       --provider string          force a provider by id
 
 
-### mwosa provider doctor --help
-Diagnose provider config
+### mwosa logout --help
+Remove credentials for a resource
 
 Usage:
-  mwosa provider doctor [provider] [flags]
+  mwosa logout [command]
+
+Available Commands:
+  provider    Remove provider credentials
 
 Flags:
-  -h, --help   help for doctor
+  -h, --help   help for logout
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa logout [command] --help" for more information about a command.
+
+
+### mwosa logout provider --help
+Remove provider credentials
+
+Usage:
+  mwosa logout provider <name> [flags]
+
+Flags:
+  -h, --help   help for provider
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa prefer --help
+Set resource preference
+
+Usage:
+  mwosa prefer [command]
+
+Available Commands:
+  provider    Prefer a provider when multiple providers match
+
+Flags:
+  -h, --help   help for prefer
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa prefer [command] --help" for more information about a command.
+
+
+### mwosa prefer provider --help
+Prefer a provider when multiple providers match
+
+Usage:
+  mwosa prefer provider <name> [flags]
+
+Flags:
+  -h, --help   help for provider
 
 Global Flags:
       --config string            config file path
@@ -754,6 +843,7 @@ Usage:
   mwosa screen [command]
 
 Available Commands:
+  etf         Run an inline jq screen against stored ETF daily records
   strategy    Run a saved screening strategy
 
 Flags:
@@ -768,6 +858,30 @@ Global Flags:
       --provider string          force a provider by id
 
 Use "mwosa screen [command] --help" for more information about a command.
+
+
+### mwosa screen etf --help
+Run an inline jq screen against stored ETF daily records
+
+Usage:
+  mwosa screen etf [flags]
+
+Aliases:
+  etf, etfs
+
+Flags:
+  -h, --help             help for etf
+      --input string     input dataset name (default "etf_daily_metrics")
+      --jq string        inline jq query
+      --jq-file string   path to a jq query file
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
 
 
 ### mwosa screen strategy --help
@@ -865,6 +979,47 @@ Flags:
   -h, --help             help for strategy
       --jq string        inline jq query
       --jq-file string   path to a jq query file
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa validate --help
+Validate local configuration and resources
+
+Usage:
+  mwosa validate [command]
+
+Available Commands:
+  provider    Validate provider configuration
+
+Flags:
+  -h, --help   help for validate
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+Use "mwosa validate [command] --help" for more information about a command.
+
+
+### mwosa validate provider --help
+Validate provider configuration
+
+Usage:
+  mwosa validate provider [name] [flags]
+
+Flags:
+  -h, --help   help for provider
 
 Global Flags:
       --config string            config file path
