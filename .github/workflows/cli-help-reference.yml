@@ -1,0 +1,66 @@
+name: cli-help-reference
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cli-help-reference.yml"
+      - ".agents/skills/mwosa/references/generate-cli-command-help.sh"
+      - "app/**"
+      - "cli/**"
+      - "cmd/**"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - "providers/**"
+      - "service/**"
+      - "skills/mwosa/references/generate-cli-command-help.sh"
+      - "storage/**"
+
+permissions:
+  contents: write
+
+jobs:
+  update-cli-help-reference:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            clients/*/go.sum
+
+      - name: Build mwosa
+        run: |
+          mkdir -p bin
+          GOWORK=off go build -o bin/mwosa ./cmd/mwosa
+
+      - name: Generate CLI help reference
+        run: MWOSA_HELP_COMMAND=./bin/mwosa skills/mwosa/references/generate-cli-command-help.sh
+
+      - name: Commit CLI help reference
+        run: |
+          if git diff --quiet -- \
+            skills/mwosa/references/cli-command-help.md \
+            .agents/skills/mwosa/references/cli-command-help.md; then
+            echo "CLI help reference is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            skills/mwosa/references/cli-command-help.md \
+            .agents/skills/mwosa/references/cli-command-help.md
+          git commit -m "docs: update mwosa cli help reference"
+          git push
