@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	appconfig "github.com/ev3rlit/mwosa/app/config"
 	provider "github.com/ev3rlit/mwosa/providers/core"
@@ -180,5 +181,5 @@ func maskedConfigSetValue(path string, value string) string {
 }
 
 func isSecretConfigPath(path string) bool {
-	return path == "providers.datago.auth.service_key"
+	return strings.HasPrefix(path, "providers.datago.") && strings.HasSuffix(path, ".auth.service_key")
 }

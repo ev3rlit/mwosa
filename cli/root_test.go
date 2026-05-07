@@ -289,7 +289,7 @@ func TestValidateProviderReportsMissingDataGoServiceKey(t *testing.T) {
 		t.Fatalf("execute validate provider datago: %v\n%s", err, out.String())
 	}
 	got := out.String()
-	for _, want := range []string{`"status": "error"`, "providers.datago.auth.service_key", "mwosa login provider datago --service-key"} {
+	for _, want := range []string{`"status": "error"`, "providers.datago.groups.securitiesProductPrice.auth.service_key", "providers.datago.groups.stockPrice.auth.service_key"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("validate provider output missing %q in:\n%s", want, got)
 		}

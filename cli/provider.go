@@ -134,14 +134,19 @@ func newLoginProviderIDCommand(opts *Options, builder provider.ProviderBuilder) 
 			}
 			fields := make([]providerLoginFieldResult, 0, len(spec.Fields))
 			for _, field := range spec.Fields {
-				rawValue := strings.TrimSpace(*values[field.Path])
-				flagChanged := cmd.Flags().Changed(field.Flag)
+				value, hasFlag := values[field.Path]
+				rawValue := ""
+				flagChanged := false
+				if hasFlag {
+					rawValue = strings.TrimSpace(*value)
+					flagChanged = cmd.Flags().Changed(field.Flag)
+				}
 				if field.Required && rawValue == "" {
 					return nil, oops.In("cli").
 						With("provider", builder.ID(), "setting", field.Path, "flag", field.Flag).
 						Errorf("provider %s requires --%s", builder.ID(), field.Flag)
 				}
-				if rawValue != "" || flagChanged {
+				if hasFlag && (rawValue != "" || flagChanged) {
 					updates[providerSettingPath(builder.ID(), field.Path)] = rawValue
 				}
 				fields = append(fields, providerLoginFieldResult{
@@ -169,6 +174,9 @@ func newLoginProviderIDCommand(opts *Options, builder provider.ProviderBuilder) 
 	}
 	for _, field := range spec.Fields {
 		field := field
+		if field.Flag == "" {
+			continue
+		}
 		values[field.Path] = new(string)
 		cmd.Flags().StringVar(values[field.Path], field.Flag, "", field.Description)
 	}

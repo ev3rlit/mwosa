@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	github.com/ev3rlit/mwosa/clients/datago-etp v0.0.0-20260503103611-57138e7267ca
+	github.com/ev3rlit/mwosa/clients/datago-stock-price v0.0.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.19
@@ -48,3 +49,5 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+replace github.com/ev3rlit/mwosa/clients/datago-stock-price => ./clients/datago-stock-price

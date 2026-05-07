@@ -122,6 +122,7 @@ func completeMarkets(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion
 
 func completeSecurityTypes(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
 	return []cobra.Completion{
+		cobra.CompletionWithDesc(string(provider.SecurityTypeStock), "Listed stock"),
 		cobra.CompletionWithDesc(string(provider.SecurityTypeETF), "Exchange-traded fund"),
 		cobra.CompletionWithDesc(string(provider.SecurityTypeETN), "Exchange-traded note"),
 		cobra.CompletionWithDesc(string(provider.SecurityTypeELW), "Equity-linked warrant"),

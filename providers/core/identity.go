@@ -14,10 +14,12 @@ const (
 	ProviderDataGo ProviderID = "datago"
 
 	GroupSecuritiesProductPrice GroupID = "securitiesProductPrice"
+	GroupStockPrice             GroupID = "stockPrice"
 
-	OperationGetETFPriceInfo OperationID = "getETFPriceInfo"
-	OperationGetETNPriceInfo OperationID = "getETNPriceInfo"
-	OperationGetELWPriceInfo OperationID = "getELWPriceInfo"
+	OperationGetETFPriceInfo   OperationID = "getETFPriceInfo"
+	OperationGetETNPriceInfo   OperationID = "getETNPriceInfo"
+	OperationGetELWPriceInfo   OperationID = "getELWPriceInfo"
+	OperationGetStockPriceInfo OperationID = "getStockPriceInfo"
 
 	MarketKRX Market = "krx"
 

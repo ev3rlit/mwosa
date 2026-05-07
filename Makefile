@@ -46,6 +46,7 @@ test:
 
 test-clients:
 	cd clients/datago-etp && $(GO) test ./... && $(GO) mod verify
+	cd clients/datago-stock-price && $(GO) test ./... && $(GO) mod verify
 
 verify: test test-clients
 
