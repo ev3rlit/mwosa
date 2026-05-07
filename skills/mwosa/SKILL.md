@@ -1,15 +1,13 @@
 ---
 name: mwosa
-description: Use when working in the mwosa repo or explaining mwosa CLI workflows, especially Datago ETF daily collection, canonical SQLite data, jq-based ETF screening, raw Datago JSON experiments, and saved screening strategies.
+description: Use when helping with installed mwosa CLI workflows, especially Datago ETF daily collection, canonical SQLite data, jq-based ETF screening, and saved screening strategies.
 ---
 
 # mwosa
 
 ## First checks
 
-- Work from the repository root.
-- Before code edits, read `RULE.md` and check `git status --short --branch`.
-- Prefer the installed `mwosa` CLI for user-facing commands. Use `go run` only when testing local source changes or running experiment-only tools that are not installed as CLI commands.
+- Prefer the installed `mwosa` CLI for user-facing commands.
 - When you need the complete installed command surface, read `references/cli-command-help.md`; it is generated from `mwosa --help` plus subcommand help.
 - Keep stdout machine-readable for `json`, `ndjson`, `csv`, and `jq` pipelines. Put progress, diagnostics, and explanations on stderr or in chat.
 
@@ -47,9 +45,9 @@ mwosa provider doctor datago -o json
 
 ## Current jq screening surface
 
-Check `references/cli-command-help.md` before recommending jq commands. The installed `mwosa v0.1.0` exposes saved strategy commands, while newer source checkouts may also expose one-off `mwosa screen etfs --jq/--jq-file`.
+Check `references/cli-command-help.md` before recommending jq commands. The installed `mwosa` CLI exposes saved strategy commands.
 
-Installed `v0.1.0` strategy flow:
+Saved strategy flow:
 
 ```bash
 mwosa create strategy etf-weekly-leaders \
@@ -66,11 +64,11 @@ mwosa history screen -o table
 mwosa inspect screen YYYY-MM-DD-weekly-leaders -o json
 ```
 
-Do not promise runtime `--argjson` support for saved strategy execution unless the codebase has been checked again; the current CLI flags only expose `--alias` on `screen strategy`.
+Do not promise runtime `--argjson` support for saved strategy execution; the captured CLI flags only expose `--alias` on `screen strategy`.
 
 ## Dataset schema and keys
 
-`etf_daily_metrics` currently reads canonical ETF daily bars from SQLite. Despite the name, treat it as daily-bar records unless the codebase has added derived metrics.
+`etf_daily_metrics` reads canonical ETF daily bars from SQLite. Despite the name, treat it as daily-bar records unless the captured CLI help documents derived metrics.
 
 Canonical strategy input rows use these JSON keys:
 
@@ -78,7 +76,7 @@ Canonical strategy input rows use these JSON keys:
 | --- | --- | --- |
 | `provider` | provider id, usually `datago` | string |
 | `provider_group` | provider group, usually `securitiesProductPrice` | string |
-| `operation` | source operation, e.g. `getETFPriceInfo` | string |
+| `operation` | provider operation, e.g. `getETFPriceInfo` | string |
 | `market` | market id, usually `krx` | string |
 | `security_type` | `etf`, `etn`, or `elw` | string |
 | `trading_date` | trading date, `YYYY-MM-DD` | string |
@@ -109,25 +107,7 @@ Common Datago ETF extras are stored under `extensions` after canonical storage:
 | `bssIdxIdxNm` | underlying index name |
 | `bssIdxClpr` | underlying index close |
 
-For raw Datago JSON files, use provider-native keys instead of canonical keys:
-
-| Raw key | Canonical key |
-| --- | --- |
-| `basDt` | `trading_date` |
-| `srtnCd` | `symbol` |
-| `isinCd` | `isin` |
-| `itmsNm` | `name` |
-| `mkp` | `opening_price` |
-| `hipr` | `highest_price` |
-| `lopr` | `lowest_price` |
-| `clpr` | `closing_price` |
-| `vs` | `price_change_from_previous_close` |
-| `fltRt` | `price_change_rate_from_previous_close` |
-| `trqu` | `traded_volume` |
-| `trPrc` | `traded_amount` |
-| `mrktTotAmt` | `market_capitalization` |
-
-When writing jq for canonical SQLite screens, use canonical snake_case keys. Use raw camel-case Datago keys only inside `testing/experiments/datago_daily_json_collector` scripts or raw snapshot files.
+When writing jq for canonical SQLite screens, use canonical snake_case keys.
 
 ## Practical jq examples
 
@@ -142,7 +122,7 @@ group_by(.symbol)
 | .[:50]
 ```
 
-Save and run a query file on installed `v0.1.0`:
+Save and run a query file:
 
 ```bash
 mwosa create strategy latest-liquidity-leaders \
@@ -183,42 +163,9 @@ map(select(.trading_date >= "YYYY-MM-DD" and .trading_date <= "YYYY-MM-DD"))
 
 For CSV output from one-off screens, prefer `-o csv` only when rows are flat. If payloads are nested, use `-o json | jq -r ...` to choose exact columns.
 
-## Raw Datago JSON experiment scripts
-
-Use the raw collector only when the user specifically wants date-partitioned source JSON or the existing experiment screeners. It writes one JSON file per date under `tmp/testing/datago-daily-json-collector/raw`.
-
-```bash
-DATAGO_SERVICE_KEY="$DATAGO_SERVICE_KEY" \
-go run ./testing/experiments/datago_daily_json_collector \
-  --products etf \
-  --start-date YYYY-MM-DD \
-  --end-date YYYY-MM-DD \
-  --workers 2 \
-  --overwrite=true
-```
-
-Run the momentum screener:
-
-```bash
-testing/experiments/datago_daily_json_collector/scripts/next_day_momentum/screen_next_day_momentum.sh \
-  --raw-dir tmp/testing/datago-daily-json-collector/raw \
-  --preset balanced \
-  --format csv
-```
-
-Run the low-volatility uptrend screener:
-
-```bash
-testing/experiments/datago_daily_json_collector/scripts/low_vol_uptrend/screen_low_vol_uptrend.sh \
-  --raw-dir tmp/testing/datago-daily-json-collector/raw \
-  --format csv
-```
-
-Always pass `--raw-dir tmp/testing/datago-daily-json-collector/raw` explicitly for these scripts. When results look stale or empty, inspect the target date file and rerun with overwrite; old empty date files have caused misleading screens before.
-
 ## How to answer users
 
 - If the user asks for a command, give the installed `mwosa` command first.
-- If the user asks how jq screening works, explain the two layers: canonical SQLite strategy screens through installed `create/screen strategy`, raw JSON experiments through `testing/experiments/.../scripts`.
+- If the user asks how jq screening works, explain canonical SQLite strategy screens through installed `create/screen strategy`.
 - Keep Korean explanations concise and command-first.
 - When producing candidate files for review, create both machine-friendly JSON and small human-openable CSV when the output could be large.
