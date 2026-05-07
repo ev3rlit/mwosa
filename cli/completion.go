@@ -129,6 +129,22 @@ func completeSecurityTypes(_ *cobra.Command, _ []string, _ string) ([]cobra.Comp
 	}, cobra.ShellCompDirectiveNoFileComp
 }
 
+func completeFinancialPeriods(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	return []cobra.Completion{
+		cobra.CompletionWithDesc("annual", "Annual financial statements"),
+		cobra.CompletionWithDesc("quarter", "Quarterly financial statements"),
+	}, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeFinancialStatementTypes(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	return []cobra.Completion{
+		cobra.CompletionWithDesc("summary", "Summary financial statement"),
+		cobra.CompletionWithDesc("income_statement", "Income statement"),
+		cobra.CompletionWithDesc("balance_sheet", "Balance sheet"),
+		cobra.CompletionWithDesc("cash_flow", "Cash flow statement"),
+	}, cobra.ShellCompDirectiveNoFileComp
+}
+
 func mustRegisterFlagCompletion(cmd *cobra.Command, flagName string, completion cobra.CompletionFunc) {
 	if err := cmd.RegisterFlagCompletionFunc(flagName, completion); err != nil {
 		panic(fmt.Sprintf("register %s completion: %v", flagName, err))

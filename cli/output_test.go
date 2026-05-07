@@ -10,6 +10,7 @@ import (
 	"github.com/ev3rlit/mwosa/app/handler"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/service/daily"
 	strategyservice "github.com/ev3rlit/mwosa/service/strategy"
 )
@@ -82,6 +83,44 @@ func TestRenderCollectResultCSVUsesServiceCSVContract(t *testing.T) {
 	want := "market,security_type,provider,group,dates,fetched,stored,rows_affected\nkrx,etf,datago,securitiesProductPrice,2,10,8,6\n"
 	if got := out.String(); got != want {
 		t.Fatalf("csv output = %q, want %q", got, want)
+	}
+}
+
+func TestRenderFinancialStatementsTableFlattensStatementLines(t *testing.T) {
+	var out bytes.Buffer
+
+	err := Render(&out, OutputModeTable, handler.FinancialStatementsOutput{financialStatementForOutputTest()})
+	if err != nil {
+		t.Fatalf("render financial statements table: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{"statement", "year", "account", "income_statement", "2025", "Revenue", "1000", "KRW"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("table output missing %q in:\n%s", want, got)
+		}
+	}
+	for _, unwanted := range []string{"provider", "group", "operation", "fakeProvider"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("table output should not include %q:\n%s", unwanted, got)
+		}
+	}
+}
+
+func TestRenderFinancialStatementsCSVFlattensStatementLines(t *testing.T) {
+	var out bytes.Buffer
+
+	err := Render(&out, OutputModeCSV, handler.FinancialStatementsOutput{financialStatementForOutputTest()})
+	if err != nil {
+		t.Fatalf("render financial statements csv: %v", err)
+	}
+
+	got := out.String()
+	if !strings.HasPrefix(got, "statement,symbol,fiscal_year,fiscal_period,period,account_id,account_name,value,currency,unit\n") {
+		t.Fatalf("csv header = %q", got)
+	}
+	if !strings.Contains(got, "income_statement,005930,2025,FY,annual,ifrs_Revenue,Revenue,1000,KRW,원\n") {
+		t.Fatalf("csv output missing financial statement line:\n%s", got)
 	}
 }
 
@@ -199,6 +238,26 @@ func dailyBarForOutputTest() dailybar.Bar {
 		Close:       "98000",
 		Change:      "-500",
 		Volume:      "16267003",
+	}
+}
+
+func financialStatementForOutputTest() financials.Statement {
+	return financials.Statement{
+		Provider:     provider.ProviderID("fakeProvider"),
+		Group:        provider.GroupID("fakeGroup"),
+		Operation:    provider.OperationID("fakeOperation"),
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeStock,
+		Statement:    financials.StatementTypeIncomeStatement,
+		Symbol:       "005930",
+		FiscalYear:   "2025",
+		FiscalPeriod: "FY",
+		Period:       financials.PeriodTypeAnnual,
+		Currency:     "KRW",
+		Unit:         "원",
+		Lines: []financials.LineItem{
+			{AccountID: "ifrs_Revenue", AccountName: "Revenue", Value: "1000"},
+		},
 	}
 }
 

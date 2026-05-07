@@ -181,5 +181,5 @@ func maskedConfigSetValue(path string, value string) string {
 }
 
 func isSecretConfigPath(path string) bool {
-	return strings.HasPrefix(path, "providers.datago.") && strings.HasSuffix(path, ".auth.service_key")
+	return strings.HasPrefix(path, "providers.") && strings.HasSuffix(path, ".service_key")
 }

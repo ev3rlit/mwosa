@@ -2,13 +2,14 @@
 
 ## 개요
 
-`datago` provider 는 공공데이터포털의 여러 OpenAPI 를 `mwosa` 안에서 하나의 provider 로 묶는 adapter 다.
+`datago` 계열 provider 는 공공데이터포털의 OpenAPI 를 `mwosa` provider 로 연결하는 adapter 다.
 
-공공데이터포털은 하나의 종합 API 보다 개별 API 서비스를 따로 제공하는 경우가 많다. 그래서 `datago` 는 provider 이름을 하나로 유지하고, 실제 승인 범위와 endpoint 묶음은 provider group 으로 나눈다.
+공공데이터포털은 하나의 종합 API 보다 개별 API 서비스를 따로 제공하고, 실제 활용 신청도 OpenAPI 단위로 나뉜다. 그래서 하나의 `datago` provider 가 모든 OpenAPI client 를 들고 있으면 사용자가 승인하지 않은 API 까지 등록된 것처럼 보인다. 현재 구현은 활용 신청 단위를 provider id 로 분리하고, 원천 API 식별은 provider group 으로 남긴다.
 
-현재 구현은 `securitiesProductPrice` 와 `stockPrice` 두 group 을 지원한다.
-`securitiesProductPrice` 는 `금융위원회_증권상품시세정보` OpenAPI를 사용해 ETF, ETN, ELW 시세 데이터를 수집한다.
-`stockPrice` 는 `금융위원회_주식시세정보` OpenAPI를 사용해 상장 주식 시세 데이터를 수집한다.
+현재 구현된 provider 는 두 개다.
+
+- `datago`: `금융위원회_증권상품시세정보` 와 `금융위원회_주식시세정보` OpenAPI 승인 범위에 해당하며 ETF, ETN, ELW, 상장 주식 시세 데이터를 수집한다.
+- `datago-corpfin`: `금융위원회_기업 재무정보` OpenAPI 승인 범위에 해당하며, 이름/단축코드 해석을 위해 `금융위원회_KRX상장종목정보` OpenAPI 승인도 필요하다.
 
 원본 OpenAPI 스펙은 provider client module 안의
 `clients/datago-etp/docs/securitiesProductPrice.openapi.yaml` 에 보관한다.
@@ -16,7 +17,7 @@
 
 이 provider 의 client 구현체는 `mwosa` workspace 안의 **독립 Go module** 로 관리한다. `mwosa` repository root 의 `go.work` 로 CLI module 과 함께 개발하고, 필요하면 나중에 별도 repository 로 분리할 수 있다.
 
-이 provider 는 canonical schema 관점에서 다음 역할을 가진다.
+`datago` provider 는 canonical schema 관점에서 다음 역할을 가진다.
 
 - ETF / ETN / ELW 종목의 일별 시세 공급
 - 상장 주식 종목의 일별 시세 공급
@@ -31,6 +32,8 @@
 
 - provider 문서: `docs/providers/datago/README.md`
 - 원본 스펙: `clients/datago-etp/docs/securitiesProductPrice.openapi.yaml`
+- 기업 재무정보 client: `clients/datago-corpfin`
+- KRX 상장종목정보 client: `clients/datago-krxlisted`
 - 공통 저장 계약: `docs/canonical-schema.md`
 
 권장 패키지 분리:
@@ -66,9 +69,16 @@
 
 이 구조를 택하면 CLI 코어는 provider 세부사항을 직접 알 필요가 없고, `datago` client 도 adapter 등록 전에 독립적으로 테스트할 수 있다.
 
-## Provider group
+## Provider id 와 group
 
-`datago` 의 provider id 는 항상 `datago` 로 둔다. `datago-securities-product-price` 나 `datago/securitiesProductPrice` 같은 이름을 provider 이름으로 만들지 않는다.
+provider id 는 활용 신청 단위와 사용자가 설정해야 하는 credential 단위를 반영한다.
+
+| provider id | 상태 | 공공데이터포털 API | 주요 group | capability |
+| --- | --- | --- | --- | --- |
+| `datago` | `core` | 금융위원회_증권상품시세정보 | `securitiesProductPrice` | `daily_bar`, `instrument` |
+| `datago-corpfin` | `core` | 금융위원회_기업 재무정보, 금융위원회_KRX상장종목정보 | `corporateFinance`, `krxListedInfo` | `financials` |
+
+group 은 provenance 와 내부 operation 식별에 사용한다.
 
 group 은 다음 기준으로 나눈다.
 
@@ -83,6 +93,8 @@ group 은 다음 기준으로 나눈다.
 | --- | --- | --- | --- | --- |
 | `securitiesProductPrice` | `core` | 금융위원회_증권상품시세정보 | `getETFPriceInfo`, `getETNPriceInfo`, `getELWPriceInfo` | `daily_bar`, `instrument` |
 | `stockPrice` | `core` | 금융위원회_주식시세정보 | `getStockPriceInfo` | `daily_bar`, `instrument` |
+| `corporateFinance` | `core` | 금융위원회_기업 재무정보 | `getSummFinaStat_V2`, `getBs_V2`, `getIncoStat_V2` | `financials` |
+| `krxListedInfo` | `core` | 금융위원회_KRX상장종목정보 | `getItemInfo` | `financials` identifier resolution |
 | `krxListedInstrument` | `planned` | KRX상장종목정보 | 미정 | `instrument` |
 | `corporateFinancial` | `planned` | 기업 재무 정보 | 미정 | `fundamentals`, `financials` |
 
@@ -102,6 +114,7 @@ unavailable 상태로 설명한다.
 config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에서 오버라이드한다.
 공공데이터포털 활용신청은 OpenAPI 서비스 단위이므로, 실제 인증 키는 group 별로 분리해서 관리한다.
 기존 `providers.datago.auth.service_key` 는 `securitiesProductPrice` 호환용 fallback 으로만 사용한다.
+`datago-corpfin` 은 별도 provider id 로 두고, 이름/단축코드 기반 조회를 위해 `krxListedInfo` 의존 설정을 함께 가진다.
 
 ```json
 {
@@ -120,12 +133,24 @@ config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에
           "auth": {
             "service_key": "..."
           }
-        },
-        "krxListedInstrument": {
-          "enabled": false
-        },
-        "corporateFinancial": {
-          "enabled": false
+        }
+      }
+    },
+    "datago-corpfin": {
+      "enabled": true,
+      "auth": {
+        "service_key": "..."
+      },
+      "groups": {
+        "corporateFinance": {
+          "enabled": true
+        }
+      },
+      "dependencies": {
+        "krxListedInfo": {
+          "auth": {
+            "service_key": "..."
+          }
         }
       }
     }
@@ -135,6 +160,13 @@ config 도 provider 전체 설정을 기본으로 두되, 필요하면 group 에
 
 한 group 의 key 만 설정하면 해당 group 의 role 만 provider registry 에 등록한다.
 예를 들어 `stockPrice` key 만 있으면 `stock` daily/instrument 는 등록되지만 ETF/ETN/ELW role 은 등록하지 않는다.
+
+CLI 설정 예:
+
+```text
+mwosa login provider datago --service-key <securitiesProductPrice-key>
+mwosa login provider datago-corpfin --service-key <corporateFinance-key> --krx-listed-service-key <krxListedInfo-key>
+```
 
 ## `securitiesProductPrice` API 표면
 
@@ -312,6 +344,70 @@ response envelope:
 
 `item` 은 단건 object 또는 array 일 수 있으므로 normalizer 는 둘 다 처리해야 한다.
 
+## `corporateFinance` API 표면
+
+공공데이터포털의 `금융위원회_기업 재무정보` API 는 다음 operation 을 제공한다.
+
+- `GET /getSummFinaStat_V2`
+- `GET /getBs_V2`
+- `GET /getIncoStat_V2`
+
+공통 요청 파라미터는 다음과 같다.
+
+- `serviceKey`
+- `numOfRows`
+- `pageNo`
+- `resultType=json`
+- `crno`: 법인등록번호
+- `bizYear`: 사업연도
+
+이 API 는 종목코드나 ISIN 이 아니라 법인등록번호를 기준으로 조회한다. 하지만 사용자-facing CLI 는 법인등록번호를 1순위 입력으로 요구하지 않는다. `datago-corpfin` provider 의 `financials` role 은 `mwosa get financials <company>` 호출 시 먼저 회사명/종목명을 `crno` 로 해석한 뒤 `corporateFinance` API 를 호출한다.
+
+해석 규칙은 다음과 같다.
+
+- 1순위: 종목명/회사명 기반 조회. `krxListedInfo/getItemInfo` 의 `itmsNm` 로 조회한 뒤 exact match 의 `crno` 를 사용한다.
+- 2순위: KRX 단축코드. 이름 조회가 실패하고 입력이 숫자 단축코드처럼 보이면 `likeSrtnCd` 로 조회한다.
+- 3순위: ISIN. 이름 조회가 실패하고 입력이 12자리 ISIN처럼 보이면 `isinCd` 로 조회한다.
+- 고급 입력: 13자리 숫자는 이미 `crno` 로 보고 바로 `corporateFinance` 를 호출한다.
+
+즉, 재무제표 조회 경로는 `datago-corpfin` provider 안에서 `krxListedInfo` client 와 `corporateFinance` client 를 연계한다. provenance 의 provider 는 `datago-corpfin`, 재무제표 group 은 `corporateFinance` 로 남기고, symbol resolution 정보는 statement extension 에 `request_symbol`, `srtnCd`, `isinCd`, `corpNm`, `resolver_group=krxListedInfo`, `resolver_source=getItemInfo` 로 보관한다.
+
+`corporateFinance` group 의 provider compatibility 는 다음처럼 본다.
+
+- data latency: `historical`
+- current trading-day supported: `false`
+- intended use: filing-derived company financial statement lookup
+- not intended use: realtime fundamentals
+- dependency: KRX listed item lookup when the caller provides ticker-like identifiers
+
+주의:
+
+- 이 API 는 현금흐름표 operation 을 제공하지 않는다.
+- 외국회사는 국내 법인등록번호가 비어 있을 수 있으며, 이 경우 `financials` 조회는 unsupported 로 실패한다.
+- `--statement cash_flow` 는 `unsupported provider capability` 로 실패해야 한다.
+- `--statement` 을 생략하면 요약재무제표, 재무상태표, 손익계산서를 차례로 조회한다.
+
+## `krxListedInfo` API 표면
+
+공공데이터포털의 `금융위원회_KRX상장종목정보` API 는 단일 operation 을 제공한다.
+
+- `GET /getItemInfo`
+
+공통 요청 파라미터는 다음과 같다.
+
+- `serviceKey`
+- `numOfRows`
+- `pageNo`
+- `resultType=json`
+- `basDt`, `beginBasDt`, `endBasDt`, `likeBasDt`
+- `likeSrtnCd`: KRX 단축코드 검색
+- `isinCd`, `likeIsinCd`: ISIN 검색
+- `itmsNm`, `likeItmsNm`: 종목명 검색
+- `crno`: 법인등록번호 검색
+- `corpNm`, `likeCorpNm`: 법인명 검색
+
+응답은 기준일자, 단축코드, ISIN, 시장구분, 종목명, 법인등록번호, 법인명을 제공한다. 데이터는 일 1회 갱신되며 금융위원회 API 특성상 실시간 데이터가 아니라 기준일자 다음 영업일 오후 1시 이후 공개되는 지연 데이터로 취급한다.
+
 ## Field to canonical mapping
 
 ### 공통 기본 매핑
@@ -410,7 +506,8 @@ ELW 역시 `basDt`, `srtnCd`, `itmsNm`, `clpr`, `mkp`, `hipr`, `lopr`, `trqu`, `
 `datago` provider 는 다음 특성을 가진다.
 
 - 장점:
-  - provider 이름을 `datago` 하나로 유지하면서 API 서비스별 group 을 확장할 수 있다.
+  - OpenAPI 활용신청 단위가 다르면 `datago-corpfin` 같은 하위 provider 로 credential 경계를 분리할 수 있다.
+  - 각 provider 안에서는 API 서비스별 group 을 유지해 provenance 와 role registration 을 명확히 남길 수 있다.
   - 공공데이터포털의 개별 API 승인 범위를 group 단위로 점검할 수 있다.
   - 검색 기반의 넓은 범위 조회가 가능
   - ETF / ETN / ELW 를 하나의 계열 API 에서 제공

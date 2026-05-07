@@ -11,15 +11,22 @@ type DataLatency string
 type Role string
 
 const (
-	ProviderDataGo ProviderID = "datago"
+	ProviderDataGo                 ProviderID = "datago"
+	ProviderDataGoCorporateFinance ProviderID = "datago-corpfin"
 
 	GroupSecuritiesProductPrice GroupID = "securitiesProductPrice"
 	GroupStockPrice             GroupID = "stockPrice"
+	GroupCorporateFinance       GroupID = "corporateFinance"
+	GroupKRXListedInfo          GroupID = "krxListedInfo"
 
-	OperationGetETFPriceInfo   OperationID = "getETFPriceInfo"
-	OperationGetETNPriceInfo   OperationID = "getETNPriceInfo"
-	OperationGetELWPriceInfo   OperationID = "getELWPriceInfo"
-	OperationGetStockPriceInfo OperationID = "getStockPriceInfo"
+	OperationGetETFPriceInfo      OperationID = "getETFPriceInfo"
+	OperationGetETNPriceInfo      OperationID = "getETNPriceInfo"
+	OperationGetELWPriceInfo      OperationID = "getELWPriceInfo"
+	OperationGetStockPriceInfo    OperationID = "getStockPriceInfo"
+	OperationGetSummFinaStatV2    OperationID = "getSummFinaStat_V2"
+	OperationGetBalanceSheetV2    OperationID = "getBs_V2"
+	OperationGetIncomeStatementV2 OperationID = "getIncoStat_V2"
+	OperationGetItemInfo          OperationID = "getItemInfo"
 
 	MarketKRX Market = "krx"
 
@@ -30,7 +37,8 @@ const (
 
 	CredentialScopeDataGo CredentialScope = "datago"
 
-	FreshnessDaily Freshness = "daily"
+	FreshnessDaily  Freshness = "daily"
+	FreshnessFiling Freshness = "filing"
 
 	DataLatencyRealtime            DataLatency = "realtime"
 	DataLatencyEndOfDay            DataLatency = "end_of_day"
@@ -38,6 +46,7 @@ const (
 	DataLatencyHistorical          DataLatency = "historical"
 
 	RoleDailyBar   Role = "daily_bar"
+	RoleFinancials Role = "financials"
 	RoleInstrument Role = "instrument"
 	RoleQuote      Role = "quote_snapshot"
 )

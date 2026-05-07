@@ -3,6 +3,7 @@ package spec
 import (
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
 	"github.com/ev3rlit/mwosa/providers/core/quote"
 	"github.com/samber/oops"
@@ -430,6 +431,96 @@ func (b QuoteBuilder) Build() (quote.Profile, error) {
 }
 
 func (b QuoteBuilder) MustBuild() quote.Profile {
+	profile, err := b.Build()
+	if err != nil {
+		panic(err)
+	}
+	return profile
+}
+
+type FinancialsBuilder struct {
+	role roleBuilder
+}
+
+func Financials() FinancialsBuilder {
+	return FinancialsBuilder{role: newRoleBuilder(provider.RoleFinancials)}
+}
+
+func (b FinancialsBuilder) Markets(markets ...provider.Market) FinancialsBuilder {
+	b.role = b.role.markets(markets...)
+	return b
+}
+
+func (b FinancialsBuilder) SecurityTypes(securityTypes ...provider.SecurityType) FinancialsBuilder {
+	b.role = b.role.securityTypes(securityTypes...)
+	return b
+}
+
+func (b FinancialsBuilder) Group(group provider.GroupID) FinancialsBuilder {
+	b.role = b.role.group(group)
+	return b
+}
+
+func (b FinancialsBuilder) Operations(operations ...provider.OperationID) FinancialsBuilder {
+	b.role = b.role.operations(operations...)
+	return b
+}
+
+func (b FinancialsBuilder) RequiresAuth(scope provider.CredentialScope) FinancialsBuilder {
+	b.role = b.role.requiresAuth(scope)
+	return b
+}
+
+func (b FinancialsBuilder) NoAuth() FinancialsBuilder {
+	b.role = b.role.noAuth()
+	return b
+}
+
+func (b FinancialsBuilder) Freshness(freshness provider.Freshness) FinancialsBuilder {
+	b.role = b.role.freshness(freshness)
+	return b
+}
+
+func (b FinancialsBuilder) Compatibility(source CompatibilitySource) FinancialsBuilder {
+	b.role = b.role.compatibility(source)
+	return b
+}
+
+func (b FinancialsBuilder) CompatibilityValue(compatibility provider.Compatibility) FinancialsBuilder {
+	b.role = b.role.compatibilityValue(compatibility)
+	return b
+}
+
+func (b FinancialsBuilder) Priority(priority int) FinancialsBuilder {
+	b.role = b.role.priority(priority)
+	return b
+}
+
+func (b FinancialsBuilder) Limitations(limitations ...string) FinancialsBuilder {
+	b.role = b.role.limitations(limitations...)
+	return b
+}
+
+func (b FinancialsBuilder) Build() (financials.Profile, error) {
+	profile, err := b.role.build()
+	if err != nil {
+		return financials.Profile{}, err
+	}
+	return financials.Profile{
+		Markets:       profile.Markets,
+		SecurityTypes: profile.SecurityTypes,
+		Group:         profile.Group,
+		Operations:    profile.Operations,
+		AuthScope:     profile.AuthScope,
+		Freshness:     profile.Freshness,
+		Compatibility: profile.Compatibility,
+		RequiresAuth:  profile.RequiresAuth,
+		Priority:      profile.Priority,
+		Limitations:   profile.Limitations,
+	}, nil
+}
+
+func (b FinancialsBuilder) MustBuild() financials.Profile {
 	profile, err := b.Build()
 	if err != nil {
 		panic(err)

@@ -9,8 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	datagocorpfin "github.com/ev3rlit/mwosa/clients/datago-corpfin"
 	provider "github.com/ev3rlit/mwosa/providers/core"
 	"github.com/ev3rlit/mwosa/providers/core/dailybar"
+	"github.com/ev3rlit/mwosa/providers/core/financials"
 	"github.com/ev3rlit/mwosa/providers/core/instrument"
 	"github.com/ev3rlit/mwosa/providers/core/quote"
 )
@@ -346,6 +348,249 @@ func TestFetchStockDailyBarsUsesStockPriceGroup(t *testing.T) {
 	}
 }
 
+func TestFetchFinancialStatementsFetchesSummaryBalanceSheetAndIncomeStatement(t *testing.T) {
+	seenPaths := make([]string, 0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPaths = append(seenPaths, r.URL.Path)
+		assertCommonQuery(t, r, "1", "1000")
+		if got := r.URL.Query().Get("crno"); got != "1746110000741" {
+			t.Fatalf("crno = %q, want 1746110000741", got)
+		}
+		if got := r.URL.Query().Get("bizYear"); got != "2019" {
+			t.Fatalf("bizYear = %q, want 2019", got)
+		}
+		switch r.URL.Path {
+		case "/getSummFinaStat_V2":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 1,
+					"items": {"item": {
+						"basDt": "20200101",
+						"bizYear": "2019",
+						"crno": "1746110000741",
+						"curCd": "KRW",
+						"enpSaleAmt": "1000",
+						"enpBzopPft": "200"
+					}}
+				}
+			}`)
+		case "/getBs_V2":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 1,
+					"items": {"item": [
+						{"basDt": "20200101", "bizYear": "2019", "crno": "1746110000741", "curCd": "KRW", "acitId": "ifrs_Assets", "acitNm": "Assets", "crtmAcitAmt": "5000"}
+					]}
+				}
+			}`)
+		case "/getIncoStat_V2":
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 1,
+					"items": {"item": [
+						{"basDt": "20200101", "bizYear": "2019", "crno": "1746110000741", "curCd": "KRW", "acitId": "ifrs_Revenue", "acitNm": "Revenue", "crtmAcitAmt": "1000", "thqrAcitAmt": "300"}
+					]}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	p := newTestCorporateFinanceProvider(t, server.URL)
+	result, err := p.FetchFinancialStatements(context.Background(), financials.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeStock,
+		Symbol:       "1746110000741",
+		FiscalYear:   "2019",
+	})
+	if err != nil {
+		t.Fatalf("fetch financial statements: %v", err)
+	}
+	if strings.Join(seenPaths, ",") != "/getSummFinaStat_V2,/getBs_V2,/getIncoStat_V2" {
+		t.Fatalf("seen paths = %v, want all financial statement operations", seenPaths)
+	}
+	if len(result.Statements) != 3 || result.TotalCount != 3 {
+		t.Fatalf("result = %+v, want three statements", result)
+	}
+	if result.Statements[0].Statement != financials.StatementTypeSummary || result.Statements[0].Lines[0].Value != "1000" {
+		t.Fatalf("summary statement = %+v", result.Statements[0])
+	}
+	if result.Statements[1].Statement != financials.StatementTypeBalanceSheet || result.Statements[1].Lines[0].AccountName != "Assets" {
+		t.Fatalf("balance statement = %+v", result.Statements[1])
+	}
+	if result.Statements[2].Statement != financials.StatementTypeIncomeStatement || result.Statements[2].Lines[0].Value != "1000" {
+		t.Fatalf("income statement = %+v", result.Statements[2])
+	}
+}
+
+func TestFetchFinancialStatementsCanSelectQuarterIncomeStatement(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/getIncoStat_V2" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		fmt.Fprint(w, `{
+			"header": {"resultCode": "00", "resultMsg": "OK"},
+			"body": {
+				"numOfRows": 1000,
+				"pageNo": 1,
+				"totalCount": 1,
+				"items": {"item": [
+					{"basDt": "20200101", "bizYear": "2019", "crno": "1746110000741", "curCd": "KRW", "acitId": "ifrs_Revenue", "acitNm": "Revenue", "crtmAcitAmt": "1000", "thqrAcitAmt": "300"}
+				]}
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	p := newTestCorporateFinanceProvider(t, server.URL)
+	result, err := p.FetchFinancialStatements(context.Background(), financials.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeStock,
+		Symbol:       "1746110000741",
+		FiscalYear:   "2019",
+		Period:       financials.PeriodTypeQuarter,
+		Statement:    financials.StatementTypeIncomeStatement,
+	})
+	if err != nil {
+		t.Fatalf("fetch financial statements: %v", err)
+	}
+	if len(result.Statements) != 1 || result.Statements[0].Lines[0].Value != "300" {
+		t.Fatalf("result = %+v, want quarter amount", result)
+	}
+}
+
+func TestFetchFinancialStatementsResolvesShortCodeWithKRXListedInfo(t *testing.T) {
+	seenPaths := make([]string, 0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPaths = append(seenPaths, r.URL.Path)
+		switch r.URL.Path {
+		case "/getItemInfo":
+			switch len(seenPaths) {
+			case 1:
+				assertCommonQuery(t, r, "1", "10")
+				if got := r.URL.Query().Get("itmsNm"); got != "005930" {
+					t.Fatalf("itmsNm = %q, want 005930", got)
+				}
+				fmt.Fprint(w, `{
+					"header": {"resultCode": "00", "resultMsg": "OK"},
+					"body": {
+						"numOfRows": 10,
+						"pageNo": 1,
+						"totalCount": 0,
+						"items": {}
+					}
+				}`)
+				return
+			case 2:
+				assertCommonQuery(t, r, "1", "10")
+				if got := r.URL.Query().Get("likeSrtnCd"); got != "005930" {
+					t.Fatalf("likeSrtnCd = %q, want 005930", got)
+				}
+			default:
+				t.Fatalf("unexpected getItemInfo call count: %d", len(seenPaths))
+			}
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 10,
+					"pageNo": 1,
+					"totalCount": 1,
+					"items": {"item": {
+						"basDt": "20260430",
+						"srtnCd": "005930",
+						"isinCd": "KR7005930003",
+						"mrktCtg": "KOSPI",
+						"itmsNm": "삼성전자",
+						"crno": "1301110006246",
+						"corpNm": "삼성전자주식회사"
+					}}
+				}
+			}`)
+		case "/getSummFinaStat_V2":
+			assertCommonQuery(t, r, "1", "1000")
+			if got := r.URL.Query().Get("crno"); got != "1301110006246" {
+				t.Fatalf("crno = %q, want 1301110006246", got)
+			}
+			fmt.Fprint(w, `{
+				"header": {"resultCode": "00", "resultMsg": "OK"},
+				"body": {
+					"numOfRows": 1000,
+					"pageNo": 1,
+					"totalCount": 1,
+					"items": {"item": {
+						"basDt": "20200101",
+						"bizYear": "2019",
+						"crno": "1301110006246",
+						"curCd": "KRW",
+						"enpSaleAmt": "1000"
+					}}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	p := newTestCorporateFinanceProvider(t, server.URL)
+	result, err := p.FetchFinancialStatements(context.Background(), financials.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeStock,
+		Symbol:       "005930",
+		FiscalYear:   "2019",
+		Statement:    financials.StatementTypeSummary,
+	})
+	if err != nil {
+		t.Fatalf("fetch financial statements: %v", err)
+	}
+	if strings.Join(seenPaths, ",") != "/getItemInfo,/getItemInfo,/getSummFinaStat_V2" {
+		t.Fatalf("seen paths = %v, want symbol resolution then summary", seenPaths)
+	}
+	if len(result.Statements) != 1 {
+		t.Fatalf("statements len = %d, want 1", len(result.Statements))
+	}
+	statement := result.Statements[0]
+	if statement.Symbol != "1301110006246" || statement.Name != "삼성전자주식회사" {
+		t.Fatalf("statement identity = %+v, want resolved crno and name", statement)
+	}
+	if statement.Extensions["request_symbol"] != "005930" || statement.Extensions["srtnCd"] != "005930" {
+		t.Fatalf("statement extensions = %+v, want symbol resolution metadata", statement.Extensions)
+	}
+}
+
+func TestFetchFinancialStatementsRequiresResolutionClientForShortCode(t *testing.T) {
+	p := NewCorporateFinanceWithClients(stubFinancialClient{}, nil)
+	_, err := p.FetchFinancialStatements(context.Background(), financials.FetchInput{
+		Market:       provider.MarketKRX,
+		SecurityType: provider.SecurityTypeStock,
+		Symbol:       "005930",
+		FiscalYear:   "2019",
+	})
+	if err == nil {
+		t.Fatal("fetch financial statements error = nil, want unsupported crno error")
+	}
+	var unsupported *provider.UnsupportedError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("error type = %T, want UnsupportedError: %v", err, err)
+	}
+	for _, want := range []string{"provider=datago-corpfin", "group=krxListedInfo", "symbol=005930", "symbol resolution"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %q in %q", want, err.Error())
+		}
+	}
+}
+
 func TestRemoteErrorIncludesProviderContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "upstream down", http.StatusBadGateway)
@@ -471,6 +716,21 @@ func newTestProvider(t *testing.T, baseURL string) *Provider {
 	return p
 }
 
+func newTestCorporateFinanceProvider(t *testing.T, baseURL string) *CorporateFinanceProvider {
+	t.Helper()
+	p, err := NewCorporateFinance(CorporateFinanceConfig{
+		ServiceKey:              "test-key",
+		CorporateFinanceBaseURL: baseURL,
+		KRXListedInfoServiceKey: "test-key",
+		KRXListedInfoBaseURL:    baseURL,
+		RetryMaxAttempts:        1,
+	})
+	if err != nil {
+		t.Fatalf("new datago corporate finance provider: %v", err)
+	}
+	return p
+}
+
 func assertCommonQuery(t *testing.T, r *http.Request, pageNo string, numOfRows string) {
 	t.Helper()
 	if got := r.URL.Query().Get("serviceKey"); got != "test-key" {
@@ -489,4 +749,18 @@ func instrumentInput(query string) instrument.SearchInput {
 		Market: provider.MarketKRX,
 		Query:  query,
 	}
+}
+
+type stubFinancialClient struct{}
+
+func (stubFinancialClient) GetAllSummaryFinancialStatements(context.Context, datagocorpfin.Query) (datagocorpfin.SummaryFinancialStatementResult, error) {
+	return datagocorpfin.SummaryFinancialStatementResult{}, nil
+}
+
+func (stubFinancialClient) GetAllBalanceSheets(context.Context, datagocorpfin.Query) (datagocorpfin.BalanceSheetResult, error) {
+	return datagocorpfin.BalanceSheetResult{}, nil
+}
+
+func (stubFinancialClient) GetAllIncomeStatements(context.Context, datagocorpfin.Query) (datagocorpfin.IncomeStatementResult, error) {
+	return datagocorpfin.IncomeStatementResult{}, nil
 }

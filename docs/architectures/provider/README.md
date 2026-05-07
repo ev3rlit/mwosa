@@ -527,7 +527,7 @@ config 는 provider 전체 설정을 기본값으로 두고, 필요한 경우 gr
 }
 ```
 
-이 구조에서는 provider 이름에 `-` 나 `/` 를 붙여 하위 API 를 표현하지 않는다. `datago` 는 provider id 로 유지하고, 세부 API 범위는 `group` 필드로 표현한다.
+기본 구조에서는 provider 이름에 `-` 나 `/` 를 붙여 하위 API 를 표현하지 않는다. 다만 활용신청과 credential 이 사용자가 별도로 관리해야 할 단위라면 `datago-corpfin` 처럼 datago 계열 하위 provider 로 분리할 수 있다. 이 경우에도 원천 API 식별과 role registration 은 `corporateFinance` 같은 provider group 으로 유지한다.
 
 ## Unsupported 처리
 
