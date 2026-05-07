@@ -19,10 +19,10 @@ MWOSA_HELP_REPO_ROOT=/path/to/mwosa skills/mwosa/references/generate-cli-command
 ## Captured Help
 
 ```text
-mwosa v0.1.1-0.20260507063946-cc9acf4aa972
+mwosa v0.1.1-0.20260507065048-104c3fa59132
 schema dev
-commit cc9acf4aa9729cb8af1317bc5a85f5b248f104bb
-built 2026-05-07T06:39:46Z
+commit 104c3fa5913249568487b62c9e42ecb1f7bdb67c
+built 2026-05-07T06:50:48Z
 go go1.25.6
 Investment research CLI for provider-backed market data
 
@@ -431,6 +431,7 @@ Usage:
 
 Available Commands:
   daily       Read stored daily bars for a symbol
+  financials  Fetch provider-backed financial statements by company name or KRX code
 
 Flags:
   -h, --help   help for get
@@ -458,6 +459,29 @@ Flags:
   -h, --help                   help for daily
       --security-type string   security type: stock, etf, etn, elw (default "etf")
       --to string              end trading date, YYYYMMDD or YYYY-MM-DD
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa get financials --help
+Fetch provider-backed financial statements by company name or KRX code
+
+Usage:
+  mwosa get financials <company> [flags]
+
+Flags:
+  -h, --help                   help for financials
+      --limit int              maximum number of statement rows to fetch
+      --period string          financial period: annual, quarter (default "annual")
+      --security-type string   security type: stock, etf, etn, elw (default "stock")
+      --statement string       statement type: summary, income_statement, balance_sheet, cash_flow; empty fetches all
+      --year string            fiscal year, for example 2025
 
 Global Flags:
       --config string            config file path
@@ -717,7 +741,8 @@ Usage:
   mwosa login provider [command]
 
 Available Commands:
-  datago      Register datago provider credentials
+  datago         Register datago provider credentials
+  datago-corpfin Register datago-corpfin provider credentials
 
 Flags:
   -h, --help   help for provider
@@ -747,6 +772,28 @@ Flags:
       --service-key string               legacy 공공데이터포털 service key for securitiesProductPrice
       --stock-price-base-url string      override datago stockPrice API base URL
       --stock-price-service-key string   공공데이터포털 stockPrice service key
+
+Global Flags:
+      --config string            config file path
+      --database string          local SQLite database path
+      --market string            market id (default "krx")
+  -o, --output output            output format: table, json, ndjson, csv (default table)
+      --prefer-provider string   prefer a provider when multiple candidates match
+      --provider string          force a provider by id
+
+
+### mwosa login provider datago-corpfin --help
+Register datago-corpfin provider credentials
+
+Usage:
+  mwosa login provider datago-corpfin [flags]
+
+Flags:
+      --corpfin-base-url string         override datago corporateFinance API base URL
+  -h, --help                            help for datago-corpfin
+      --krx-listed-base-url string      override datago krxListedInfo API base URL
+      --krx-listed-service-key string   공공데이터포털 krxListedInfo service key used for company-name and KRX-code resolution
+      --service-key string              공공데이터포털 corporateFinance service key
 
 Global Flags:
       --config string            config file path
