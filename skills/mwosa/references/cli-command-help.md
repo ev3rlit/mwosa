@@ -19,10 +19,10 @@ MWOSA_HELP_REPO_ROOT=/path/to/mwosa skills/mwosa/references/generate-cli-command
 ## Captured Help
 
 ```text
-mwosa v0.1.1-0.20260506112216-fff61ee80aad
+mwosa v0.1.1-0.20260507063946-cc9acf4aa972
 schema dev
-commit fff61ee80aad1308f3f77176984e47d73b7c2830
-built 2026-05-06T11:22:16Z
+commit cc9acf4aa9729cb8af1317bc5a85f5b248f104bb
+built 2026-05-07T06:39:46Z
 go go1.25.6
 Investment research CLI for provider-backed market data
 
@@ -97,7 +97,7 @@ Usage:
 Flags:
       --from string            start trading date, YYYYMMDD or YYYY-MM-DD
   -h, --help                   help for daily
-      --security-type string   security type: etf, etn, elw (default "etf")
+      --security-type string   security type: stock, etf, etn, elw (default "etf")
       --to string              end trading date, YYYYMMDD or YYYY-MM-DD
       --workers int            number of page fetch workers for range-capable providers (default 1)
 
@@ -411,7 +411,7 @@ Flags:
       --as-of string           single trading date, YYYYMMDD or YYYY-MM-DD
       --from string            start trading date, YYYYMMDD or YYYY-MM-DD
   -h, --help                   help for daily
-      --security-type string   security type: etf, etn, elw (default "etf")
+      --security-type string   security type: stock, etf, etn, elw (default "etf")
       --to string              end trading date, YYYYMMDD or YYYY-MM-DD
 
 Global Flags:
@@ -456,7 +456,7 @@ Flags:
       --as-of string           single trading date, YYYYMMDD or YYYY-MM-DD
       --from string            start trading date, YYYYMMDD or YYYY-MM-DD
   -h, --help                   help for daily
-      --security-type string   security type: etf, etn, elw (default "etf")
+      --security-type string   security type: stock, etf, etn, elw (default "etf")
       --to string              end trading date, YYYYMMDD or YYYY-MM-DD
 
 Global Flags:
@@ -740,10 +740,13 @@ Usage:
   mwosa login provider datago [flags]
 
 Flags:
-      -- string              enable datago securitiesProductPrice group
-      --base-url string      override datago API base URL
-  -h, --help                 help for datago
-      --service-key string   공공데이터포털 service key
+      --base-url string                  legacy override datago securitiesProductPrice API base URL
+      --etp-base-url string              override datago securitiesProductPrice API base URL
+      --etp-service-key string           공공데이터포털 securitiesProductPrice service key
+  -h, --help                             help for datago
+      --service-key string               legacy 공공데이터포털 service key for securitiesProductPrice
+      --stock-price-base-url string      override datago stockPrice API base URL
+      --stock-price-service-key string   공공데이터포털 stockPrice service key
 
 Global Flags:
       --config string            config file path
@@ -935,7 +938,7 @@ Usage:
 Flags:
       --as-of string           trading date to collect, YYYYMMDD or YYYY-MM-DD
   -h, --help                   help for daily
-      --security-type string   security type: etf, etn, elw (default "etf")
+      --security-type string   security type: stock, etf, etn, elw (default "etf")
 
 Global Flags:
       --config string            config file path
